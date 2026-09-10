@@ -198,7 +198,11 @@ export async function playLevelTwo(page, { wrongFirst = false, diagonal = 0, bud
          is normally followed by PHASE_RUN and the crossings still to be replaced; only
          when none remain does it lead to the run home. This loop answers the diagonal
          crossing and nothing after it, so it stops at either. */
-      if (s === 'PHASE_RUN' || s === 'FINAL_RUN' || s === 'COMPLETE') break;
+      /* Whatever it hands on TO. A Part 2 crossing is followed by the next Part 2
+         crossing (RUN_SEGMENT_2) while any are left, then by whatever remains of the
+         original journey (PHASE_RUN), and by the run home only when nothing else is
+         left. This loop answers ONE crossing, so it stops at any of them. */
+      if (s === 'RUN_SEGMENT_2' || s === 'PHASE_RUN' || s === 'FINAL_RUN' || s === 'COMPLETE') break;
       await new Promise(r => requestAnimationFrame(r));
     }
     const G = g.debug();

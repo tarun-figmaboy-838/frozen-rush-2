@@ -459,6 +459,31 @@ export const optionShapes = {
         "y": 0.23736
       }
     ]
+  },
+  "iceQuadrilateral": {
+    "image": "assets/option-shape/iceQuadrilateral.webp",
+    "sides": 4,
+    "regular": false,
+    "convex": true,
+    "aspect": 1.10631,
+    "points": [
+      {
+        "x": -0.7215,
+        "y": -0.90391
+      },
+      {
+        "x": 0.89414,
+        "y": -0.17264
+      },
+      {
+        "x": 0.99511,
+        "y": 0.90228
+      },
+      {
+        "x": -1,
+        "y": 0.6645
+      }
+    ]
   }
 };
 

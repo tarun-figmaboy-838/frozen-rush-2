@@ -56,7 +56,12 @@ const MAP = {
   irregularConvexOctagon:  'irregularOctagon.png',
   concavePentagon:         'concavePentagon.png',       // built
   concaveHexagon:          'concaveHexagon.png',        // built
-  concaveHeptagon:         'concaveHeptagon.png'
+  concaveHeptagon:         'concaveHeptagon.png',
+  /* PART 2's DRAWING SLAB, delivered as 1.png and renamed for what it measures as —
+     the way every other name in this table was arrived at (see the note above). Four
+     sides, irregular, convex, and therefore exactly two diagonals, which is the whole
+     subject of the level it belongs to. */
+  iceQuadrilateral:        'iceQuadrilateral.png'
 };
 
 /* What each id has to be, so a wrong picture cannot pass silently. */
@@ -68,7 +73,8 @@ const EXPECT = {
   irregularHexagon: [6, false, true], irregularConvexHexagon: [6, false, true],
   irregularConvexOctagon: [8, false, true],
   concavePentagon: [5, false, false], concaveHexagon: [6, false, false],
-  concaveHeptagon: [7, false, false]
+  concaveHeptagon: [7, false, false],
+  iceQuadrilateral: [4, false, true]
 };
 
 function contour(mask, W, H) {

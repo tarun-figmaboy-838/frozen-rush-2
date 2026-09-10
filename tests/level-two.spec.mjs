@@ -411,7 +411,7 @@ test.describe('Level 2 — the mend', () => {
     await enterLevelTwo(page);
     const r = await playLevelTwo(page, { budgetMs: 150_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state).toBe(false);
-    expect(['PHASE_RUN', 'FINAL_RUN', 'COMPLETE'], 'the crossing handed on').toContain(r.state);
+    expect(['RUN_SEGMENT_2', 'PHASE_RUN', 'FINAL_RUN', 'COMPLETE'], 'the crossing handed on').toContain(r.state);
     expect(r.trail.join(' '), 'the answer beat played').toContain('LEVEL_2_SUCCESS');
     expect(r.trail.join(' '), 'and the crossing celebrated').toContain('BRIDGE_2_COMPLETE');
     expect(jsErrors(errors), 'the game threw').toEqual([]);
@@ -422,7 +422,7 @@ test.describe('Level 2 — the mend', () => {
     await enterLevelTwo(page);
     const r = await playLevelTwo(page, { wrongFirst: true, budgetMs: 150_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state).toBe(false);
-    expect(['PHASE_RUN', 'FINAL_RUN', 'COMPLETE'], 'the crossing handed on').toContain(r.state);
+    expect(['RUN_SEGMENT_2', 'PHASE_RUN', 'FINAL_RUN', 'COMPLETE'], 'the crossing handed on').toContain(r.state);
     expect(r.trail.join(' ')).toContain('LEVEL_2_WRONG_FEEDBACK');
     expect(jsErrors(errors), 'the game threw').toEqual([]);
   });

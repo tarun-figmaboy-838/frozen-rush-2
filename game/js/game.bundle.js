@@ -79,6 +79,7 @@ const ASSET_V = {
   "assets/option-shape/concaveHeptagon.webp": "d943871c",
   "assets/option-shape/concaveHexagon.webp": "38aae90c",
   "assets/option-shape/concavePentagon.webp": "25cd2560",
+  "assets/option-shape/iceQuadrilateral.webp": "346a8175",
   "assets/option-shape/irregularConvexHexagon.webp": "34026be0",
   "assets/option-shape/irregularConvexOctagon.webp": "c9da4f1e",
   "assets/option-shape/irregularConvexPentagon.webp": "9d83d4f8",
@@ -856,6 +857,31 @@ const optionShapes = {
       {
         "x": -1,
         "y": 0.23736
+      }
+    ]
+  },
+  "iceQuadrilateral": {
+    "image": "assets/option-shape/iceQuadrilateral.webp",
+    "sides": 4,
+    "regular": false,
+    "convex": true,
+    "aspect": 1.10631,
+    "points": [
+      {
+        "x": -0.7215,
+        "y": -0.90391
+      },
+      {
+        "x": 0.89414,
+        "y": -0.17264
+      },
+      {
+        "x": 0.99511,
+        "y": 0.90228
+      },
+      {
+        "x": -1,
+        "y": 0.6645
       }
     ]
   }
@@ -1825,8 +1851,63 @@ const CFG = {
     /* Turn this off and the last mended crossing leads straight into the run home,
        exactly as it did while the level was parked. Nothing else has to change. */
     enabled: true,
+    /* ---- THE CROSSINGS, one per replaced level ----------------------------------
+     *
+     * Part 2 replaces the journey's crossings one at a time, so this is a list and not
+     * a single record. Everything ABOVE and BELOW is shared — the timings, the framing,
+     * how a wrong answer is punished — and only what makes a crossing itself different
+     * lives in here. `p2Cfg()` merges the two, so a new crossing is an entry and not a
+     * branch.
+     *
+     * `mechanic` is the whole of the difference:
+     *
+     *   cut-diagonal        drag ONE diagonal; the slab halves and the two halves
+     *                       bridge two crevasses.
+     *   draw-all-diagonals  draw EVERY diagonal; the slab is then solved and drops in
+     *                       whole to bridge one crevasse.
+     *
+     * WHY THE SECOND ONE DOES NOT SPLIT, since it is the obvious question. A
+     * quadrilateral has two diagonals and they CROSS, so drawing both cuts it into four
+     * triangles rather than two halves — and those four cannot bridge. Measured on this
+     * shape: the triangles' decks run 131 to 240px, so a slot sized for the narrowest
+     * leaves the widest overhanging by 47% against the 3% bearing everything else uses,
+     * and the only sizes where two such crevasses fit on the stage are ones where each
+     * is narrow enough to jump. There is no R that works. So the diagonals are the
+     * TASK, the solved slab is the bridge, and it keeps the lines drawn on it. */
+    levels: [
+      {
+        id: 1,
+        mechanic: 'cut-diagonal',
+        shape: 'regularHexagon',
+        /* 139: the only size at which two properly undercut crevasses (mouth = throat
+           x 1.6) are both wide enough to be unjumpable and still fit the row. */
+        hexR: 139,
+        ditches: 2,
+        instruction: 'Cut the shape along its diagonal.',
+        voId: 'p2-1-diagonal'
+      },
+      {
+        id: 2,
+        mechanic: 'draw-all-diagonals',
+        /* The delivered slab, traced off assets/option-shape/iceQuadrilateral.webp.
+           Four sides, so exactly two diagonals — the fewest any polygon has, and they
+           cross in the middle where both stay plainly visible. The first thing the
+           learner ever draws is therefore the whole answer rather than two of five. */
+        shape: 'iceQuadrilateral',
+        /* 140, and the cavity is what binds it. Seated on its longest side the slab is
+           223px tall against 234 of room, so anything past ~146 has to be shrunk to
+           fit — which the standing rule forbids. At 140 the deck is 281 and the hole
+           comes out at 422, over the 400 a jump would clear. */
+        hexR: 140,
+        ditches: 1,
+        instruction: 'Draw all the diagonals.',
+        voId: 'p2-2-diagonals'
+      }
+    ],
+
     /* The delivered block this level is about. Named, not inlined, so the art and the
-       geometry can only ever come from the same record. */
+       geometry can only ever come from the same record. Kept as the fallback for a
+       crossing that does not name its own. */
     shape: 'regularHexagon',
     /* 139, and it is the ONLY value that works once the crevasse is drawn properly.
        A hole's visible cut is its throat x 1.6 (see layoutLevelTwo), so the slab's
@@ -1914,7 +1995,9 @@ const CFG = {
     instructions: {
       corners: 'Connect two corners.',
       side: "That's a side — try a diagonal.",
-      shortDiagonal: 'Cut right across, corner to opposite corner.'
+      shortDiagonal: 'Cut right across, corner to opposite corner.',
+      // a real diagonal, drawn twice: not a mistake, so it is not treated as one
+      already: 'That one is done — find another.'
     },
     /* The recorded line for the question. Nothing is recorded under this id yet, so
        say() logs it and returns 0 and the level is simply silent — see the note in
@@ -6367,7 +6450,7 @@ function createGame(canvas, hooks = {}) {
        halves bridge; they are also in ground.gaps and in G.gapsThisPhase, so the
        collapse, the water, the pruning and the mended-piece renderer all reach them
        through the paths they already use. `level` is 1 until Level 2 opens. */
-    level: 1, l2: null, gapA: null, gapB: null,
+    level: 1, l2: null, gapA: null, gapB: null, p2i: 0,
     attempts: 0, idle: 0, hintUntil: 0, hint: null,
     /* oops stays on the state object and is now always false: the Ouch card it drove
        is gone (the crash recovers by itself — see OBSTACLE_HIT). It is left here, and
@@ -6698,9 +6781,11 @@ function createGame(canvas, hooks = {}) {
         /* THE QUESTION ARRIVES WITH THE MOVE, not before it. It is put up here rather
            than in the overview so the sentence and the slab travelling to the middle are
            one event — the thing lights up, comes forward, and is asked about. */
-        G.instruction = (CFG.levels[1] && CFG.levels[1].instruction) || '';
+        /* From the crossing being played, not from a fixed sentence — Part 2 has more
+           than one crossing now and each asks its own question. */
+        G.instruction = p2Cfg().instruction || '';
         armInstruction(T.instructionHold);
-        if (L2.voId) G.voDur = audio.say(L2.voId) || 0;
+        { const vo = p2Cfg().voId; if (vo) G.voDur = audio.say(vo) || 0; }
         break;
       case 'LEVEL_2_ACTIVE': G.idle = 0; G.idleHand = 0; if (!G.l2) buildLevel2(); break;
       case 'LEVEL_2_WRONG_FEEDBACK': break;
@@ -6858,7 +6943,8 @@ function createGame(canvas, hooks = {}) {
     // the puzzle is about to ask about, and every one is far too wide to jump.
     G.phaseLayout = level === 2 ? layoutLevelTwo(targetWorldX) : layoutPhase(targetWorldX);
     G.gapsThisPhase = G.phaseLayout.gaps;
-    if (level === 2) { G.gapA = G.phaseLayout.gaps[0]; G.gapB = G.phaseLayout.gaps[1]; }
+    // gapB is null for a one-hole crossing; everything downstream guards on it
+    if (level === 2) { G.gapA = G.phaseLayout.gaps[0]; G.gapB = G.phaseLayout.gaps[1] || null; }
     mammoth.setState('RUN');
   }
   function updateBreak(dt) {
@@ -8791,12 +8877,26 @@ function createGame(canvas, hooks = {}) {
          crossing one; the crossings still to be replaced follow it, starting at phase
          index 0. When the last of them has been replaced this becomes the run home
          on its own — `phases` being empty is the end of the list, not a special case. */
+      /* ON TO THE NEXT REPLACED CROSSING, and only then to what is left of the old
+         journey. Part 2's crossings run in order at the front — crossing 1 is the
+         diagonal cut, crossing 2 draws all of them — and the six original crossings
+         that have not been replaced yet follow behind. When the last replacement lands
+         this simply stops finding a next one and hands over, so nothing here has to
+         change as the list grows. */
       case 'BRIDGE_2_COMPLETE':
         if (G.st > T.celebrate) {
           G.l2 = null; G.gapsThisPhase = null; G.gapA = null; G.gapB = null;
-          G.phasesDone = Math.max(G.phasesDone, 1);
-          G.phase = 0;
-          setState(L1.phases.length ? 'PHASE_RUN' : 'FINAL_RUN');
+          G.p2i = (G.p2i || 0) + 1;
+          G.phasesDone = Math.max(G.phasesDone, G.p2i);
+          if (G.p2i < p2Count()) {
+            // another Part 2 crossing: run to it exactly as the journey runs to any other
+            G.moving = true; G.jumpEnabled = true; G.speedFactor = 1;
+            mammoth.setState('RUN');
+            setState('RUN_SEGMENT_2');
+          } else {
+            G.phase = 0;
+            setState(L1.phases.length ? 'PHASE_RUN' : 'FINAL_RUN');
+          }
         }
         break;
       case 'PHASE_INTRO':
@@ -10142,6 +10242,20 @@ function createGame(canvas, hooks = {}) {
     ctx.scale(kk * (1 + sq * 0.03), kk * (1 - sq * 0.05));
     // rim divided by the seating scale, so it matches a hanging chunk on screen
     paintGlacierChunk(ctx, p, true, 1 / kk);
+    /* SCORE LINES, where a plug carries them. Only Part 2's draw-all-diagonals
+       crossing sets these: the slab bridges whole, and the diagonals the learner drew
+       stay cut into it once it is the path. Guarded, so every Part 1 plug is untouched. */
+    if (p.marks) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const [a, b] of p.marks) {
+        ctx.strokeStyle = 'rgba(20,70,120,0.6)'; ctx.lineWidth = 7 / kk;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2.5 / kk;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      ctx.restore();
+    }
     ctx.restore();
 
     // while it is still growing, frost blooms along the leading edges
@@ -10436,6 +10550,20 @@ function createGame(canvas, hooks = {}) {
        has three right answers (the three main diagonals) and never points at one. */
   const L2 = CFG.levelTwo;
 
+  /* THE CROSSING BEING PLAYED, shared settings merged with its own.
+     G.p2i indexes CFG.levelTwo.levels. Everything that is the same for every Part 2
+     crossing — the timings, the framing, what a wrong answer costs — is written once
+     on L2; only the shape, its size, how many holes and what is being asked live on
+     the entry. Read through here and nowhere else, so adding a crossing stays a matter
+     of adding data. */
+  function p2Cfg() {
+    const list = L2.levels || [];
+    const cur = list[clamp(G.p2i || 0, 0, Math.max(0, list.length - 1))] || {};
+    return Object.assign({}, L2, cur);
+  }
+  /** How many crossings Part 2 has replaced so far. */
+  function p2Count() { return (L2.levels || []).length; }
+
   /* THE SLAB'S GEOMETRY, AND IT COMES OFF THE PICTURE.
 
      option-shapes.js is generated by tracing the delivered artwork, so this ring is the
@@ -10454,14 +10582,15 @@ function createGame(canvas, hooks = {}) {
      a picture sitting thirteen pixels off its own outline. There is no rotation here
      (the slab hangs as drawn), so the whole transform is the centring and the scale. */
   function cutShapeAndArt() {
-    const rec = optionShapes[L2.shape];
+    const C = p2Cfg();
+    const rec = optionShapes[C.shape];
     const raw = rec ? rec.points : regularHexagon(1);
-    const R = L2.hexR;
+    const R = C.hexR;
     const b = polyBounds(raw);
     const c = { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 };
     return {
       pts: raw.map(p => ({ x: (p.x - c.x) * R, y: (p.y - c.y) * R })),
-      art: rec ? { id: L2.shape, rot: 0, scale: R, off: { x: c.x * R, y: c.y * R },
+      art: rec ? { id: C.shape, rot: 0, scale: R, off: { x: c.x * R, y: c.y * R },
                    box: { x: b.x0, y: b.y0, w: b.w, h: b.h } } : null
     };
   }
@@ -10477,13 +10606,25 @@ function createGame(canvas, hooks = {}) {
   function minMainCut() {
     const pts = cutRing();
     const n = pts.length;
+    /* A CROSSING THAT IS NOT SPLIT IS BRIDGED BY THE WHOLE SLAB, so what has to span
+       the hole is its DECK — the longest side, the edge it comes to rest on — and not
+       a diagonal it is never cut along. Sizing this one from a diagonal would cut a
+       hole the slab could not reach across. */
+    if (p2Cfg().mechanic === 'draw-all-diagonals') {
+      let longest = 0;
+      for (let i = 0; i < n; i++) {
+        const a = pts[i], b = pts[(i + 1) % n];
+        longest = Math.max(longest, Math.hypot(b.x - a.x, b.y - a.y));
+      }
+      return longest;
+    }
     let m = Infinity;
     for (let i = 0; i < n; i++) {
       const j = i + n / 2;
       if (!Number.isInteger(j) || j >= n) continue;      // odd n has no "opposite" corner
       m = Math.min(m, Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y));
     }
-    return Number.isFinite(m) ? m : 2 * L2.hexR;
+    return Number.isFinite(m) ? m : 2 * p2Cfg().hexR;
   }
 
   /* THE TWO CREVASSES, cut to the halves that will bridge them.
@@ -10507,9 +10648,11 @@ function createGame(canvas, hooks = {}) {
      is why hexR is 139 — that is the only size at which two flared crevasses wide enough
      to be unjumpable still fit between the character and the right edge. */
   function layoutLevelTwo(originX) {
+    const C = p2Cfg();
+    const n = Math.max(1, Math.min(2, C.ditches || 2));      // one hole or two
     const throatW = Math.round(minMainCut() * (1 - 2 * L2.bearing));
     const gapW = Math.round(throatW * (L1.mouth || 1));      // the visible cut: the MOUTH
-    const groupW = gapW * 2 + L2.ditchGap;
+    const groupW = gapW * n + L2.ditchGap * (n - 1);
     const rowMid = (CFG.mammothX + L1.clearOfPlayer + (CFG.W - 60)) / 2;
     const lead = clamp(
       Math.max(Math.round(rowMid - groupW / 2), CFG.mammothX + L1.clearance),
@@ -10524,7 +10667,7 @@ function createGame(canvas, hooks = {}) {
        is supposed to be standing on — the same correction layoutPhase makes. */
     const ins0 = (gapW - throatW) / 2;
     let x = originX + lead - ins0;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < n; i++) {
       /* The record is Level 1's, field for field, because everything downstream reads
          it: ground.drawDitch paints the undercut and the water, drawCracks runs the
          crack across it, updateBreak opens it, the pruner keeps it alive while it is
@@ -10550,17 +10693,24 @@ function createGame(canvas, hooks = {}) {
      it is balanced on, which is the picture the level opens with: plainly too big for
      where it is, and exactly the right size for the two holes either side. */
   function buildLevel2(keepScore) {
-    if (!G.gapA || !G.gapB) return;
+    if (!G.gapA) return;
     if (!keepScore) { G.attempts = 0; }
     G.idle = 0;
-    const R = L2.hexR;
+    const C = p2Cfg();
+    const R = C.hexR;
     const { pts, art } = cutShapeAndArt();
     /* IT SITS ON THE PILLAR, ON ITS OWN FEET. The rest height is measured off the ring
        rather than assumed from R — the traced outline is not symmetric, so half its
        drawn height is not half its width, and a fixed drop left it either buried in the
        ice or hovering above it. */
     const b = polyBounds(pts);
-    const cx = (G.gapA.x1 + G.gapB.x0) / 2 - G.worldX;
+    /* WHERE IT STANDS. With two holes it balances on the pillar between them, plainly
+       too big for what it is on and exactly right for the pair either side. With one
+       hole there is no pillar, so it stands over the hole itself — the thing it is
+       about to become the bridge for. */
+    const cx = G.gapB
+      ? (G.gapA.x1 + G.gapB.x0) / 2 - G.worldX
+      : (G.gapA.x0 + G.gapA.x1) / 2 - G.worldX;
     const cy = CFG.surfaceY - b.y1 - L2.homeLift;
     G.l2 = {
       R, pts, art,
@@ -10573,6 +10723,13 @@ function createGame(canvas, hooks = {}) {
          glow and a small swell in place. Separate from `focusT` (the travel to centre)
          so the two read as two beats — noticed, then picked up — rather than one move. */
       pop: 0, glow: 0,
+      /* THE DIAGONALS ALREADY DRAWN, for the draw-all-diagonals crossing. Keyed
+         "lo-hi" so A-B and B-A are the same line and cannot be counted twice —
+         which is the whole of the "every diagonal, once" rule. `need` is how many
+         the shape actually has, computed from its corner count rather than written
+         down: n(n-3)/2, which is 2 for a quadrilateral and 9 for a hexagon. */
+      drawn: [], need: (pts.length * (pts.length - 3)) / 2,
+      mechanic: C.mechanic || 'cut-diagonal',
       /* THE FALL, when a wrong cut tips it into the river, and the replacement coming
          down behind it. Both null in the ordinary case; see loseSlab(). */
       fall: null, respawn: 0
@@ -10679,8 +10836,50 @@ function createGame(canvas, hooks = {}) {
       return rejectCut('corners', L.dragStart, { x: e.x, y: e.y });
     }
     const pts = hexScreenPts();
+    const n = L.pts.length;
     // a side: two corners, but next-door ones. This is the misunderstanding the level exists for
-    if (!PolygonCutManager.isDiagonal(6, i, j)) return rejectCut('side', pts[i], pts[j]);
+    if (!PolygonCutManager.isDiagonal(n, i, j)) return rejectCut('side', pts[i], pts[j]);
+
+    /* ---- DRAW ALL THE DIAGONALS ----
+       Every diagonal counts, none counts twice, and nothing is cut until they are all
+       there. A repeat is not a mistake — the learner has drawn a real diagonal and
+       simply drawn it already — so it gets its own gentle line and, unlike a side, it
+       never costs them the slab. */
+    if (L.mechanic === 'draw-all-diagonals') {
+      const key = Math.min(i, j) + '-' + Math.max(i, j);
+      if (L.drawn.includes(key)) return rejectCut('already', pts[i], pts[j]);
+      L.drawn.push(key);
+      particles.chips((pts[i].x + pts[j].x) / 2, (pts[i].y + pts[j].y) / 2, 4, -120);
+      L.cornerPulse = 0.8;
+      if (L.drawn.length < L.need) {
+        audio.ui();                 // one down, and the shape stays open
+        return;
+      }
+      /* ALL OF THEM, so the shape is solved and becomes the bridge WHOLE — see the note
+         on `mechanic` in CFG for why it is not split: its two diagonals cross, and the
+         four triangles that leaves cannot span anything. The lines stay drawn on it. */
+      L.solved = true;
+      const whole = PolygonCutManager.toPiece(L.pts.map(p => ({ x: p.x, y: p.y })));
+      whole.cx = whole.x; whole.cy = whole.y;
+      whole.sep = { x: 0, y: 0 };
+      whole.rotTarget = 0; whole.offset = 0; whole.rot = 0; whole.scale = L.scale;
+      whole.art = L.art ? Object.assign({}, L.art, {
+        off: { x: L.art.off.x + whole.x, y: L.art.off.y + whole.y }
+      }) : null;
+      // the diagonals travel with it, in the piece's own frame
+      whole.marks = L.drawn.map(k => {
+        const [a, b] = k.split('-').map(Number);
+        return [{ x: L.pts[a].x - whole.cx, y: L.pts[a].y - whole.cy },
+                { x: L.pts[b].x - whole.cx, y: L.pts[b].y - whole.cy }];
+      });
+      L.pieces = [whole];
+      audio.crack();
+      hitStop(CFG.juice.stopHit * 0.6);
+      punch(CFG.juice.punchHit * 0.7, 280, L.pos.x, L.pos.y);
+      setState('LEVEL_2_SUCCESS');
+      return;
+    }
+
     /* A SHORT DIAGONAL IS A DIAGONAL, and is not called wrong. It cuts a triangle off
        and leaves a five-sided piece half again as tall as the cavity under the walking
        line, so it cannot bridge — but the learner has understood what a diagonal is and
@@ -10725,7 +10924,8 @@ function createGame(canvas, hooks = {}) {
      slab in half; which half goes where is not a second question. */
   function planFlight() {
     const L = G.l2;
-    const gaps = [G.gapA, G.gapB];
+    // one hole or two; a solved whole slab has one piece and goes to the only hole
+    const gaps = [G.gapA, G.gapB].filter(Boolean);
     const order = L.pieces.slice().sort((a, b) => a.x - b.x);
     order.forEach((pc, idx) => {
       const g = gaps[idx];
@@ -10967,8 +11167,14 @@ function createGame(canvas, hooks = {}) {
           off: { x: pc.art.off.x * cs - pc.art.off.y * sn,
                  y: pc.art.off.x * sn + pc.art.off.y * cs }
         }) : null;
+        /* The drawn diagonals, turned with the piece so they stay on the ice the
+           learner scored. Same rotation as the artwork above, for the same reason. */
+        const marks = pc.marks ? pc.marks.map(([p, q]) => [
+          { x: p.x * cs - p.y * sn, y: p.x * sn + p.y * cs },
+          { x: q.x * cs - q.y * sn, y: q.x * sn + q.y * cs }
+        ]) : null;
         g.pieces.push({
-          kind: 'half', pts: pc.seatPts, seed: (pc.local.length * 131) | 0, art,
+          kind: 'half', pts: pc.seatPts, seed: (pc.local.length * 131) | 0, art, marks,
           topLocal: sb.y0, rot0: 0, rot: 0,
           grow: 0, fit: pc.fit || 1, impact: 1,
           /* SEATED ON THE NECK, not on the middle of the void. The mouth is 1.6x wider
@@ -11011,6 +11217,23 @@ function createGame(canvas, hooks = {}) {
     ctx.scale(pc.scale || 1, pc.scale || 1);
     if (pc.art) paintGlacierChunk(ctx, { pts: pc.local, art: pc.art, seed: 13 }, false, 1 / (pc.scale || 1));
     else paintIce(ctx, pc.local, ICE_PIECE);
+    /* THE LINES THE LEARNER DREW, carried into the flight. On the draw-all-diagonals
+       crossing the slab goes in whole, so without these the diagonals would vanish at
+       the exact moment they paid off — and the child would watch a plain block drop
+       into a hole with no sign that their work is what did it. Stored in the piece's
+       own frame, so they travel, turn and shrink with it. */
+    if (pc.marks) {
+      const inv = 1 / (pc.scale || 1);
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const [a, b] of pc.marks) {
+        ctx.strokeStyle = 'rgba(20,70,120,0.75)'; ctx.lineWidth = 8 * inv;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3 * inv;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      ctx.restore();
+    }
     ctx.restore();
   }
 
@@ -11160,6 +11383,28 @@ function createGame(canvas, hooks = {}) {
       }
     }
 
+    /* THE DIAGONALS ALREADY DRAWN. They stay on the slab for the rest of the level —
+       that is the whole feedback of "draw ALL the diagonals": the learner can see what
+       they have and work out what is missing, instead of holding it in their head. Cut
+       into the ice rather than laid over it: a dark score with a bright highlight under
+       it, which is how the crack on the block itself is drawn. */
+    if (L.drawn && L.drawn.length) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const key of L.drawn) {
+        const [a, b] = key.split('-').map(Number);
+        const p = pts[a], q = pts[b];
+        if (!p || !q) continue;
+        ctx.strokeStyle = 'rgba(20,70,120,0.8)';
+        ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // the line being drawn, following the finger
     if (L.dragPt && L.dragStart) {
       ctx.save();
@@ -11223,7 +11468,7 @@ function createGame(canvas, hooks = {}) {
     G.speedFactor = 1; G.shake = 0; G.shakeT = 0; G.moving = true;
     G.instruction = ''; G.jumpEnabled = false;
     G.complete = false; G.l1 = null; G.attempts = 0; G.idle = 0;
-    G.level = 1; G.l2 = null; G.gapA = null; G.gapB = null;
+    G.level = 1; G.l2 = null; G.gapA = null; G.gapB = null; G.p2i = 0;
     G.phase = 0; G.phasesDone = 0; G.gapsThisPhase = null; G.phaseLayout = null; G.phaseJumped = false;
     G.oops = false; G.hitFx = 0; G.hitObstacle = null; G.hitReturn = null; G.hitCount = 0;
     G.handHint = null; G.idleHand = 0; G.dropReady = false; G.introT = 0; G.stageBeat = 0; G.signSay = ''; G.saidQuestion = '';

@@ -61,6 +61,7 @@ export const ASSET_V = {
   "assets/option-shape/concaveHeptagon.webp": "d943871c",
   "assets/option-shape/concaveHexagon.webp": "38aae90c",
   "assets/option-shape/concavePentagon.webp": "25cd2560",
+  "assets/option-shape/iceQuadrilateral.webp": "346a8175",
   "assets/option-shape/irregularConvexHexagon.webp": "34026be0",
   "assets/option-shape/irregularConvexOctagon.webp": "c9da4f1e",
   "assets/option-shape/irregularConvexPentagon.webp": "9d83d4f8",
