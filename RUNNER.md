@@ -165,7 +165,9 @@ Saying so would remove the thing the learner is meant to work out.
 ## 4. What shapes are available
 
 ### The verified registry — where a brief should get its shapes
-[game/js/polygons.js](game/js/polygons.js) holds **fourteen verified geometries**, and it
+[game/js/polygons.js](game/js/polygons.js) holds **fifteen verified geometries** (the
+fourteen Part 1 uses, plus `iceQuadrilateral` traced off the delivered slab for Part 2
+level 1 — see §16), and it
 is the authority. `PolygonFactory` in `engine.js` asks it for vertices by name, so there
 is exactly one definition of each and the runner holds no copy:
 

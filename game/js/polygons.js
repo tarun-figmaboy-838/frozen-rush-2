@@ -100,6 +100,22 @@ export const polygonDefinitions = {
     { x: -1.00, y: -0.28 }
   ] },
 
+  /* PART 2, LEVEL 1 — and its coordinates are TRACED FROM THE DELIVERED ART rather
+     than invented. The slab in assets/option-shape/1.png is an irregular quadrilateral
+     leaning back in perspective, and level 1 asks the learner to draw its diagonals ON
+     it: the corner handles have to sit exactly where the picture's corners are, or the
+     child aims at a painted corner and misses the hit target beside it.
+
+     Four sides, no two the same (46% spread), all four corners turning the same way —
+     so it has exactly two diagonals, which is the smallest number that still shows what
+     a diagonal IS, and they cross in the middle where both are plainly visible. */
+  iceQuadrilateral: { points: [
+    { x: -0.695, y: -0.893 },
+    { x:  0.887, y: -0.179 },
+    { x:  0.990, y:  0.872 },
+    { x: -0.967, y:  0.644 }
+  ] },
+
   /* Five sides with one corner folded inward. The indentation is deep enough to be
      obvious and shallow enough that no two sides cross: a self-crossing outline stops
      being a pentagon at all. */
@@ -146,6 +162,7 @@ export const polygonMetadata = {
   regularHexagon:          { sides: 6, regular: true,  convex: true },
   regularHeptagon:         { sides: 7, regular: true,  convex: true },
   regularOctagon:          { sides: 8, regular: true,  convex: true },
+  iceQuadrilateral:        { sides: 4, regular: false, convex: true },
   irregularPentagon:       { sides: 5, regular: false, convex: true },
   irregularConvexPentagon: { sides: 5, regular: false, convex: true },
   irregularHexagon:        { sides: 6, regular: false, convex: true },
