@@ -493,6 +493,16 @@ export const CFG = {
        trigger: about 2.4 s of running, the rock visibly approaching, then "Watch out!".
        The journey feel now lives AFTER the tutorial (CFG.obstacle.leadS). postJump1 is the
        recovery after the first rock, before the first crevasse. */
+    /* THE AVALANCHE THAT OPENS THE GAME. PLAY hands over to this before the run: a wall
+       of snow comes down the pass behind Momo, he bolts, and once it has spent itself
+       the tutorial starts. It is the reason he is running — the game never had one —
+       and it is over in a little under four seconds, which is long enough to read as an
+       event and short enough that a child replaying is not made to sit through a film.
+
+       roar   the low build before anything is visible: the ground shakes, snow lifts.
+       sweep  the wall crossing the screen, left to right, with Momo running ahead.
+       settle the dust falling out, the rumble dying, Momo easing back to his stride. */
+    avalancheRoar: 900, avalancheSweep: 1900, avalancheSettle: 1000,
     run1: 1400, postJump1: 4200, run2: 2600, postJump2: 1900,
     /* breakSkid is the whole stop, and it is now 2300 rather than 920 because the skid
        sheet is 36 frames mapped across it: at 920ms those played at 46fps and the
@@ -785,71 +795,91 @@ export const CFG = {
          `tutorial: true` went with it. The tutorial's cut lesson now teaches the
          diagonal drag, because that is what crossing 1 asks for — see tutorial.js. */
 
-      { id: 2, ditches: 1, options: 3,
-        targets: ['regularQuadrilateral'],
-        distractors: ['regularTriangle', 'regularPentagon'],
-        rotate: 0, swing: 0,
-        instruction: 'Cut the quadrilateral.' },
-
-      { id: 3, ditches: 1, options: 3,
-        targets: ['regularPentagon'],
-        distractors: ['regularTriangle', 'regularOctagon'],
-        rotate: 0, swing: 0,
-        instruction: 'Cut the pentagon.' },
-
-      /* regularPentagon -> irregularPentagon closes a leak. The target here is an
-         IRREGULAR hexagon, and with two regular distractors it was the only irregular
-         shape in the row — so "cut the wonky one" passed this phase every time, without
-         counting a single side. Phase 4 is the phase that introduces irregular shapes,
-         so that shortcut defeated the exact lesson it exists to teach. An irregular
-         distractor means irregularity no longer separates the answer from the rest and
-         only the side count can. */
+      /* ---- 4-9: WHICH SHAPE, chosen from the ropes ----------------------------
+       *
+       * From here the question changes from "work with this slab" to "which of these".
+       * The mechanic is the one Part 1 shipped — ropes over a crossing, a swipe to cut,
+       * the piece drops and wedges — and only the RULE that decides an answer is new:
+       * Part 1 asked how many sides, and these ask whether a shape is dented.
+       *
+       * THE SEVEN ORIGINAL CROSSINGS ARE GONE. They taught side-counting, which Part 2
+       * replaces; keeping them would have made an eleven-crossing journey asking two
+       * unrelated questions. Their ids are not reused either — 4 to 9 here are the
+       * level numbers the design names, so the sentence a child sees and the id in this
+       * file agree, and jumpBefore and the tests read the same numbers as the brief.
+       *
+       * EVERY ROW IS BUILT SO ONLY THE STATED PROPERTY DECIDES IT. In 6 and 7 that
+       * means including a shape with the right property but the wrong side count AND
+       * one with the right count but the wrong property, so neither half of the
+       * question can be skipped. It is the easiest thing here to break with a careless
+       * swap, and nothing in the suite would catch it but the curriculum test. */
       { id: 4, ditches: 1, options: 3,
-        targets: ['irregularConvexHexagon'],
-        distractors: ['irregularPentagon', 'regularHeptagon'],
+        targets: ['concaveHexagon'],
+        /* Five, six and seven sides across the row, so counting cannot answer it and
+           only the dent can. */
+        distractors: ['regularPentagon', 'regularHeptagon'],
         rotate: 0, swing: 0,
-        instruction: 'Cut the hexagon.' },
+        instruction: 'Cut the concave polygon.',
+        sub: 'Choose the polygon that is concave.' },
 
-      /* irregularConvexHexagon -> concaveHexagon, for the same reason one phase up.
-         The target is a CONCAVE heptagon and both distractors were convex, so it was
-         the only concave shape in the row and "cut the dented one" always worked. A
-         concave distractor puts the decision back on 7 against 6 and 8. */
+      /* The mirror, and it matters that it comes second: having found the dented one,
+         the learner now has to find the one that is NOT. Two concave distractors, so
+         the odd one out is the answer here and was a distractor last time. */
       { id: 5, ditches: 1, options: 3,
-        targets: ['concaveHeptagon'],
-        distractors: ['concaveHexagon', 'irregularConvexOctagon'],
+        targets: ['regularHexagon'],
+        distractors: ['concavePentagon', 'concaveHeptagon'],
         rotate: 0, swing: 0,
-        instruction: 'Cut the heptagon.' },
+        instruction: 'Cut the convex polygon.',
+        sub: 'Choose the polygon that is convex.' },
 
-      /* TWO crevasses, and the reason it was once reduced to one no longer holds.
-
-         It was changed to a single crevasse because three answers over two holes split
-         2 and 1, and back then a plug was scaled so its width filled its SLOT — so one
-         hole got two 215px plugs and the other a single 430px one, the same phase
-         showing pieces of two different sizes for no reason a learner could see.
-
-         A plug's size now comes from the CAVITY DEPTH and not from its slot width, so
-         every plug is the same size however the slots are shared out. Two crevasses
-         also widen the option row — the row is centred on the crevasse group, so a
-         wider group means bigger, more countable shapes (a six-option chunk goes from
-         127px to 142px).
-
-         Three answers over two holes is the most the stage geometry allows; three
-         separate unjumpable crevasses do not fit. Which answer lands in which hole is
-         still not fixed: any wanted shape takes whichever free slot is nearest the cut. */
-      { id: 6, ditches: 2, options: 5,
-        targets: ['regularPentagon', 'irregularConvexPentagon', 'concavePentagon'],
-        /* irregularHexagon -> concaveHexagon. Both distractors were convex while one
-           of the three targets is a concave pentagon, so concavity identified one of
-           the three answers for free. A concave distractor removes that. */
-        distractors: ['concaveHexagon', 'regularQuadrilateral'],
+      /* TWO ANSWERS, and two properties at once. Both concave pentagons are wanted; the
+         distractors are a pentagon that is convex and a concave shape that is not a
+         pentagon, so neither "the dented ones" nor "the five-sided ones" is enough on
+         its own. concavePentagon2 exists for this level — the delivered set had one
+         concave pentagon, and a question with a single answer could be passed by
+         finding the one dent rather than by checking two things. */
+      { id: 6, ditches: 1, options: 4,
+        targets: ['concavePentagon', 'concavePentagon2'],
+        distractors: ['regularPentagon', 'concaveHeptagon'],
         rotate: 0, swing: 0,
-        instruction: 'Cut all the pentagons.' },
+        instruction: 'Cut the concave pentagon.',
+        /* THE SUB-LINE CARRIES THE COUNT. The instruction is the owner's wording and
+           is singular; this level wants BOTH concave pentagons, and a child told to cut
+           'the' one would cut one and wait. The second line is where that is said, so
+           the headline stays as specified and the question is still answerable. */
+        sub: 'Choose both polygons that are concave pentagons.' },
 
-      { id: 7, ditches: 2, options: 6,
-        targets: ['irregularConvexHexagon', 'concaveHexagon', 'regularHexagon'],
-        distractors: ['concaveHeptagon', 'irregularPentagon', 'regularOctagon'],
+      /* The same double condition the other way up: a convex non-hexagon and a concave
+         hexagon sit against the two convex hexagons. */
+      { id: 7, ditches: 1, options: 4,
+        targets: ['regularHexagon', 'irregularConvexHexagon'],
+        distractors: ['regularPentagon', 'concaveHexagon'],
         rotate: 0, swing: 0,
-        instruction: 'Cut all the hexagons.' }
+        instruction: 'Cut the convex hexagon.',
+        // two answers here as well; see the note on level 6
+        sub: 'Choose both polygons that are convex hexagons.' },
+
+      /* EVERY shape that matches, which Part 1's machinery already does: the crossing
+         stays open until all three are cut, in any order, and none can be counted
+         twice. All three concave geometries are answers here — the whole set — which is
+         what makes this the level that proves the learner can find a dent rather than
+         remember one. */
+      { id: 8, ditches: 2, options: 6,
+        targets: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
+        distractors: ['regularPentagon', 'irregularConvexHexagon', 'regularOctagon'],
+        rotate: 0, swing: 0,
+        instruction: 'Cut all the concave polygons.',
+        sub: 'Choose all the polygons that are concave.' },
+
+      /* The last, and the widest: three convex answers spread across a triangle, a
+         quadrilateral and an octagon, so the property is plainly not about size or side
+         count, against all three concave shapes. */
+      { id: 9, ditches: 2, options: 6,
+        targets: ['regularTriangle', 'regularQuadrilateral', 'regularOctagon'],
+        distractors: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
+        rotate: 0, swing: 0,
+        instruction: 'Cut all the convex polygons.',
+        sub: 'Choose all the polygons that are convex.' }
     ],
     // which phases are preceded by a rock to jump, so it never becomes every phase
     /* WHICH PHASES GET A ROCK STRETCH BEFORE THEM, and there are more of them now:
@@ -858,7 +888,10 @@ export const CFG = {
        the curve that was asked for. Phase 1 has none: the tutorial teaches the jump on
        a single rock before any phase, and stacking a stretch in front of the first
        puzzle as well would put two rock runs back to back before any cutting. */
-    jumpBefore: [2, 3, 4, 5, 6, 7],
+    /* THE ROPE CROSSINGS ARE 4 TO 9 NOW, so these are their ids. Not 5 to 9: the first
+       of them still gets a rock, because Part 2's three drawing crossings come before
+       it and a stretch of running is what separates one kind of question from the next. */
+    jumpBefore: [4, 5, 6, 7, 8, 9],
     /* One entry per phase. A different phase count moves this array with it, and
        nothing else: every other per-phase number is inside the phase itself. */
     /* HOW LONG THE MAMMOTH RUNS before each crevasse. Roughly tripled from
@@ -964,14 +997,19 @@ export const CFG = {
      *   draw-all-diagonals  draw EVERY diagonal; the slab is then solved and drops in
      *                       whole to bridge one crevasse.
      *
-     * WHY THE SECOND ONE DOES NOT SPLIT, since it is the obvious question. A
-     * quadrilateral has two diagonals and they CROSS, so drawing both cuts it into four
-     * triangles rather than two halves — and those four cannot bridge. Measured on this
-     * shape: the triangles' decks run 131 to 240px, so a slot sized for the narrowest
-     * leaves the widest overhanging by 47% against the 3% bearing everything else uses,
-     * and the only sizes where two such crevasses fit on the stage are ones where each
-     * is narrow enough to jump. There is no R that works. So the diagonals are the
-     * TASK, the solved slab is the bridge, and it keeps the lines drawn on it. */
+     * THE DITCH IS CUT TO HOLD WHAT THE CUT MAKES, in both cases, and that is the rule
+     * that decides how many holes a crossing opens. One diagonal of a hexagon makes two
+     * halves, so crossing 1 opens two crevasses and each half bridges one. Both
+     * diagonals of a quadrilateral CROSS, so crossing 2 makes four triangles — and four
+     * crevasses will not fit a 1920 stage, so it opens ONE wide crevasse divided into
+     * four slots and the pieces come down side by side to floor it.
+     *
+     * That second arrangement was nearly got wrong. Four triangles across TWO crevasses
+     * genuinely is impossible here: their decks run 103 to 191px, so a slot cut for the
+     * narrowest leaves the widest overhanging by half, and every size at which two such
+     * crevasses fit is a size narrow enough to jump. One wide crevasse with a slot per
+     * piece has none of those problems — each slot is cut to its OWN triangle, so every
+     * piece meets its neighbours edge to edge and the four together are the floor. */
     levels: [
       {
         id: 1,
@@ -981,6 +1019,7 @@ export const CFG = {
            x 1.6) are both wide enough to be unjumpable and still fit the row. */
         hexR: 139,
         ditches: 2,
+        focusK: 2.79,
         instruction: 'Cut the shape along its diagonal.',
         voId: 'p2-1-diagonal'
       },
@@ -992,14 +1031,54 @@ export const CFG = {
            cross in the middle where both stay plainly visible. The first thing the
            learner ever draws is therefore the whole answer rather than two of five. */
         shape: 'iceQuadrilateral',
-        /* 140, and the cavity is what binds it. Seated on its longest side the slab is
-           223px tall against 234 of room, so anything past ~146 has to be shrunk to
-           fit — which the standing rule forbids. At 140 the deck is 281 and the hole
-           comes out at 422, over the 400 a jump would clear. */
-        hexR: 140,
+        /* 95, and it is the FOUR PIECES that set it. Both diagonals cross, so the slab
+           comes apart into four triangles whose decks total 614px; the crevasse is cut
+           to hold all four, which makes its mouth 923 and puts the far lip at 1823 —
+           just inside the 1860 the stage allows. Past about 100 the far lip runs off
+           the right of the screen; below about 55 the mouth stops being unjumpable. */
+        /* 80, not 95. The slab now RESTS on the far lip rather than hovering over the
+           hole, so the crossing has to leave room for it on the ice beyond: at 95 the
+           mouth is 923 and the slab lands past the right edge of the stage. At 80 the
+           mouth is 778, the far lip 1684, and the slab sits comfortably on the path. */
+        hexR: 80,
         ditches: 1,
+        /* Four slots in the one crevasse: a piece each, so they meet edge to edge and
+           the four together are the floor. layoutLevelTwo cuts each to its own triangle
+           rather than to a shared width — they are 103 to 191px and a common size would
+           leave the widest overhanging by half. */
+        slots: 4,
+        /* Bigger than crossing 1's, because the slab itself is smaller: at rest it is
+           190px against the hexagon's 278, so the same on-screen working size needs a
+           larger multiplier. 3.7 puts it at about 700 across. */
+        focusK: 4.5,
         instruction: 'Draw all the diagonals.',
         voId: 'p2-2-diagonals'
+      },
+      {
+        id: 3,
+        /* THE SAME IDEA, NARROWED TO ONE CORNER. Two diagonals is not the whole of the
+           question — they must both start at the SAME corner, which is the first time
+           the learner has to hold a constraint while drawing rather than just produce
+           valid lines.
+           A PENTAGON, and that choice is load-bearing: it has five diagonals but only
+           two from any one corner, so drawing two valid diagonals from DIFFERENT
+           corners is the reasonable mistake this level exists to catch. A quadrilateral
+           could not pose the question at all — its two diagonals never share a corner. */
+        mechanic: 'same-vertex-diagonals',
+        shape: 'regularPentagon',
+        /* THREE PIECES. Two diagonals from one corner fan the pentagon into three
+           triangles, so the crevasse is cut to hold three — decks totalling 469 at this
+           size, a 700px mouth, far lip at 1615. Room to spare, unlike crossing 2. */
+        // 80, for the same reason as crossing 2: the slab has to stand past the far lip
+        hexR: 80,
+        ditches: 1,
+        slots: 3,
+        /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
+           width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
+           in behind the question board. 2.15 keeps it clear. */
+        focusK: 4.3,
+        instruction: 'Draw 2 diagonals from the same vertex.',
+        voId: 'p2-3-samevertex'
       }
     ],
 
@@ -1061,12 +1140,15 @@ export const CFG = {
        size it genuinely was a picture of a block rather than something to draw a line
        on, especially on a phone stage rendering the whole 1920 into 844.
 
-       2.63 is the largest that clears both edges. focusY 0.47 rather than dead centre:
-       the stage's lower band is ice and crevasse, so hanging the slab on the exact
-       middle left a wide empty strip under it — the reported "bottom negative space".
-       At 0.47 its bottom sits at 825, just above the 840 walking line, and the
-       composition closes up. */
-    focusX: 0.5, focusY: 0.47, focusK: 2.63,
+       focusK is per crossing now — the two slabs are different sizes at rest, so the
+       same multiplier would not give them the same working size on screen.
+
+       focusY 0.53, lowered three times. The stage's lower band is ice and crevasse, so
+       hanging the slab high left a wide dead strip beneath it — the reported "bottom
+       negative area". At 0.49 the slab's foot sits within a few pixels of the 840
+       walking line and the composition closes up, with the crossing it is about
+       visible just under it rather than stranded at the bottom of the frame. */
+    focusX: 0.5, focusY: 0.53, focusK: 2.63,
     dragSnap: 1.9,            // x cut.vertexSnap: how near a corner a finger has to land
     wrongMs: 700,             // how long a nudge holds before the slab is live again
     holdMs: 200, unfocusMs: 320,
@@ -1087,7 +1169,21 @@ export const CFG = {
          no corner at all       a slip of the finger, not an answer. A wobble, nothing more.
 
        Say the word and every miss can drop it instead — it is the `drops` flag below. */
-    wrongDrops: { side: true, shortDiagonal: false, corners: false },
+    /* WHAT A BAD CUT COSTS, and it is graded by what the cut actually MAKES.
+
+         side            shears nothing off — there is no chord between two neighbours —
+                         so the whole slab tips and goes. The blade skidded off the edge.
+         shortDiagonal   a real cut, and it DOES come apart: into a sliver and a lump
+                         that plainly cannot bridge. Both halves fall, and the learner
+                         watches the thing they made fail to fit, which is the lesson.
+                         It was a gentle nudge before, which said "not that" without ever
+                         showing why not.
+         corners         the stroke reached no corner. Nothing was cut, so nothing is
+                         lost — a slip of the finger is not an answer.
+
+       In every case a fresh slab is lowered afterwards: this crossing has one object in
+       it and destroying it for good would make the level unwinnable. */
+    wrongDrops: { side: true, shortDiagonal: true, corners: false },
     dropMs: 900,              // the tumble into the water
     respawnMs: 1100,          // the next slab lowering into place
     instructions: {
@@ -1095,7 +1191,9 @@ export const CFG = {
       side: "That's a side — try a diagonal.",
       shortDiagonal: 'Cut right across, corner to opposite corner.',
       // a real diagonal, drawn twice: not a mistake, so it is not treated as one
-      already: 'That one is done — find another.'
+      already: 'That one is done — find another.',
+      // two good diagonals, but not from one corner: the constraint, not the concept
+      sameVertex: 'Start this one at the same corner.'
     },
     /* The recorded line for the question. Nothing is recorded under this id yet, so
        say() logs it and returns 0 and the level is simply silent — see the note in
@@ -5492,7 +5590,7 @@ export function createGame(canvas, hooks = {}) {
   let reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const mqReduced = reduced;
 
-  const RUN_STATES = new Set(['RUN_SEGMENT_1', 'JUMP_CHALLENGE_1', 'POST_JUMP_RUN_1',
+  const RUN_STATES = new Set(['AVALANCHE', 'RUN_SEGMENT_1', 'JUMP_CHALLENGE_1', 'POST_JUMP_RUN_1',
     'PHASE_RUN', 'RUN_SEGMENT_2', 'JUMP_CHALLENGE_2', 'POST_JUMP_RUN_2', 'FINAL_RUN']);
 
   /* THE LEVEL 2 STATES, in one place. Three of them are the run that leads to it and
@@ -5682,6 +5780,9 @@ export function createGame(canvas, hooks = {}) {
       /* A tutorial line is a SENTENCE, not a question: it is too long for the plank's left band,
          so the HUD widens and centres the plank for it (see .instruction.banner). */
       signBanner: !!G.signSay,
+      /* The crossing's second line, where it has one. Blank while a tutorial sentence
+         has the board, so the two never stack. */
+      sub: (!G.signSay && G.subline) || '',
       /* PART 2's FOCUS LAYER, and whether the plank should move to the middle.
          `p2Focus` raises the blur sheet and the sharp-slab canvas; `signCentre` is
          true for the whole of Part 2's crossing so the question does not hop back to
@@ -5824,7 +5925,23 @@ export function createGame(canvas, hooks = {}) {
 
   function onEnter(s) {
     switch (s) {
+      /* THE AVALANCHE. PLAY opens here, not on the run.
+         Momo is already running when the game starts and nothing ever said why; this
+         does. A wall of snow comes down the pass from the left, he bolts ahead of it,
+         and when it has spent itself the tutorial begins on a character who is plainly
+         escaping something. Entirely procedural — no new art — so it costs a few
+         hundred particles and nothing to download. */
+      case 'AVALANCHE':
+        G.moving = true; G.jumpEnabled = false; G.speedFactor = 1;
+        G.avT = 0; G.avX = -760;            // it starts off the left edge
+        mammoth.setState('RUN');
+        audio.rumble();
+        audio.setDuck(0.55);                // the roar owns this beat
+        quake(reduced ? 5 : 13, T.avalancheRoar + T.avalancheSweep, T.avalancheRoar);
+        break;
       case 'RUN_SEGMENT_1':
+        G.avT = 0;                          // the wall is gone; nothing left to draw
+        audio.setDuck(1);
         G.moving = true; G.jumpEnabled = true; mammoth.setState('RUN'); break;
       case 'JUMP_CHALLENGE_1':
         /* The very first rock is always a single one: it is the step where the jump is
@@ -5882,6 +5999,7 @@ export function createGame(canvas, hooks = {}) {
         /* From the crossing being played, not from a fixed sentence — Part 2 has more
            than one crossing now and each asks its own question. */
         G.instruction = p2Cfg().instruction || '';
+        G.subline = p2Cfg().sub || '';
         armInstruction(T.instructionHold);
         { const vo = p2Cfg().voId; if (vo) G.voDur = audio.say(vo) || 0; }
         break;
@@ -5917,6 +6035,7 @@ export function createGame(canvas, hooks = {}) {
         G.dropReady = false;                 // nothing moves until the panel leaves
         G.introT = 0; G.stageBeat = 0;        // see the beats in update: hole, sign, options
         G.instruction = phaseCfg().instruction;
+        G.subline = phaseCfg().sub || '';
         // let the tremble that started at the stop play out into the head-down look
         if (mammoth.state !== 'SHAKE') mammoth.setState('LOOK_DOWN');
         buildPhase(); break;
@@ -5924,7 +6043,7 @@ export function createGame(canvas, hooks = {}) {
       case 'PHASE_SUCCESS': break;
       case 'PHASE_DONE':
         // the whole phase is repaired: celebrate, then back to the adventure
-        G.instruction = '';
+        G.instruction = ''; G.subline = '';
         /* AND THE PLANK IS GIVEN BACK. A tutorial line borrows it (api.saySign) and only the
            tutorial handed it back, so a tutorial that stalled left its sentence on screen for the
            rest of the game. The phase ending takes it back, whatever the tutorial is doing. */
@@ -6845,6 +6964,7 @@ export function createGame(canvas, hooks = {}) {
          still does; there is no "one more gap", no count of what is left, and no
          second sentence — those were more to read and taught nothing. */
       G.instruction = phaseCfg().instruction;
+      G.subline = phaseCfg().sub || '';
       G.instrLast = '';                 // force the card to re-enter rather than sit
       armInstruction(T.instructionRemind);
       mammoth.setState('LOOK_DOWN');
@@ -7460,6 +7580,8 @@ export function createGame(canvas, hooks = {}) {
     if (G.l2 && !G.l2.fall && !(G.l2.respawn > 0) &&
         ['LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state)) {
       const L = G.l2;
+      // a finger on the stage is a learner reaching for it: show them the corners
+      L.wantReveal = true;
       const vi = nearestVertex(p.x, p.y);
       L.dragFrom = vi;
       L.dragStart = vi >= 0 ? hexScreenPts()[vi] : { x: p.x, y: p.y };
@@ -7902,6 +8024,29 @@ export function createGame(canvas, hooks = {}) {
     }
 
     switch (G.state) {
+      /* THE AVALANCHE, in three beats on one clock.
+         G.avT runs 0..1 across the whole thing and the renderer reads it; the wall's x
+         is advanced here rather than in the draw so it is on the game clock like
+         everything else and is identical at any frame rate. */
+      case 'AVALANCHE': {
+        const roar = T.avalancheRoar, sweep = T.avalancheSweep, settle = T.avalancheSettle;
+        const total = roar + sweep + settle;
+        G.avT = clamp(G.st / total, 0, 1);
+        /* SNOW REACHING THE GROUND. The cloud itself is drawn as a falling field (see
+           drawAvalanche); this is what it throws up where it lands, so the wave has a
+           foot on the ice rather than floating over it. Along the left of the pass,
+           which is the side it is pouring down. */
+        const q = clamp((G.st - roar) / sweep, 0, 1);
+        if (!reduced && q > 0 && q < 1 && G.st - (G.avPuff || 0) > 55) {
+          G.avPuff = G.st;
+          const fx = rand(-60, 520) + q * 300;
+          particles.poof(fx, CFG.surfaceY - rand(0, 90), 2, 1.7);
+          particles.chips(fx, CFG.surfaceY - rand(10, 60), 1, -rand(140, 320));
+        }
+        if (G.st > roar && !G.avRoared) { G.avRoared = true; audio.crack(); shake(reduced ? 2 : 6, 400); }
+        if (G.st > total) setState('RUN_SEGMENT_1');
+        break;
+      }
       case 'RUN_SEGMENT_1': if (G.st > T.run1) setState('JUMP_CHALLENGE_1'); break;
       case 'JUMP_CHALLENGE_1':
         if (obstacles.list.length && obstacles.list.every(o => o.passed)) setState('POST_JUMP_RUN_1');
@@ -8059,6 +8204,7 @@ export function createGame(canvas, hooks = {}) {
           mammoth.setState('LOOK_DOWN');
           // the instruction comes back so the learner is reminded what they are after
           G.instruction = phaseCfg().instruction;
+          G.subline = phaseCfg().sub || '';
           G.instrLast = '';             // re-enter, so the chips re-pop with what is left
           armInstruction(T.instructionRemind);
           setState('PHASE_ACTIVE');
@@ -9599,6 +9745,7 @@ export function createGame(canvas, hooks = {}) {
       if (duo > 0) ctx.restore();
     }
     if (duo > 0) drawDuo(ctx, duo);
+    drawAvalanche(ctx);
     drawDazeStars(ctx);
     atmos.drawFront(ctx, G.worldX, G.t, reduced, !!G.l1);   // no snow over an open question
 
@@ -9701,6 +9848,88 @@ export function createGame(canvas, hooks = {}) {
      longer ones simply take a deeper seat on the lips. Measured off the ring rather
      than written down, so re-cutting the artwork re-sizes the crevasses by itself
      instead of quietly leaving a constant that no longer matches the picture. */
+  /* THE FOUR PIECES BOTH DIAGONALS MAKE, and how wide each one sits.
+   *
+   * Two crossing diagonals cut a quadrilateral into four triangles, each one a side of
+   * the shape plus the point where the diagonals meet. This returns the DECK of each —
+   * its longest edge, the one it comes to rest on — in the order the sides run, because
+   * that is the order they will be laid into the crevasse.
+   *
+   * Measured here rather than assumed anywhere else: the crevasse is cut from these,
+   * each slot is cut from its own, and the flight aims at those slots. One source, so a
+   * different slab re-sizes the whole crossing by itself. */
+  function quarterDecks() { return quarterPieces().map(q => q.deck); }
+
+  /* THE FAN two diagonals from one corner leave.
+   *
+   * From corner v of an n-gon, the diagonals to every non-neighbour cut it into n-2
+   * triangles that all share v — a fan. A pentagon gives three. This builds them for a
+   * given origin, in the order they go round, which is already left-to-right enough for
+   * the slots once they are sorted by centroid below.
+   *
+   * The origin matters to the SHAPE of the pieces but not to their total width, so the
+   * crevasse can be cut before the learner has chosen which corner to work from — which
+   * it has to be, because the ice opens long before the question is answered. */
+  function fanPieces(origin) {
+    const pts = cutRing();
+    const n = pts.length;
+    if (n < 4) return [];
+    const v = ((origin || 0) % n + n) % n;
+    const out = [];
+    for (let k = 1; k < n - 1; k++) {
+      const tri = [pts[v], pts[(v + k) % n], pts[(v + k + 1) % n]];
+      let deck = 0;
+      for (let i = 0; i < 3; i++) {
+        const a = tri[i], b = tri[(i + 1) % 3];
+        deck = Math.max(deck, Math.hypot(b.x - a.x, b.y - a.y));
+      }
+      out.push({ pts: tri, deck, cx: (tri[0].x + tri[1].x + tri[2].x) / 3 });
+    }
+    out.sort((a, b) => a.cx - b.cx);
+    return out;
+  }
+  /** The fan's decks. Every origin gives the same total, so the hole can be cut first. */
+  function fanDecks() { return fanPieces(0).map(q => q.deck); }
+
+  function quarterPieces() {
+    const pts = cutRing();
+    const n = pts.length;
+    if (n !== 4) return [];
+    // where the diagonals cross
+    const seg = (a, b, c, d) => {
+      const A = b.x - a.x, B = b.y - a.y, C = d.x - c.x, D = d.y - c.y;
+      const den = A * D - B * C;
+      if (!den) return { x: 0, y: 0 };
+      const t = ((c.x - a.x) * D - (c.y - a.y) * C) / den;
+      return { x: a.x + A * t, y: a.y + B * t };
+    };
+    const X = seg(pts[0], pts[2], pts[1], pts[3]);
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      const tri = [pts[i], pts[(i + 1) % 4], { x: X.x, y: X.y }];
+      let deck = 0;
+      for (let k = 0; k < 3; k++) {
+        const a = tri[k], b = tri[(k + 1) % 3];
+        deck = Math.max(deck, Math.hypot(b.x - a.x, b.y - a.y));
+      }
+      out.push({ pts: tri, deck, cx: (tri[0].x + tri[1].x + tri[2].x) / 3 });
+    }
+    /* LEFT TO RIGHT, and this ordering is load-bearing rather than tidiness.
+     *
+     * The slots are cut from these decks in the order they come out of here, and the
+     * pieces are flown to the slots sorted by x — so if these came out in SIDE order
+     * (which runs around the perimeter, not across the shape) the two orders disagree
+     * and every piece lands in a slot cut for a different one. Measured before this
+     * line existed: a 191px triangle seated in a 97px slot and a 103px one rattling
+     * around in a 142px slot, which is daylight through the crossing at one end and an
+     * overhang at the other.
+     *
+     * Sorting by centroid here makes the decks, the slots and the flight one order, so
+     * each piece meets the slot that was cut for it and the four sit edge to edge. */
+    out.sort((a, b) => a.cx - b.cx);
+    return out;
+  }
+
   function minMainCut() {
     const pts = cutRing();
     const n = pts.length;
@@ -9708,14 +9937,12 @@ export function createGame(canvas, hooks = {}) {
        the hole is its DECK — the longest side, the edge it comes to rest on — and not
        a diagonal it is never cut along. Sizing this one from a diagonal would cut a
        hole the slab could not reach across. */
-    if (p2Cfg().mechanic === 'draw-all-diagonals') {
-      let longest = 0;
-      for (let i = 0; i < n; i++) {
-        const a = pts[i], b = pts[(i + 1) % n];
-        longest = Math.max(longest, Math.hypot(b.x - a.x, b.y - a.y));
-      }
-      return longest;
-    }
+    /* THE CREVASSE HOLDS EVERY PIECE THE CUT MAKES, so it is as wide as their decks
+       laid side by side — whichever cut this crossing asks for. Two crossing diagonals
+       quarter the slab; two from one corner fan it into three. */
+    const mech = p2Cfg().mechanic;
+    if (mech === 'draw-all-diagonals') return quarterDecks().reduce((a, d) => a + d, 0);
+    if (mech === 'same-vertex-diagonals') return fanDecks().reduce((a, d) => a + d, 0);
     let m = Infinity;
     for (let i = 0; i < n; i++) {
       const j = i + n / 2;
@@ -9776,15 +10003,34 @@ export function createGame(canvas, hooks = {}) {
         crack: 0, crackPts: makeCrack(),
         bridge: 0, splashes: null, slots: [], pieces: []
       });
-      /* One slot, and it spans the THROAT — the neck the half actually wedges at, inset
-         inside the wider mouth. Spanning the mouth instead would seat the piece to the
-         void rather than to the opening, which is the same mistake in a second place. */
+      /* THE SLOTS SPAN THE THROAT — the neck a piece actually wedges at, inset inside
+         the wider mouth. Spanning the mouth instead would seat pieces against the void
+         rather than the opening, which is the same mistake in a second place.
+
+         One slot per PIECE, each cut to its own width. A crossing that halves its slab
+         puts one piece in each of two crevasses; one that quarters it lays four
+         side by side in a single wide crevasse, and those four are 103 to 191px, so a
+         shared width would leave the widest overhanging by half. Each gets its own. */
       const ins = (gapW - throatW) / 2;
-      g.slots.push({ gapIndex: i, x0: x + ins, x1: x + ins + throatW, full: true, filled: false, reserved: false, kind: null });
+      const decks = (C.slots > 1)
+        ? (C.mechanic === 'same-vertex-diagonals' ? fanDecks() : quarterDecks())
+        : null;
+      if (decks && decks.length) {
+        const total = decks.reduce((a, d) => a + d, 0) || 1;
+        let sx = x + ins;
+        decks.forEach((d, k) => {
+          const w = throatW * (d / total);           // its share of the opening
+          g.slots.push({ gapIndex: i, x0: sx, x1: sx + w, full: false, filled: false, reserved: false, kind: null });
+          sx += w;
+        });
+      } else {
+        g.slots.push({ gapIndex: i, x0: x + ins, x1: x + ins + throatW, full: true, filled: false, reserved: false, kind: null });
+      }
       gaps.push(g);
       x += gapW + L2.ditchGap;
     }
-    return { gaps, slots: gaps.map(g => g.slots[0]) };
+    // every slot across every crevasse, in left-to-right order — one per piece
+    return { gaps, slots: gaps.reduce((a, g) => a.concat(g.slots), []) };
   }
 
   /* The slab, standing on the pillar between the two holes. It is twice as wide as what
@@ -9802,13 +10048,22 @@ export function createGame(canvas, hooks = {}) {
        drawn height is not half its width, and a fixed drop left it either buried in the
        ice or hovering above it. */
     const b = polyBounds(pts);
-    /* WHERE IT STANDS. With two holes it balances on the pillar between them, plainly
-       too big for what it is on and exactly right for the pair either side. With one
-       hole there is no pillar, so it stands over the hole itself — the thing it is
-       about to become the bridge for. */
+    /* WHERE IT STANDS, AND IT STANDS ON THE ICE.
+     *
+     * With two holes it balances on the pillar between them: plainly too big for what
+     * it is on, and exactly right for the pair either side.
+     *
+     * With ONE hole there is no pillar, and it used to be centred on the hole — which
+     * put a solid block hovering in mid-air over open water with nothing under it.
+     * Reported as exactly that: "the shape is not on the path and why add it on the
+     * ditch". A slab rests on something. So it sits on the far lip instead, on the
+     * solid path just past the crevasse — the ice Momo is trying to reach, with the
+     * hole between him and it. Half its own width clear of the edge, so it is plainly
+     * ON the ground rather than teetering off it. */
+    const halfW = polyBounds(pts).w / 2;
     const cx = G.gapB
       ? (G.gapA.x1 + G.gapB.x0) / 2 - G.worldX
-      : (G.gapA.x0 + G.gapA.x1) / 2 - G.worldX;
+      : G.gapA.x1 + halfW + 26 - G.worldX;
     const cy = CFG.surfaceY - b.y1 - L2.homeLift;
     G.l2 = {
       R, pts, art,
@@ -9827,10 +10082,17 @@ export function createGame(canvas, hooks = {}) {
          the shape actually has, computed from its corner count rather than written
          down: n(n-3)/2, which is 2 for a quadrilateral and 9 for a hexagon. */
       drawn: [], need: (pts.length * (pts.length - 3)) / 2,
+      /* The corner both lines must share, for same-vertex-diagonals. Undefined until
+         the first line is drawn, then held as two candidates (a line has two ends)
+         until the second settles which end was really the origin. */
+      origin: undefined, cands: null,
       mechanic: C.mechanic || 'cut-diagonal',
       /* THE FALL, when a wrong cut tips it into the river, and the replacement coming
          down behind it. Both null in the ordinary case; see loseSlab(). */
-      fall: null, respawn: 0
+      fall: null, respawn: 0, debris: null,
+      /* 0 until the learner reaches for it, then eases to 1 and the corner handles
+         fade in. See the note where they are drawn. */
+      reveal: 0, wantReveal: false
     };
   }
 
@@ -9869,13 +10131,13 @@ export function createGame(canvas, hooks = {}) {
      diagonal is still a diagonal and only wobbles — dropping it would punish the child
      for having understood the idea. A stroke that reached no corner is a slip, not an
      answer, and costs nothing at all. CFG.levelTwo.wrongDrops is the switch. */
-  function rejectCut(kind, a, b) {
+  function rejectCut(kind, a, b, ci, cj) {
     const L = G.l2;
     L.wrong++;
     L.badLine = { a, b, t: 0, kind };
     G.signSay = L2.instructions[kind] || '';
     audio.reject();
-    if ((L2.wrongDrops || {})[kind]) loseSlab(a, b);
+    if ((L2.wrongDrops || {})[kind]) loseSlab(a, b, ci, cj);
     else {
       // it holds: a shove and a shiver, so the miss is still felt
       L.shake = 1;
@@ -9896,10 +10158,54 @@ export function createGame(canvas, hooks = {}) {
      rule that a wrong cut removes nothing but itself). The fall is the feedback; the
      new slab is what keeps it a game. `wrong` is carried across the rebuild so the
      count is of the learner's attempts and not of the slabs. */
-  function loseSlab(a, b) {
+  /* THE CUT IS MADE, AND IT DOES NOT FIT.
+   *
+   * This is the difference between "wrong" and "wrong BECAUSE". A bad line used to
+   * wobble the slab and drop it whole, which tells the learner they failed but not what
+   * they made. Now the shape actually comes apart along the line they drew — and the
+   * pieces it leaves are plainly not bridges: a sliver and a lump, or two halves of a
+   * shape that was never going to span the hole. They tumble into the river in front of
+   * the child, who has seen the thing they built and seen why it was no good.
+   *
+   * `i` and `j` are the corners, or -1 where the stroke reached none. A cut between two
+   * real corners always yields two pieces (that is what a chord of a polygon does), even
+   * along a SIDE — where one of them is the sliver between the side and the hull, which
+   * is exactly the point: a side cuts nothing off worth having.
+   */
+  function splitUnfit(i, j) {
+    const L = G.l2;
+    if (i < 0 || j < 0 || i === j) return null;
+    const n = L.pts.length;
+    if (Math.abs(i - j) === 1 || Math.abs(i - j) === n - 1) return null;   // a side: no real chord
+    const lo = Math.min(i, j), hi = Math.max(i, j);
+    const [pa, pb] = PolygonCutManager.split(L.pts, lo, hi);
+    if (pa.length < 3 || pb.length < 3) return null;
+    const vi = L.pts[lo], vj = L.pts[hi];
+    let nx = -(vj.y - vi.y), ny = (vj.x - vi.x);
+    const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;
+    return [pa, pb].map(ring => {
+      const pc = PolygonCutManager.toPiece(ring);
+      pc.cx = pc.x; pc.cy = pc.y;
+      pc.scale = L.scale; pc.rot = 0; pc.offset = 0;
+      const side = Math.sign((pc.cx - vi.x) * nx + (pc.cy - vi.y) * ny) || 1;
+      pc.sep = { x: nx * side, y: ny * side };
+      pc.spin = side * rand(1.4, 2.4);
+      pc.vx = side * rand(60, 150) + rand(-30, 30);
+      pc.art = L.art ? Object.assign({}, L.art, {
+        off: { x: L.art.off.x + pc.x, y: L.art.off.y + pc.y }
+      }) : null;
+      return pc;
+    });
+  }
+
+  function loseSlab(a, b, i, j) {
     const L = G.l2;
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const away = mid.x < L.pos.x ? 1 : -1;      // it tips away from where it was weakened
+    /* THE PIECES THE BAD CUT ACTUALLY MADE, where it made any. A side shears nothing
+       off, so there the whole slab goes; a diagonal that cannot bridge comes apart and
+       both halves go. Either way what falls is what the learner produced. */
+    L.debris = splitUnfit(i, j);
     L.fall = {
       /* TWO BEATS, and the first one is what was missing. The slab is at centre stage
          at 1.66 when the wrong cut lands, and dropping it from there is a block falling
@@ -9936,7 +10242,7 @@ export function createGame(canvas, hooks = {}) {
     const pts = hexScreenPts();
     const n = L.pts.length;
     // a side: two corners, but next-door ones. This is the misunderstanding the level exists for
-    if (!PolygonCutManager.isDiagonal(n, i, j)) return rejectCut('side', pts[i], pts[j]);
+    if (!PolygonCutManager.isDiagonal(n, i, j)) return rejectCut('side', pts[i], pts[j], i, j);
 
     /* ---- DRAW ALL THE DIAGONALS ----
        Every diagonal counts, none counts twice, and nothing is cut until they are all
@@ -9953,24 +10259,77 @@ export function createGame(canvas, hooks = {}) {
         audio.ui();                 // one down, and the shape stays open
         return;
       }
-      /* ALL OF THEM, so the shape is solved and becomes the bridge WHOLE — see the note
-         on `mechanic` in CFG for why it is not split: its two diagonals cross, and the
-         four triangles that leaves cannot span anything. The lines stay drawn on it. */
+      /* ALL OF THEM, so the slab comes apart along every line the learner drew — into
+         FOUR triangles, because the two diagonals cross. The crevasse was cut to hold
+         exactly these (see quarterPieces / layoutLevelTwo), so each one has a slot of
+         its own width waiting and the four together floor it edge to edge. */
       L.solved = true;
-      const whole = PolygonCutManager.toPiece(L.pts.map(p => ({ x: p.x, y: p.y })));
-      whole.cx = whole.x; whole.cy = whole.y;
-      whole.sep = { x: 0, y: 0 };
-      whole.rotTarget = 0; whole.offset = 0; whole.rot = 0; whole.scale = L.scale;
-      whole.art = L.art ? Object.assign({}, L.art, {
-        off: { x: L.art.off.x + whole.x, y: L.art.off.y + whole.y }
-      }) : null;
-      // the diagonals travel with it, in the piece's own frame
-      whole.marks = L.drawn.map(k => {
-        const [a, b] = k.split('-').map(Number);
-        return [{ x: L.pts[a].x - whole.cx, y: L.pts[a].y - whole.cy },
-                { x: L.pts[b].x - whole.cx, y: L.pts[b].y - whole.cy }];
+      const quarters = quarterPieces();
+      L.pieces = quarters.map(q => {
+        const pc = PolygonCutManager.toPiece(q.pts.map(p => ({ x: p.x, y: p.y })));
+        pc.cx = pc.x; pc.cy = pc.y;
+        pc.rotTarget = rand(-0.05, 0.05);
+        pc.offset = 0; pc.rot = 0; pc.scale = L.scale;
+        /* Each quarter drifts out from the middle of the slab as it parts — away from
+           the point the diagonals meet, which is where it was cut free. */
+        const len = Math.hypot(pc.cx, pc.cy) || 1;
+        pc.sep = { x: pc.cx / len, y: pc.cy / len };
+        pc.art = L.art ? Object.assign({}, L.art, {
+          off: { x: L.art.off.x + pc.x, y: L.art.off.y + pc.y }
+        }) : null;
+        return pc;
       });
-      L.pieces = [whole];
+      audio.crack();
+      hitStop(CFG.juice.stopHit * 0.6);
+      punch(CFG.juice.punchHit * 0.7, 280, L.pos.x, L.pos.y);
+      setState('LEVEL_2_SUCCESS');
+      return;
+    }
+
+    /* ---- TWO DIAGONALS FROM THE SAME CORNER ----
+       The first valid diagonal fixes the corner; the second must start or end at that
+       SAME corner. Two perfectly good diagonals from different corners is the mistake
+       this crossing exists to catch, so it is refused by name rather than accepted —
+       but gently, and without costing the slab: the learner has drawn real diagonals
+       and only missed the constraint. */
+    if (L.mechanic === 'same-vertex-diagonals') {
+      const key = Math.min(i, j) + '-' + Math.max(i, j);
+      if (L.drawn.includes(key)) return rejectCut('already', pts[i], pts[j]);
+      if (L.origin === undefined || L.origin === null) {
+        /* WHICH END IS THE ORIGIN IS NOT DECIDED YET. A single diagonal has two, and
+           choosing now would refuse a perfectly good second line that shares the other
+           one. Both are held as candidates and the second cut settles it. */
+        L.origin = null; L.cands = [i, j];
+      } else if (!L.cands.includes(i) && !L.cands.includes(j)) {
+        return rejectCut('sameVertex', pts[i], pts[j]);
+      }
+      if (L.drawn.length === 1) {
+        // the shared end of the two lines IS the origin
+        const shared = L.cands.includes(i) ? i : j;
+        L.origin = shared;
+        L.cands = [shared];
+      }
+      L.drawn.push(key);
+      particles.chips((pts[i].x + pts[j].x) / 2, (pts[i].y + pts[j].y) / 2, 4, -120);
+      L.cornerPulse = 0.8;
+      if (L.drawn.length < (p2Cfg().requiredCount || 2)) { audio.ui(); return; }
+
+      /* BOTH OF THEM, FROM ONE CORNER: the slab fans into three and the crevasse was
+         cut to hold exactly that. */
+      L.solved = true;
+      const fan = fanPieces(L.origin);
+      L.pieces = fan.map(q => {
+        const pc = PolygonCutManager.toPiece(q.pts.map(p => ({ x: p.x, y: p.y })));
+        pc.cx = pc.x; pc.cy = pc.y;
+        pc.rotTarget = rand(-0.05, 0.05);
+        pc.offset = 0; pc.rot = 0; pc.scale = L.scale;
+        const len = Math.hypot(pc.cx, pc.cy) || 1;
+        pc.sep = { x: pc.cx / len, y: pc.cy / len };
+        pc.art = L.art ? Object.assign({}, L.art, {
+          off: { x: L.art.off.x + pc.x, y: L.art.off.y + pc.y }
+        }) : null;
+        return pc;
+      });
       audio.crack();
       hitStop(CFG.juice.stopHit * 0.6);
       punch(CFG.juice.punchHit * 0.7, 280, L.pos.x, L.pos.y);
@@ -9983,7 +10342,7 @@ export function createGame(canvas, hooks = {}) {
        line, so it cannot bridge — but the learner has understood what a diagonal is and
        telling them otherwise would unteach it. The nudge asks for the cut that goes
        right across; the corners stay live and nothing is taken away. */
-    if (!isMainDiagonal(i, j)) return rejectCut('shortDiagonal', pts[i], pts[j]);
+    if (!isMainDiagonal(i, j)) return rejectCut('shortDiagonal', pts[i], pts[j], i, j);
 
     const lo = Math.min(i, j), hi = Math.max(i, j);
     const [pa, pb] = PolygonCutManager.split(L.pts, lo, hi);
@@ -10020,14 +10379,22 @@ export function createGame(canvas, hooks = {}) {
 
      Left piece to the left hole, by where each one currently is. The learner cut the
      slab in half; which half goes where is not a second question. */
+  /* WHERE EACH PIECE GOES, and it aims at a SLOT rather than at a crevasse.
+     A crossing that halves its slab has one slot in each of two crevasses, so the two
+     are the same thing; one that quarters it has four slots in a single crevasse, and
+     aiming at the crevasse would pile all four on its centre. Sorting both the pieces
+     and the slots left to right pairs them in the order they were cut, so the shape
+     reassembles across the hole in the arrangement it came apart in. */
   function planFlight() {
     const L = G.l2;
-    // one hole or two; a solved whole slab has one piece and goes to the only hole
     const gaps = [G.gapA, G.gapB].filter(Boolean);
+    const slots = gaps.reduce((a, g) => a.concat((g.slots || []).map(s => ({ s, g }))), [])
+                      .sort((a, b) => a.s.x0 - b.s.x0);
     const order = L.pieces.slice().sort((a, b) => a.x - b.x);
     order.forEach((pc, idx) => {
-      const g = gaps[idx];
-      if (!g) return;
+      const pair = slots[idx];
+      if (!pair) return;
+      const g = pair.g, slot = pair.s;
       let bi = 0, bl = -1;
       for (let k = 0; k < pc.local.length; k++) {
         const a = pc.local[k], b = pc.local[(k + 1) % pc.local.length];
@@ -10043,7 +10410,7 @@ export function createGame(canvas, hooks = {}) {
       pc.seatRot = rot;
       pc.seatPts = pc.local.map(p => rotate(p, rot));
       pc.cutLen = bl;
-      pc.gap = g;
+      pc.gap = g; pc.slot = slot;
       pc.flyFrom = { x: pc.x, y: pc.y, rot: pc.rot, scale: pc.scale };
       /* IT LANDS AT THE SIZE IT WAS CUT, which is the standing rule (RUNNER §10) and the
          reason CFG.levelTwo.hexR is what it is: a half is 0.866R tall, the cavity under
@@ -10053,7 +10420,8 @@ export function createGame(canvas, hooks = {}) {
          is the fault that once made Level 1's triangle read as a trapezoid. */
       const sb = polyBounds(pc.seatPts);
       const fit = Math.min(1, sb.h > 0 ? (CFG.H - CFG.surfaceY - 6) / sb.h : 1);
-      const gx = (g.x0 + g.x1) / 2 - G.worldX;
+      // its OWN slot's centre, not the crevasse's — four pieces in one hole must not stack
+      const gx = (slot.x0 + slot.x1) / 2 - G.worldX;
       pc.flyTo = {
         x: gx,
         // positioned by the TOP of the seated silhouette, so the cut edge lands on the snow line
@@ -10073,6 +10441,11 @@ export function createGame(canvas, hooks = {}) {
     const L = G.l2; if (!L) return;
     L.cornerPulse = Math.max(0, L.cornerPulse - dt * 1.4);
     L.shake = Math.max(0, (L.shake || 0) - dt * 3.4);
+    /* THE HANDLES FADE IN once they are wanted — on the first touch, or on their own
+       after a few seconds, so a child who is still looking is not left with nothing to
+       aim at. Eased rather than switched, or six beads appear between two frames. */
+    if (G.state === 'LEVEL_2_ACTIVE' && (L.wantReveal || G.idle > 2.6)) L.wantReveal = true;
+    L.reveal = clamp((L.reveal || 0) + (L.wantReveal ? dt * 3.2 : 0), 0, 1);
     if (L.shear) { L.shear.t += dt; if (L.shear.t > 0.9) L.shear = null; }
     if (L.badLine) { L.badLine.t += dt; if (L.badLine.t > 0.65) L.badLine = null; }
 
@@ -10118,10 +10491,22 @@ export function createGame(canvas, hooks = {}) {
         return;
       }
 
-      // BEAT TWO: it goes. Gravity is the game's own, so it falls like everything else.
+      /* BEAT TWO: it goes. Gravity is the game's own, so it falls like everything else.
+         Where the bad cut made real pieces, THEY fall — each on its own arc, tumbling
+         apart — and the slab's own position is carried along with them so the splash
+         and the recovery still have something to measure from. */
+      const drop = 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
       L.pos.x = f.from.x + f.vx * f.t;
-      L.pos.y = f.from.y + 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
+      L.pos.y = f.from.y + drop;
       L.spin = f.spin * f.t;
+      if (L.debris) {
+        for (const pc of L.debris) {
+          pc.x = f.from.x + pc.cx * f.from.scale + pc.vx * f.t;
+          pc.y = f.from.y + pc.cy * f.from.scale + drop;
+          pc.rot = pc.spin * f.t;
+          pc.scale = f.from.scale;
+        }
+      }
       if (!f.splashed && L.pos.y >= wy) {
         f.splashed = true;
         audio.splash();
@@ -10252,7 +10637,8 @@ export function createGame(canvas, hooks = {}) {
       L.seated = true;
       L.pieces.forEach(pc => {
         const g = pc.gap; if (!g || !pc.seatPts) return;
-        const sl = (g.slots && g.slots[0]) || { x0: g.x0, x1: g.x1 };
+        // the slot this piece was flown to, so several in one crevasse keep their lanes
+        const sl = pc.slot || (g.slots && g.slots[0]) || { x0: g.x0, x1: g.x1 };
         const sb = polyBounds(pc.seatPts);
         /* THE PICTURE TURNS WITH THE PIECE. seatPts is `local` rotated by seatRot to put
            the cut edge level; paintGlacierChunk lands an artwork point at
@@ -10282,8 +10668,12 @@ export function createGame(canvas, hooks = {}) {
           cx: (sl.x0 + sl.x1) / 2, cy: CFG.surfaceY,
           x0: sl.x0, x1: sl.x1, full: true
         });
-        g.slots.forEach(s => { s.filled = true; });
-        g.repaired = true; g.bridge = 0;
+        /* ONLY THIS PIECE'S SLOT, and the crevasse is mended only when they are all
+           taken. With one piece per crevasse the two are the same moment; with four
+           laid side by side in one hole, marking the lot on the first arrival would
+           seal the crossing while three pieces were still in the air. */
+        sl.filled = true;
+        if (g.slots.every(s => s.filled)) { g.repaired = true; g.bridge = 0; }
       });
       L.pieces = null;                // the halves are the crossing now, not the slab
       setState('BRIDGE_2_COMPLETE');
@@ -10345,6 +10735,13 @@ export function createGame(canvas, hooks = {}) {
        hanging options in Part 1 go through, so this block is made of exactly what every
        other block in the game is made of. `false` for `installed`: it is still loose,
        so it keeps the drop shadow a seated plug does not have. */
+    /* THE PIECES A BAD CUT MADE, falling. Drawn instead of the slab, because the slab
+       no longer exists — it came apart along the line the learner drew, and what is on
+       screen is the two things they actually made going into the water. */
+    if (L.debris && L.fall && L.fall.phase === 'drop') {
+      for (const pc of L.debris) drawL2Piece(ctx, pc);
+      return;
+    }
     const shakeX = (L.shake || 0) ? Math.sin(G.t * 46) * 7 * L.shake : 0;
     ctx.save();
     ctx.translate(L.pos.x + shakeX, L.pos.y);
@@ -10405,10 +10802,28 @@ export function createGame(canvas, hooks = {}) {
        the brightest at any moment, and on a level with three correct answers the eye
        reads the brightest thing as the hint. The only corner ever treated differently is
        the one under the finger, and that is feedback about the finger. */
-    {
-      const a = Math.max(L.cornerPulse, 0.34);
+    /* THEY ARRIVE WHEN THE CHILD DOES, and not before.
+     *
+     * Six beads sitting on the slab from the moment it appears is the interface
+     * announcing itself over the question — the same reason Part 1's cut guide waits
+     * rather than marking every rope the instant the row lands. So they are held back
+     * until the level is actually being touched, and then fade in together.
+     *
+     * `reveal` rises the moment a finger goes down anywhere on the stage during the
+     * puzzle, and also on its own after a few seconds of nothing — a child who is
+     * looking rather than reaching still gets shown what to take hold of, which is the
+     * difference between restraint and hiding the control. */
+    if (L.reveal > 0.01) {
+      const a = Math.max(L.cornerPulse, 0.34) * L.reveal;
       const breath = 0.5 + 0.5 * Math.sin(G.t * 2.3);
-      const R0 = 15 * L.scale, R1 = 21 * L.scale;
+      /* A HANDLE IS A TARGET, SO IT IS SIZED IN SCREEN PIXELS — not in the slab's.
+         These used to be 15 x L.scale, and L.scale reaches 3.7 on the quadrilateral:
+         55px beads swallowing the corners they were supposed to mark. Reported as
+         "make small and evident", and both halves of that come from the same fix —
+         a fixed size is smaller AND reads as a control rather than as decoration.
+         A whisker of scale is kept so they do not look pinned on. */
+      const k = 1 + (L.scale - 1) * 0.12;
+      const R0 = 13 * k, R1 = 18 * k;
       pts.forEach((p, i) => {
         const held = L.dragFrom === i && !!L.dragPt;
         const r = (held ? R1 : R0) * (1 + (held ? 0 : 0.06 * breath));
@@ -10428,13 +10843,28 @@ export function createGame(canvas, hooks = {}) {
         g2.addColorStop(1, '#9AD9F5');
         ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.2832);
         ctx.fillStyle = g2; ctx.fill();
-        ctx.lineWidth = 3.5 * L.scale;
+        ctx.lineWidth = 3.5 * k;
         ctx.strokeStyle = held ? '#2D82B5' : 'rgba(45,130,181,0.85)';
         ctx.stroke();
         // the catchlight, which is what makes a circle read as a bead
         ctx.beginPath();
         ctx.arc(p.x - r * 0.33, p.y - r * 0.38, r * 0.26, 0, 6.2832);
         ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fill();
+        /* IT ANSWERS THE FINGER. A ring springs off the corner the moment it is taken
+           hold of and fades as it widens — the touch feedback the rest of the game
+           already gives a tap, brought to the one control this level has. Without it
+           the only sign a corner had been grabbed was the bead going a little brighter,
+           which on a stage scaled into a phone is nothing at all. Driven by
+           cornerPulse, which the grab sets and update decays, so it costs no state. */
+        if (held && L.cornerPulse > 0.01) {
+          const e = 1 - L.cornerPulse / 0.8;
+          ctx.globalAlpha = alpha * (1 - e) * 0.8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r * (1 + e * 1.6), 0, 6.2832);
+          ctx.lineWidth = 3 * k;
+          ctx.strokeStyle = 'rgba(190,240,255,0.95)';
+          ctx.stroke();
+        }
         ctx.restore();
       });
     }
@@ -10538,6 +10968,140 @@ export function createGame(canvas, hooks = {}) {
     }
   }
 
+  /* THE AVALANCHE.
+   *
+   * IT IS NOT A SHAPE. The first version drew a filled body with a wavy top edge and it
+   * read exactly as reported — a cut-out sliding across the screen. Anything with a
+   * continuous silhouette does: real snow has no outline, it has a DENSITY, and the eye
+   * reads the difference immediately.
+   *
+   * So there is no polygon here at all. It is a field of soft radial puffs falling from
+   * above the frame and tumbling down and to the right, each one its own size, speed and
+   * wobble, drawn back to front and accumulating into a mass wherever they crowd. Where
+   * they are dense it looks solid; at the edges it frays into nothing, which is what a
+   * snow cloud actually does and what no outline can imitate.
+   *
+   * IT POURS FROM THE TOP, down the pass, rather than sliding in from the side — the
+   * direction snow actually comes from, and the direction the mountains behind already
+   * lead the eye. Momo runs out from under it.
+   *
+   * The whole thing is deterministic: every puff's position is a function of its index
+   * and the level clock, with no stored state and no particle pool, so it costs one loop
+   * a frame, cannot leak, and looks identical at any frame rate.
+   */
+  /* MORE PUFFS, EACH FAINTER. At 132 x 0.42 the middle of the cloud saturated to flat
+     white and the thin edges resolved into separate circles — the two ends of the same
+     mistake. 210 much fainter ones overlap enough to stay continuous where they crowd
+     and stay soft where they do not, and additive blending still gets a bright core out
+     of them without it clipping. */
+  const AV_N = 210;
+  function drawAvalanche(ctx) {
+    if (G.state !== 'AVALANCHE') return;
+    const roar = T.avalancheRoar, sweep = T.avalancheSweep, settle = T.avalancheSettle;
+    const total = roar + sweep + settle;
+    const t = G.st;
+    /* The envelope: it builds as it comes over the ridge, holds through the sweep, and
+       thins out as it spends itself. Nothing is ever switched on or off. */
+    const rise = easeOut(clamp(t / (roar * 1.25), 0, 1));
+    const fade = easeInOut(clamp((total - t) / settle, 0, 1));
+    const amp = Math.min(rise, fade);
+    if (amp <= 0.01) return;
+
+    const sec = t / 1000;
+    ctx.save();
+    /* NORMAL BLENDING, NOT ADDITIVE — and this is what turned it from a glow into snow.
+       Additive white over a bright sky can only ever get brighter, so the cloud had no
+       form: it washed the sky out and read as a lens flare. Snow has SHADOW in it. So
+       each puff is drawn twice, a cool grey-blue underneath and a white highlight
+       offset up-left of it, which is the cheapest way to give a soft mass a light
+       direction and the only reason it reads as volume rather than haze. */
+
+    for (let i = 0; i < AV_N; i++) {
+      /* Each puff has a fixed identity derived from its index — no randomness per
+         frame, or the whole cloud would boil rather than fall. */
+      const seed = i * 12.9898;
+      const r1 = (Math.sin(seed) * 43758.5453) % 1;
+      const r2 = (Math.sin(seed * 1.7 + 4.1) * 24634.6345) % 1;
+      const r3 = (Math.sin(seed * 2.3 + 9.7) * 15731.743) % 1;
+      const a1 = Math.abs(r1), a2 = Math.abs(r2), a3 = Math.abs(r3);
+
+      /* WHERE IT FALLS FROM, and how far down it has got. Each starts above the frame
+         at its own moment and travels down-and-right, so the mass leans the way it is
+         moving instead of dropping straight like weather. */
+      const lane = a1;                                   // 0 = left of the pass, 1 = right
+      const speed = 0.55 + a2 * 0.75;
+      const phase = (sec * speed * 0.62 + a3) % 1;       // 0 at the ridge, 1 at the foot
+
+      const x = -260 + lane * 1500
+              + phase * 760                              // the down-slope lean
+              + Math.sin(sec * 1.6 + i) * 26;            // turbulence
+      const y = -220 + phase * (CFG.H + 300)
+              + Math.cos(sec * 1.9 + i * 0.7) * 18;
+
+      // it fattens as it falls and thins again at the foot, so the mass has a shape
+      const grow = Math.sin(clamp(phase, 0, 1) * Math.PI);
+      const r = (58 + a2 * 74) * (0.45 + grow * 0.85);
+
+      /* DENSER AT THE FRONT OF THE WAVE. The leading puffs are the ones that have
+         fallen furthest, and they carry the brightness; the tail is thinner, which is
+         what stops it looking like an even curtain. */
+      const dens = amp * (0.30 + grow * 0.62) * (0.55 + a1 * 0.5);
+      if (dens <= 0.01) continue;
+
+      // the body: a cool grey-blue, so the mass has weight and does not blow out
+      const sh = ctx.createRadialGradient(x, y, 0, x, y, r);
+      sh.addColorStop(0, `rgba(196,219,238,${(0.40 * dens).toFixed(3)})`);
+      sh.addColorStop(0.55, `rgba(206,228,244,${(0.22 * dens).toFixed(3)})`);
+      sh.addColorStop(1, 'rgba(206,228,244,0)');
+      ctx.fillStyle = sh;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+
+      // the lit crown, up and to the left, where the sun is
+      const lx = x - r * 0.26, ly = y - r * 0.3, lr = r * 0.78;
+      const li = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
+      li.addColorStop(0, `rgba(255,255,255,${(0.52 * dens).toFixed(3)})`);
+      li.addColorStop(0.6, `rgba(250,253,255,${(0.20 * dens).toFixed(3)})`);
+      li.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = li;
+      ctx.beginPath(); ctx.arc(lx, ly, lr, 0, 6.2832); ctx.fill();
+    }
+
+    /* STREAKS OF SNOW BEING CARRIED DOWN, drawn over the billows. The cloud alone
+       reads as weather sitting still; these say which way it is going. Short, faint
+       and steep, following the same down-and-right lean the puffs do. */
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 70; i++) {
+      const a1 = Math.abs((Math.sin(i * 7.13) * 43758.5453) % 1);
+      const a2 = Math.abs((Math.sin(i * 3.71 + 2.2) * 24634.6345) % 1);
+      const ph = (sec * (1.5 + a2 * 1.4) + a1) % 1;
+      const sx = -200 + a1 * 1600 + ph * 700;
+      const sy = -140 + ph * (CFG.H + 220);
+      const len = 34 + a2 * 62;
+      const al = amp * 0.5 * Math.sin(clamp(ph, 0, 1) * Math.PI);
+      if (al <= 0.02) continue;
+      ctx.strokeStyle = `rgba(255,255,255,${al.toFixed(3)})`;
+      ctx.lineWidth = 2 + a2 * 3;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + len * 0.55, sy + len);      // the lean, matching the billows
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    /* A HAZE OVER THE GROUND IT HAS ALREADY TAKEN. Not a hard front — a gradient that
+       thins to nothing, so the ice behind the wave dims out rather than being cut off
+       at a line. Normal blending, over the top, because this one is meant to obscure. */
+    ctx.save();
+    ctx.globalAlpha = amp * 0.34 * clamp((t - roar * 0.4) / roar, 0, 1);
+    const veil = ctx.createLinearGradient(0, 0, CFG.W * 0.72, CFG.H);
+    veil.addColorStop(0, 'rgba(238,248,255,0.92)');
+    veil.addColorStop(0.55, 'rgba(238,248,255,0.35)');
+    veil.addColorStop(1, 'rgba(238,248,255,0)');
+    ctx.fillStyle = veil;
+    ctx.fillRect(0, 0, CFG.W, CFG.H);
+    ctx.restore();
+  }
+
   /* ---- loop ---- */
   function frame(ts) {
     if (destroyed) return;
@@ -10566,7 +11130,7 @@ export function createGame(canvas, hooks = {}) {
     G.speedFactor = 1; G.shake = 0; G.shakeT = 0; G.moving = true;
     G.instruction = ''; G.jumpEnabled = false;
     G.complete = false; G.l1 = null; G.attempts = 0; G.idle = 0;
-    G.level = 1; G.l2 = null; G.gapA = null; G.gapB = null; G.p2i = 0;
+    G.level = 1; G.l2 = null; G.gapA = null; G.gapB = null; G.p2i = 0; G.subline = '';
     G.phase = 0; G.phasesDone = 0; G.gapsThisPhase = null; G.phaseLayout = null; G.phaseJumped = false;
     G.oops = false; G.hitFx = 0; G.hitObstacle = null; G.hitReturn = null; G.hitCount = 0;
     G.handHint = null; G.idleHand = 0; G.dropReady = false; G.introT = 0; G.stageBeat = 0; G.signSay = ''; G.saidQuestion = '';
@@ -10575,12 +11139,16 @@ export function createGame(canvas, hooks = {}) {
     G.quakeT = 0; G.quakeAmp = 0; G.quakeLen = 0; G.quakePeak = 0; G.quakeAt = 0;
     G.freeze = 0; G.punchAmp = 0; G.punchT = 0; G.punchLen = 0; G.punchAt = 0;
     G.bearAt = 0;                   // the friend is not placed until the run home
+    G.avT = 0; G.avX = -760; G.avRoared = false; G.avPuff = 0;
     G.retryRun = false; G.runLeadMs = 0;
     slash = null; brk = null; taps.length = 0; audio.stopSay();
     ground.reset(); obstacles.reset(); particles.clear(); mammoth.reset(); bgm.reset();
     atmos.intensity = 0; atmos.flash = 0;
     audio.setDuck(1);
-    setState('RUN_SEGMENT_1');
+    /* PLAY OPENS ON THE AVALANCHE, not on the run. It is the reason Momo is running,
+       which the game never gave. The tutorial's opening lines wait for the run proper,
+       so nothing is taught over the top of it. */
+    setState('AVALANCHE');
   }
 
   const api = {

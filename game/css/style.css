@@ -807,3 +807,28 @@ a:hover { color: var(--ice-pale); }
   /* Above the focus layer: the words are the question and must never be softened. */
   z-index: 8;
 }
+
+/* THE SECOND LINE ON THE BOARD.
+
+   Part 1 had none — its questions were three words and anything more was noise. Part 2's
+   later crossings ask about two properties at once ("a concave pentagon"), and two of
+   them want BOTH matching shapes while the headline stays singular, so the count has to
+   be said somewhere.
+
+   Deliberately quieter than the question: smaller, and in the board's own brown rather
+   than the key-word blue. It is a clarification, not a second instruction, and if it
+   competed with the line above it there would be two things to read instead of one. */
+.instruction-sub {
+  display: block;
+  font-size: clamp(9px, calc(1.02 * var(--u)), 26px);
+  font-weight: 600;
+  line-height: 1.15;
+  margin-top: calc(0.28 * var(--u));
+  color: #7A5230;
+  opacity: 0.92;
+  white-space: normal;
+}
+.instruction-sub[hidden] { display: none; }
+/* On the centred Part 2 board the words have the width of the stage, so the second line
+   should not be allowed to run the full span and turn into a paragraph. */
+.instruction.centered .instruction-sub { max-width: 72ch; margin-left: auto; margin-right: auto; }

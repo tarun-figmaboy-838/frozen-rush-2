@@ -460,6 +460,35 @@ export const optionShapes = {
       }
     ]
   },
+  "concavePentagon2": {
+    "image": "assets/option-shape/concavePentagon2.webp",
+    "sides": 5,
+    "regular": false,
+    "convex": false,
+    "aspect": 0.99171,
+    "points": [
+      {
+        "x": -0.21227,
+        "y": -1
+      },
+      {
+        "x": 0.99005,
+        "y": -0.5738
+      },
+      {
+        "x": 0.12272,
+        "y": 0.12604
+      },
+      {
+        "x": 0.95025,
+        "y": 0.99834
+      },
+      {
+        "x": -0.99171,
+        "y": 0.73134
+      }
+    ]
+  },
   "iceQuadrilateral": {
     "image": "assets/option-shape/iceQuadrilateral.webp",
     "sides": 4,

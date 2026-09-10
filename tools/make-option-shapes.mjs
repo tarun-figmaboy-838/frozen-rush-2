@@ -40,7 +40,9 @@ const INNER = 6;
 const WANT = [
   { id: 'regularHexagon',  donor: 'regularOctagon.png' },
   { id: 'concavePentagon', donor: 'regularPentagon.png' },
-  { id: 'concaveHexagon',  donor: 'regularHeptagon.png' }
+  { id: 'concaveHexagon',  donor: 'regularHeptagon.png' },
+  // the second concave pentagon: a different donor, so the pair are not twins
+  { id: 'concavePentagon2', donor: 'irregularPentagon.png' }
 ];
 
 /** The verified ring, fitted into an S x S canvas with a little padding. */
@@ -88,7 +90,11 @@ for (const { id, donor } of WANT) {
   /* 2. real ice, lifted from a donor and masked to the new face. */
   const texMask = await sharp(svg(`<polygon points="${poly(face)}" fill="#fff"/>`))
     .png().toBuffer();
-  const donorFace = await sharp(join(DIR, donor))
+  /* THE DONOR IS SOURCE ART, so it comes from SRC_DIR. This read DIR — the served
+     folder — which was right when the delivered PNGs still lived inside game/, and has
+     been wrong since they moved to art-source/ with the rest of the build inputs. It
+     only surfaced now because nothing had needed to build a new shape since the move. */
+  const donorFace = await sharp(join(SRC_DIR, donor))
     // pull from the middle of the donor, well inside its own frame
     .extract({ left: 210, top: 210, width: S - 420, height: S - 420 })
     .resize(S, S, { fit: 'fill' })
@@ -115,7 +121,11 @@ for (const { id, donor } of WANT) {
     <polygon points="${poly(outer)}" fill="none" stroke="#0B94F7"
              stroke-width="${OUTLINE}" stroke-linejoin="miter"/>`)).png().toBuffer();
 
-  const out = join(DIR, id + '.png');
+  /* AND IT WRITES SOURCE ART, not a served asset. What this makes is a delivered-style
+     PNG that build-option-shapes.mjs then traces and turns into the webp the game
+     loads — so it belongs beside the other inputs in art-source/, and writing it into
+     game/assets/ put a 1254px PNG in the deploy folder that no URL ever asks for. */
+  const out = join(SRC_DIR, id + '.png');
   await sharp({ create: { width: S, height: S, channels: 4,
                           background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite([{ input: base }, { input: texture }, { input: frame }])

@@ -32,6 +32,7 @@ export class Hud {
       instruction: root.getElementById('instruction'),
       pill: root.getElementById('instruction-pill'),
       text: root.getElementById('instruction-text'),
+      sub: root.getElementById('instruction-sub'),
       complete: root.getElementById('complete'),
       replay: root.getElementById('btn-replay'),
       /* oops and retry are gone from the markup: a crash recovers by itself now and
@@ -260,6 +261,14 @@ export class Hud {
        stage, so the left band is not where the eye is and a sign parked there reads as
        abandoned. A class on the same element — same board, same type, moved. */
     if (el) el.classList.toggle('centered', !!h.signCentre);
+    /* THE SECOND LINE. Only the later Part 2 crossings set one — it names the property
+       being asked about and, where two shapes match, says so. Hidden the rest of the
+       time rather than left empty, so it takes no space on the board when unused. */
+    if (this.el.sub) {
+      const sub = h.sub || '';
+      this.el.sub.textContent = sub;
+      this.el.sub.hidden = !sub;
+    }
     const outOfSync = message && (el.hidden || el.classList.contains('leaving'));
     if (message !== this.lastMessage || outOfSync) {
       const isNewLine = message !== this.lastMessage;

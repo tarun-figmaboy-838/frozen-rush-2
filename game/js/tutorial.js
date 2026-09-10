@@ -191,6 +191,9 @@ export class Tutorial {
     return [
       {
         id: 'meet',
+        /* NOT DURING THE AVALANCHE. The opening is a wall of snow chasing Momo down
+           the pass, and a coach mark over the top of it would talk through the one
+           moment the game is being dramatic. Both opening lines wait for the run. */
         at: g => ['RUN_SEGMENT_1', 'JUMP_CHALLENGE_1'].includes(g.state),
         spot: momo,
         text: 'This is Momo. He needs to find his friend.',
@@ -199,6 +202,9 @@ export class Tutorial {
       },
       {
         id: 'goal',
+        /* NOT DURING THE AVALANCHE. The opening is a wall of snow chasing Momo down
+           the pass, and a coach mark over the top of it would talk through the one
+           moment the game is being dramatic. Both opening lines wait for the run. */
         at: g => ['RUN_SEGMENT_1', 'JUMP_CHALLENGE_1'].includes(g.state),
         spot: momo,
         text: 'Help Momo cross the Frozen Pass!',

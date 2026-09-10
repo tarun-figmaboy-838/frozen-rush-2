@@ -57,6 +57,10 @@ const MAP = {
   concavePentagon:         'concavePentagon.png',       // built
   concaveHexagon:          'concaveHexagon.png',        // built
   concaveHeptagon:         'concaveHeptagon.png',
+  /* A SECOND CONCAVE PENTAGON (built). "Cut the concave pentagon" wants two answers,
+     and the delivered set has one — so this fills the gap the same way the three above
+     do, from the verified ring and a donor's own material. */
+  concavePentagon2:        'concavePentagon2.png',
   /* PART 2's DRAWING SLAB, delivered as 1.png and renamed for what it measures as —
      the way every other name in this table was arrived at (see the note above). Four
      sides, irregular, convex, and therefore exactly two diagonals, which is the whole
@@ -74,6 +78,7 @@ const EXPECT = {
   irregularConvexOctagon: [8, false, true],
   concavePentagon: [5, false, false], concaveHexagon: [6, false, false],
   concaveHeptagon: [7, false, false],
+  concavePentagon2: [5, false, false],
   iceQuadrilateral: [4, false, true]
 };
 

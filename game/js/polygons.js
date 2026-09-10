@@ -111,6 +111,24 @@ export const polygonDefinitions = {
     { x: -0.92, y:  0.44 }
   ] },
 
+  /* A SECOND CONCAVE PENTAGON, because one level needs two of them.
+     "Cut the concave pentagon" asks for every shape that is both five-sided and
+     dented, and with only one in the registry that level could only ever have a single
+     answer — so the question would be answerable by finding the one dent rather than
+     by checking two things.
+
+     Deliberately notched on the RIGHT where concavePentagon is notched along the
+     BOTTOM, and with its long edge running the other way, so the pair read as two
+     different shapes rather than as one shape turned round. Five sides, exactly one
+     inward corner, 40% spread — verify() checks all of that. */
+  concavePentagon2: { points: [
+    { x: -0.16, y: -0.98 },
+    { x:  0.92, y: -0.60 },
+    { x:  0.10, y:  0.06 },
+    { x:  0.86, y:  0.86 },
+    { x: -0.88, y:  0.62 }
+  ] },
+
   /* Six sides, one clear inward corner — notched into the TOP edge. The notch used to be
      on the right, which made this and the concave heptagon two left-pointing arrows that
      were genuinely hard to tell apart, and Level 7 puts them in the same column with one
@@ -152,6 +170,7 @@ export const polygonMetadata = {
   irregularConvexHexagon:  { sides: 6, regular: false, convex: true },
   irregularConvexOctagon:  { sides: 8, regular: false, convex: true },
   concavePentagon:         { sides: 5, regular: false, convex: false },
+  concavePentagon2:        { sides: 5, regular: false, convex: false },
   concaveHexagon:          { sides: 6, regular: false, convex: false },
   concaveHeptagon:         { sides: 7, regular: false, convex: false }
 };

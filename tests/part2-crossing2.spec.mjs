@@ -114,29 +114,43 @@ test.describe('crossing 2 — draw all the diagonals', () => {
     expect(await page.evaluate(() => window.iceAgeGame._l2().corners.length)).toBe(4);
   });
 
-  test('the solved slab bridges the crevasse and keeps its lines', async ({ page }) => {
+  /* THE FOUR PIECES FLOOR THE CREVASSE. Both diagonals cross, so the slab comes apart
+     into four triangles, and the hole was cut to hold exactly those — a slot each, cut
+     to its own width, laid left to right in the order they were cut. Together they are
+     the bridge; no one of them spans anything on its own. */
+  test('the four pieces floor the crevasse, each in its own slot', async ({ page }) => {
     const errors = await boot(page, { speed: 900, fast: 4 });
     await enterCrossing(page, 2);
     await page.evaluate(() => { window.iceAgeGame._l2Cut(0, 2); window.iceAgeGame._l2Cut(1, 3); });
     await waitState(page, ['BRIDGE_2_COMPLETE', 'PHASE_RUN', 'FINAL_RUN'], 60_000);
     const r = await page.evaluate(() => {
       const g = window.iceAgeGame.debug().gapA;
-      const p = g.pieces[0];
+      const span = p => { const xs = p.pts.map(q => q.x * p.fit); return Math.max(...xs) - Math.min(...xs); };
       return {
-        repaired: g.repaired, pieces: g.pieces.length,
-        fit: p.fit, marks: p.marks ? p.marks.length : 0,
-        span: (() => { const xs = p.pts.map(q => q.x * p.fit); return Math.max(...xs) - Math.min(...xs); })(),
-        throat: g.throat
+        repaired: g.repaired,
+        pieces: g.pieces.length,
+        slots: g.slots.length,
+        allFilled: g.slots.every(s => s.filled),
+        fits: g.pieces.map(p => p.fit),
+        // each piece against the slot it was flown to
+        cover: g.pieces.map(p => ({ span: span(p), slot: p.x1 - p.x0 })),
+        throat: g.throat,
+        total: g.pieces.reduce((a, p) => a + span(p), 0)
       };
     });
-    expect(r.repaired, 'the crossing is mended').toBe(true);
-    expect(r.pieces, 'by one whole slab').toBe(1);
-    expect(r.fit, 'landing at the size it was drawn on').toBe(1);
-    /* THE LINES STAY ON IT. Without this the diagonals would vanish at the exact moment
-       they paid off, and the child would watch a plain block drop into a hole with no
-       sign that their work is what did it. */
-    expect(r.marks, 'both diagonals are still cut into it').toBe(2);
-    expect(r.span, 'and it spans the opening').toBeGreaterThanOrEqual(r.throat);
+    expect(r.pieces, 'four triangles').toBe(4);
+    expect(r.slots, 'and a slot for each').toBe(4);
+    expect(r.allFilled, 'every slot taken').toBe(true);
+    expect(r.repaired, 'so the crossing is mended').toBe(true);
+    // nothing was shrunk to fit — the standing rule
+    for (const f of r.fits) expect(f, 'seated at the size it was cut').toBe(1);
+    // each piece covers its own lane...
+    for (const { span, slot } of r.cover) {
+      expect(span, `a ${Math.round(span)}px piece in a ${Math.round(slot)}px slot`)
+        .toBeGreaterThanOrEqual(slot - 1);
+    }
+    // ...and together they cover the opening, which is what makes them a floor
+    expect(r.total, 'the four together span the crevasse').toBeGreaterThanOrEqual(r.throat - 2);
     expect(jsErrors(errors), 'the game threw').toEqual([]);
   });
 
