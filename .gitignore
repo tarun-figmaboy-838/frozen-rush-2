@@ -20,3 +20,5 @@ art-source/char-sheets/tremble-new.png
 # Evidence frames for a QA report — regenerate with: node tools/qa-evidence.mjs
 qa-report/
 art-source/char-sheets/idle-sheet.png
+*.tmp.mjs
+
