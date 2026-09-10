@@ -257,8 +257,11 @@ export class Tutorial {
            after. GLACIER_BREAK_1 is the skid, and firing there froze him mid-slide; SHAKE is
            the tremble, and firing during it froze the performance. So: stopped, and no
            longer trembling. */
+        /* CROSSING 1 IS THE DIAGONAL LEVEL NOW, so the states this waits for are its
+           states. The condition is otherwise unchanged and means the same thing: the
+           ice has actually opened, he has stopped, and he is no longer trembling. */
         at: g => (g.gapsThisPhase || []).some(gp => gp && (gp.open || 0) > 0.75) &&
-                 ['PHASE_INTRO', 'PHASE_ACTIVE'].includes(g.state) &&
+                 ['PHASE_INTRO', 'PHASE_ACTIVE', 'LEVEL_2_INTRO', 'LEVEL_2_OVERVIEW'].includes(g.state) &&
                  (() => { const p = this.game._player && this.game._player(); return !p || p.state !== 'SHAKE'; })(),
         spot: g => {
           const gp = (g.gapsThisPhase || [])[0];
@@ -289,29 +292,49 @@ export class Tutorial {
            own question ("Cut the TRIANGLE."), and only then does the hand sweep. Told WHAT to do,
            then asked WHICH (the owner's order; the question used to arrive first because it came
            on the plank's own beat). */
+        /* WHAT THE ICE IS FOR, and it is now said about ONE slab rather than a row of
+           hanging blocks — crossing 1 is the diagonal level. The sentence changed with
+           the mechanic: there is nothing to choose between here, so "use the RIGHT
+           piece" would be asking a question the level does not ask. */
         id: 'use',
-        at: g => ['PHASE_INTRO', 'PHASE_ACTIVE'].includes(g.state),
+        at: g => ['PHASE_INTRO', 'PHASE_ACTIVE', 'LEVEL_2_OVERVIEW', 'LEVEL_2_FOCUS'].includes(g.state),
         spot: () => null,
-        text: 'Use the right ice piece to fix the path.',
+        text: 'Cut this ice block to fix the path.',
         sign: 99, focus: 'blocks',
         advance: 0, pause: false
       },
       {
-        /* THE ASK: no words of its own — the plank is doing the asking — just the sweep hand on
-           the rope of the answer, waiting for the cut. */
+        /* THE ASK. No words of its own — the plank is doing the asking — just the hand,
+           drawing the answer's shape without performing it.
+
+           IT DRAGS BETWEEN TWO CORNERS, because that is the control this crossing uses.
+           The old step swept a hand ACROSS a rope, which is the Part 1 gesture and would
+           now be teaching the wrong thing entirely. The hand travels one main diagonal of
+           the slab; which one it shows does not matter, since all three are correct — and
+           it stops short of committing, as every step here does. */
         id: 'cut',
-        at: g => !!g.l1 && g.state === 'PHASE_ACTIVE' && this.ropeBox(g) !== null,
-        spot: g => this.ropeBox(g),
+        at: g => !!g.l2 && g.state === 'LEVEL_2_ACTIVE' && this.diagonalBox(g) !== null,
+        spot: g => this.diagonalBox(g),
         text: '',
         handOnly: true,
-        advance: 'cut', pause: false, hand: 'sweep'
+        /* NO DOM HAND HERE, and that is the difference from Part 1's cut step. The
+           gesture is a drag down a slanted line, and the hand element travels a
+           horizontal CSS translate in its own units — pointing it along a diagonal
+           would either stop being responsive or need an animation per angle. The
+           ENGINE draws the demonstration instead (drawL2's demo branch): a marching
+           dashed line corner to opposite corner with a finger running it, on the
+           canvas, where everything else that points at a cut is already drawn and
+           where it is resolution-independent for free. `demo` switches it on. */
+        demo: true,
+        advance: 'cut', pause: false, hand: null
       },
       {
         /* The reward line runs over the celebration and lets go by itself; the game is
            not stopped for it. Only after a RIGHT cut — a wrong one gets the game's own
            answer (the splash, the instruction back), not this. */
         id: 'fit',
-        at: g => ['PHASE_SUCCESS', 'PHASE_DONE', 'PHASE_RUN'].includes(g.state),
+        at: g => ['PHASE_SUCCESS', 'PHASE_DONE', 'PHASE_RUN',
+                  'LEVEL_2_SUCCESS', 'BRIDGE_2_COMPLETE'].includes(g.state),
         spot: momo,
         text: 'Perfect fit! Keep going!',
         advance: 0, pause: false
@@ -340,6 +363,43 @@ export class Tutorial {
   }
 
   /** The nearest obstacle ahead, as words: { noun: 'rock'|'log'|'fossil', cap: 'A rock'|... }. */
+  /* WHERE THE HAND DRAWS THE DIAGONAL, for crossing 1.
+   *
+   * Part 1's lesson swept a hand ACROSS a rope. Crossing 1 is the diagonal level now and
+   * its control is a drag between two corners, so the hand has to travel a diagonal
+   * instead — a sweep across anything here would be teaching the previous game.
+   *
+   * WHICH diagonal does not matter and that is the point: all three main ones are
+   * correct, so showing one gives nothing away that the instruction has not already
+   * said. It takes the first (corner 0 to the corner opposite), which for a six-corner
+   * slab is always a main diagonal.
+   *
+   * The box is the diagonal's own span with a little padding, in STAGE coordinates —
+   * the slab's `pos` is already stage space and the level does not zoom, so unlike the
+   * rope box there is no world-to-stage step to get wrong.
+   */
+  diagonalBox(g) {
+    const L = g.l2;
+    if (!L || !L.pts || !L.pts.length || L.pieces) return null;
+    // not while it is falling into the river or being lowered back in
+    if (L.fall || (L.respawn || 0) > 0) return null;
+    const n = L.pts.length;
+    const j = n / 2;
+    if (!Number.isInteger(j)) return null;            // no opposite corner to aim at
+    const at = i => ({ x: L.pos.x + L.pts[i].x * L.scale, y: L.pos.y + L.pts[i].y * L.scale });
+    const a = at(0), b = at(j);
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    return {
+      x: cx, y: cy,
+      rx: Math.max(90, Math.abs(b.x - a.x) / 2 + 46),
+      ry: Math.max(70, Math.abs(b.y - a.y) / 2 + 46),
+      /* The two ends, so the hand can travel the real line rather than a horizontal
+         sweep through the middle of a box. */
+      from: a, to: b,
+      world: false
+    };
+  }
+
   ropeBox(g) {
     const hang = ((g.l1 && g.l1.shapes) || []).filter(s => s.state === 'hang');
     if (!hang.length) return null;
@@ -567,6 +627,8 @@ export class Tutorial {
 
   next() {
     if (this.game.saySign) this.game.saySign('');      // the plank goes back to its question
+    // a drawn demonstration belongs to the step that asked for it and to nothing after it
+    if (this.game._l2Demo) this.game._l2Demo(false);
     this.step++;
     this.t = 0;
     this.spoke = false;                                // the new step has not been read aloud yet
@@ -579,6 +641,10 @@ export class Tutorial {
 
   finish() {
     if (this.game.saySign) this.game.saySign('');
+    /* AND THE DRAWN DEMONSTRATION GOES. A tutorial that is skipped, or that throws and
+       is finished by the failsafe in main.js, must not leave a dashed line lying across
+       the slab for the rest of the level. */
+    if (this.game._l2Demo) this.game._l2Demo(false);
     if (this.done) return;
     this.done = true;
     // the tutorial is over: the game must never be left believing a line is still up
@@ -799,6 +865,11 @@ export class Tutorial {
     if (s.handOnly) {
       if (this.el.bubble) this.el.bubble.hidden = true;
       this.hideFocus();
+      /* A step whose demonstration is DRAWN BY THE ENGINE turns it on here rather than
+         showing a hand of its own — see the note on the cut step. Kept in step with the
+         step itself, and switched off again in finish()/next(), so a tutorial that is
+         skipped or that throws can never leave a demo line on the slab. */
+      if (s.demo && this.game._l2Demo) this.game._l2Demo(true);
       this.show(this.toView(box, g), '', false, s.hand || null, false, null, true);
       return;
     }

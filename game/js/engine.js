@@ -769,11 +769,21 @@ export const CFG = {
          6 and 7 ask for EVERY pentagon and EVERY hexagon across regular,
          irregular-convex and concave examples - the lesson being that the number of
          sides is the only thing that decides. */
-      { id: 1, ditches: 1, options: 3,
-        targets: ['regularTriangle'],
-        distractors: ['regularPentagon', 'regularHexagon'],
-        rotate: 0, tutorial: true, swing: 0,
-        instruction: 'Cut the triangle.' },
+      /* CROSSING 1 IS NO LONGER HERE. It was "Cut the triangle." — one crevasse, three
+         hanging blocks, and the crossing the tutorial taught the cut on. Part 2
+         replaces the journey's crossings one at a time and this is the first one done:
+         it is now "Cut the shape along its diagonal.", which is a different mechanic
+         (a drag between two corners of one slab) and therefore lives in CFG.levelTwo
+         and its own states rather than in this list.
+
+         The list is what remains of the ORIGINAL journey, in order, and it shrinks as
+         the replacements land. Nothing here is renumbered when one goes: `id` is the
+         crossing's name in jumpBefore and in the tests, not its position, and
+         renumbering the survivors every time would make every id in the repo a moving
+         target. So the ids below start at 2 and that is correct.
+
+         `tutorial: true` went with it. The tutorial's cut lesson now teaches the
+         diagonal drag, because that is what crossing 1 asks for — see tutorial.js. */
 
       { id: 2, ditches: 1, options: 3,
         targets: ['regularQuadrilateral'],
@@ -856,7 +866,10 @@ export const CFG = {
        had established itself, and the sky — which advances with phases repaired —
        barely had time to move between them. Eight seconds is long enough to watch the
        journey and short enough that a learner never waits for the next thing to do. */
-    runMs: [7500, 8500, 8000, 9000, 8000, 9000, 8500]
+    /* ONE ENTRY PER SURVIVING CROSSING, so this shrinks with `phases`. The 7500 that
+       led the triangle crossing went with it — the diagonal level's own lead-in is the
+       opening run (timing.run1) and its overview beat. */
+    runMs: [8500, 8000, 9000, 8000, 9000, 8500]
   },
 
   /* ================= LEVEL 2 — "Cut the shape along its diagonal." =================
@@ -899,31 +912,138 @@ export const CFG = {
      So a short diagonal is not called wrong — it IS a diagonal, and saying otherwise
      would teach the wrong thing — it gets its own nudge asking for the cut that goes
      right across. Only the three main diagonals complete the level. */
+  /* ================= PART 2, LEVEL 1 — "Cut the shape along its diagonal." =============
+
+     Two crevasses open with a slab of glacier ice left standing on the pillar between
+     them. The learner drags corner to corner; the slab comes apart along that diagonal
+     and the two halves drop in as the bridge.
+
+     THE SHAPE IS THE DELIVERED ART, and that decided more than it looks like it should.
+     `shape` names an entry in option-shapes.js, whose ring is TRACED OFF THE PICTURE by
+     tools/build-option-shapes.mjs — and that traced ring is NOT the same hexagon as
+     polygons.js defines under the same name. For Part 1 the difference is invisible
+     because the question there is "how many sides"; here the child drags between corner
+     handles drawn ON the picture, so the handles have to sit on the PAINTED corners or
+     they are aiming at one corner and hitting another. The geometry therefore comes
+     from the art, and `cutRing()` is the one place that is decided.
+
+     THE HOLES ARE SIZED FROM THE SHAPE, at run time, and not written down here. A main
+     diagonal of this ring cuts anywhere between 388 and 473 px depending which one is
+     chosen, so the holes are cut to the SHORTEST of them — every main diagonal then
+     bridges, the longer ones simply taking a deeper seat on the lips. Deriving it means
+     re-cutting the artwork re-sizes the crevasses by itself; a constant here would
+     quietly stop matching the picture. See layoutLevelTwo().
+
+     A REGULAR HEXAGON, and it is the right shape for more than looks. Its three main
+     diagonals are identical, so every correct answer leaves the same two halves —
+     191px tall against a 234px cavity, a 440px cut edge over a 413px hole. Every rule
+     holds with room to spare: the holes clear the 400px "or a jump carries it" floor
+     (§6), the pair plus the pillar is 946 against the 960 the row allows, and the
+     halves seat at 1.0 so nothing is ever seen to resize.
+
+     An irregular hexagon was tried first and its main diagonals cut anywhere between
+     388 and 473px, which forced the holes down to 365 — under that floor — and made
+     the two halves different sizes depending which diagonal was chosen. Regular is
+     both fairer and tidier: whichever answer the learner picks, the bridge is the same. */
   levelTwo: {
     /* Turn this off and the last mended crossing leads straight into the run home,
        exactly as it did while the level was parked. Nothing else has to change. */
     enabled: true,
-    hexR: 220,
+    /* The delivered block this level is about. Named, not inlined, so the art and the
+       geometry can only ever come from the same record. */
+    shape: 'regularHexagon',
+    /* 139, and it is the ONLY value that works once the crevasse is drawn properly.
+       A hole's visible cut is its throat x 1.6 (see layoutLevelTwo), so the slab's
+       diagonal sets the throat, the throat sets the mouth, and two mouths plus the
+       pillar have to fit the 960px the row allows. Solved: R must clear 131 for the
+       mouth to beat the 400px unjumpable floor and stay under 145 for the pair to fit.
+       139 lands the mouth at 418 — within three pixels of the 415 Part 1's own
+       two-crevasse phases use, which is why it now looks like the rest of the game.
+
+       It is SMALL AT REST on purpose: 278px standing on a 120px pillar. The slab is not
+       cut at that size — the focus beat enlarges it 2.63x to 731px, bigger than it has
+       ever been — so the only thing R decides is how the crossing looks, and how big
+       the answer is when it lands in it. */
+    hexR: 139,                // half the slab's drawn width; the ring is normalised to +-1
     ditchGap: 120,            // the pillar the slab balances on, between the two holes
     bearing: 0.03,            // the overlap each half takes on its lip; levelOne.bearing
     /* Where the slab rests before it is cut: on the pillar, overhanging both holes.
        It is far wider than what it is standing on, which is the picture — a slab that
-       plainly cannot stay there, and two holes either side that it is exactly twice
-       the size of. */
+       plainly cannot stay there, and two holes either side it is about twice the size of. */
     homeLift: 6,              // px of daylight under it, so it reads as resting not sunk
+
+    /* THE SCENE IS SHOWN BEFORE IT IS ASKED ABOUT. The whole picture — mammoth, both
+       holes, the slab standing between them — is held for this long with the controls
+       locked, so the child reads the PROBLEM before being handed the question. It is a
+       beat, not a loading pause: a tap skips the rest of it, because a returning player
+       should not sit through it twice. */
+    /* 2200, from 1350. Measured against what the beat is FOR rather than against how
+       long it feels to someone who already knows the answer: the child has to find the
+       mammoth, see that the path has two holes in it, and notice the block standing
+       between them — three things, and the last one is the smallest object on screen.
+       At 1350 the question arrived while that was still being taken in and the beat
+       read as a stutter before the real thing. A tap still skips it. */
+    overviewMs: 2200,
+    /* Then the slab announces itself: it glows and swells in place before it travels.
+       The glow is what says "this one" — without it the move reads as the game taking
+       the object away rather than as the object being picked up.
+
+       The pop runs in the LAST part of the overview and the travel follows it, so the
+       three read as one gesture: seen, singled out, brought forward. */
+    popMs: 520, popK: 1.14, glowMs: 760,
+    /* THE TRAVEL, and it is slower than Part 1's camera moves on purpose. T.focus is
+       500ms, which is right for a camera easing onto a row of blocks and too fast for
+       an object crossing most of the stage — at that speed it jumps rather than moves,
+       and the eye loses which thing it was. 820 is long enough to follow. */
+    focusMs: 820,
     /* THE LOOK. The slab moves to the middle of the stage and grows while the question
        is being asked, and goes back when it is answered. This is the whole of the level's
        framing: there is no camera zoom, because the subject is one object and moving the
        object is cheaper and steadier than moving the world around it. */
-    focusX: 0.5, focusY: 0.52, focusK: 1.22,
+    /* THE SIZE IT IS CUT AT, which is nothing to do with the size it rests at. The slab
+       stands 278px wide on the pillar (hexR, set by the crevasse geometry) and is drawn
+       at 731 x 633 for the cut — reported as "not enough big to cut", and at the old
+       size it genuinely was a picture of a block rather than something to draw a line
+       on, especially on a phone stage rendering the whole 1920 into 844.
+
+       2.63 is the largest that clears both edges. focusY 0.47 rather than dead centre:
+       the stage's lower band is ice and crevasse, so hanging the slab on the exact
+       middle left a wide empty strip under it — the reported "bottom negative space".
+       At 0.47 its bottom sits at 825, just above the 840 walking line, and the
+       composition closes up. */
+    focusX: 0.5, focusY: 0.47, focusK: 2.63,
     dragSnap: 1.9,            // x cut.vertexSnap: how near a corner a finger has to land
     wrongMs: 700,             // how long a nudge holds before the slab is live again
     holdMs: 200, unfocusMs: 320,
+
+    /* A WRONG CUT LOSES THE SLAB TO THE RIVER, and then another one is sent down — the
+       owner's ask, and the recovery is the half that makes it safe. A level with one
+       object in it cannot simply destroy that object on a wrong answer: it would be
+       unwinnable, which is the one thing a wrong answer must never make it. So the fall
+       is the joke and the replacement is the mechanism.
+
+       IT IS GRADED, because the three wrong things are not equally wrong:
+
+         a side                 the misunderstanding this level exists to correct.
+                                The slab shears, tips and goes in the water.
+         a SHORT diagonal       still a diagonal — the child has understood the idea and
+                                only picked one that cannot span. It wobbles and holds;
+                                dropping it would punish the concept being taught.
+         no corner at all       a slip of the finger, not an answer. A wobble, nothing more.
+
+       Say the word and every miss can drop it instead — it is the `drops` flag below. */
+    wrongDrops: { side: true, shortDiagonal: false, corners: false },
+    dropMs: 900,              // the tumble into the water
+    respawnMs: 1100,          // the next slab lowering into place
     instructions: {
       corners: 'Connect two corners.',
       side: "That's a side — try a diagonal.",
       shortDiagonal: 'Cut right across, corner to opposite corner.'
-    }
+    },
+    /* The recorded line for the question. Nothing is recorded under this id yet, so
+       say() logs it and returns 0 and the level is simply silent — see the note in
+       docs/VO-SCRIPT.md. Wiring it now means the take drops straight in. */
+    voId: 'p2-1-diagonal'
   },
   /* THE MUSIC BED. One looping track under everything.
 
@@ -5322,8 +5442,8 @@ export function createGame(canvas, hooks = {}) {
      the rest are the puzzle; several checks below want to ask "is this Level 2?"
      without listing them again, and a list written out twice is a list that drifts. */
   const L2_RUN_STATES = ['RUN_SEGMENT_2', 'JUMP_CHALLENGE_2', 'POST_JUMP_RUN_2', 'GLACIER_BREAK_2'];
-  const L2_PUZZLE_STATES = ['LEVEL_2_INTRO', 'LEVEL_2_FOCUS', 'LEVEL_2_ACTIVE',
-    'LEVEL_2_WRONG_FEEDBACK', 'LEVEL_2_SUCCESS', 'BRIDGE_2_COMPLETE'];
+  const L2_PUZZLE_STATES = ['LEVEL_2_INTRO', 'LEVEL_2_OVERVIEW', 'LEVEL_2_FOCUS',
+    'LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK', 'LEVEL_2_SUCCESS', 'BRIDGE_2_COMPLETE'];
   const L2_STATES = new Set([...L2_RUN_STATES, ...L2_PUZZLE_STATES]);
 
   // Day/night follows JOURNEY MILESTONES, never wall-clock or extra distance spent
@@ -5460,6 +5580,12 @@ export function createGame(canvas, hooks = {}) {
 
      What is left is exactly what hud.js and main.js consume. */
   function pushHud() {
+    /* PUBLISHED ON THE STATE OBJECT, not only in the payload below. The DOM layer that
+       raises the blur sheet has to repaint the sharp slab EVERY frame, so it runs its
+       own animation frame and reads this directly — the payload is diffed and only
+       delivered on a change, which is right for the sheet and useless for the canvas.
+       pushHud runs at the end of every update, so this is per-frame. */
+    G.p2Focus = p2FocusOn();
     const h = {
       /* IT STAYS UP FOR THE WHOLE PLAYABLE PHASE. It used to slide away a few seconds
          after arriving, which meant the one thing telling the learner what to look for
@@ -5499,6 +5625,14 @@ export function createGame(canvas, hooks = {}) {
       /* A tutorial line is a SENTENCE, not a question: it is too long for the plank's left band,
          so the HUD widens and centres the plank for it (see .instruction.banner). */
       signBanner: !!G.signSay,
+      /* PART 2's FOCUS LAYER, and whether the plank should move to the middle.
+         `p2Focus` raises the blur sheet and the sharp-slab canvas; `signCentre` is
+         true for the whole of Part 2's crossing so the question does not hop back to
+         the left band between beats. Two flags because they turn on at different
+         moments: the sign centres as soon as the crossing opens, the blur waits until
+         the scene has been read. */
+      p2Focus: p2FocusOn(),
+      signCentre: !!G.l2 && L2_PUZZLE_STATES.includes(G.state),
       // how long the spoken question runs, so the HUD can reveal the words in step with it
       voDur: G.voDur || 0,
       jumpEnabled: G.jumpEnabled, complete: G.complete,
@@ -5666,13 +5800,32 @@ export function createGame(canvas, hooks = {}) {
       case 'POST_JUMP_RUN_2': G.hitCount = 0; break;
       case 'GLACIER_BREAK_2': G.jumpEnabled = false; startBreak(2); break;
       case 'LEVEL_2_INTRO':
+        /* He arrives at the edge and reacts. NO QUESTION YET — the sentence used to go
+           up here, which put words on screen while he was still recoiling from the hole.
+           The reaction, then the whole picture (LEVEL_2_OVERVIEW), then the question. */
         G.level = 2; G.jumpEnabled = false;
-        G.instruction = (CFG.levels[1] && CFG.levels[1].instruction) || '';
-        armInstruction(T.instructionHold);
+        G.instruction = ''; G.signSay = '';
         // let the tremble that started at the stop play out into the head-down look
         if (mammoth.state !== 'SHAKE') mammoth.setState('LOOK_DOWN');
         buildLevel2(); break;
-      case 'LEVEL_2_FOCUS': audio.setDuck(0.75); break;
+      /* THE WHOLE PICTURE, BEFORE THE QUESTION. Mammoth, both holes, and the slab left
+         standing between them — held with the controls locked so the child reads the
+         PROBLEM first and the question arrives as the answer to something already seen.
+         The slab glows and swells at the end of it (updateL2), which is the hand-off. */
+      case 'LEVEL_2_OVERVIEW':
+        G.jumpEnabled = false;
+        G.instruction = ''; G.signSay = '';
+        if (!G.l2) buildLevel2();
+        break;
+      case 'LEVEL_2_FOCUS':
+        audio.setDuck(0.75);
+        /* THE QUESTION ARRIVES WITH THE MOVE, not before it. It is put up here rather
+           than in the overview so the sentence and the slab travelling to the middle are
+           one event — the thing lights up, comes forward, and is asked about. */
+        G.instruction = (CFG.levels[1] && CFG.levels[1].instruction) || '';
+        armInstruction(T.instructionHold);
+        if (L2.voId) G.voDur = audio.say(L2.voId) || 0;
+        break;
       case 'LEVEL_2_ACTIVE': G.idle = 0; G.idleHand = 0; if (!G.l2) buildLevel2(); break;
       case 'LEVEL_2_WRONG_FEEDBACK': break;
       case 'LEVEL_2_SUCCESS': G.signSay = ''; break;
@@ -7179,6 +7332,15 @@ export function createGame(canvas, hooks = {}) {
       G.introT = T.gapBeat;                   // straight to the ice coming down
       return true;
     }
+    /* PART 2's SCENE-READING BEAT, skippable for the same reason as the rest of the
+       pre-roll: it exists so a first-time player can take the problem in, and a player
+       who already has should not be made to watch it again. What is skipped is the
+       WAITING — the slab still lights up and still travels, because that hand-off is
+       what says which object the question is about. */
+    if (G.state === 'LEVEL_2_OVERVIEW' && G.st < (L2.overviewMs || 1350) - 1) {
+      G.st = (L2.overviewMs || 1350) - 1;
+      return true;
+    }
     return false;
   }
 
@@ -7230,7 +7392,13 @@ export function createGame(canvas, hooks = {}) {
        Armed through the wrong-feedback beat as well, for the same reason Level 1's
        slash is: a learner who starts the next attempt while the nudge is still up
        should not have it thrown away. The COMMIT is still gated to LEVEL_2_ACTIVE. */
-    if (G.l2 && ['LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state)) {
+    /* NOT WHILE THE SLAB IS IN THE AIR. Armed through the nudge as well as the live
+       state, so a stroke begun a moment early is not thrown away — but never while it
+       is falling into the river or being lowered back, because there is nothing there
+       to take hold of and a drag started mid-flight would anchor to a corner that is
+       about to move. */
+    if (G.l2 && !G.l2.fall && !(G.l2.respawn > 0) &&
+        ['LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state)) {
       const L = G.l2;
       const vi = nearestVertex(p.x, p.y);
       L.dragFrom = vi;
@@ -7678,7 +7846,15 @@ export function createGame(canvas, hooks = {}) {
       case 'JUMP_CHALLENGE_1':
         if (obstacles.list.length && obstacles.list.every(o => o.passed)) setState('POST_JUMP_RUN_1');
         break;
-      case 'POST_JUMP_RUN_1': if (G.st > T.postJump1) setState('GLACIER_BREAK_1'); break;
+      /* THE FIRST CROSSING IS THE DIAGONAL LEVEL.
+         Part 2 replaces the old crossings one at a time, and this is the first one
+         done: what used to be "Cut the triangle." is now "Cut the shape along its
+         diagonal." The old hanging-option crossings follow behind it and take over
+         from BRIDGE_2_COMPLETE, until they are replaced too. L2_ON switches it back
+         to the original triangle crossing if the level is ever turned off. */
+      case 'POST_JUMP_RUN_1':
+        if (G.st > T.postJump1) setState(L2_ON ? 'GLACIER_BREAK_2' : 'GLACIER_BREAK_1');
+        break;
       case 'OBSTACLE_HIT':
         /* THE CRASH PLAYS OUT AND THE RUN RESUMES BY ITSELF. No panel, no button.
 
@@ -7715,15 +7891,38 @@ export function createGame(canvas, hooks = {}) {
          out first: the clock does not run while he is still reacting to the hole. */
       case 'LEVEL_2_INTRO':
         if (mammoth.state === 'SHAKE') break;
-        if (G.st > T.levelIntro + T.gapBeat) setState('LEVEL_2_FOCUS');
+        if (G.st > T.levelIntro) setState('LEVEL_2_OVERVIEW');
         break;
-      case 'LEVEL_2_FOCUS': if (G.st > T.focus) setState('LEVEL_2_ACTIVE'); break;
+      /* The scene is held, then handed on. `skipPreRoll` lets a tap cut it short — the
+         beat is for reading, and a player who has already read it should not wait. */
+      case 'LEVEL_2_OVERVIEW':
+        if (G.st > (L2.overviewMs || 1350)) setState('LEVEL_2_FOCUS');
+        break;
+      case 'LEVEL_2_FOCUS': if (G.st > (L2.focusMs || T.focus)) setState('LEVEL_2_ACTIVE'); break;
       case 'LEVEL_2_ACTIVE': break;
-      case 'LEVEL_2_WRONG_FEEDBACK':
-        if (G.st > (CFG.levelTwo.wrongMs || 700)) { G.signSay = ''; setState('LEVEL_2_ACTIVE'); }
+      /* THE NUDGE HOLDS, AND SO DOES ANYTHING STILL MOVING. A wrong cut that only
+         wobbled the slab is over in wrongMs; one that tipped it into the river is over
+         when the replacement has finished coming down. Returning to ACTIVE on the timer
+         alone would hand the controls back to a child watching a block fall. */
+      case 'LEVEL_2_WRONG_FEEDBACK': {
+        const L = G.l2;
+        const busy = !!(L && (L.fall || L.respawn > 0));
+        if (!busy && G.st > (L2.wrongMs || 700)) { G.signSay = ''; setState('LEVEL_2_ACTIVE'); }
         break;
+      }
       case 'LEVEL_2_SUCCESS': updateL2Success(dt); break;
-      case 'BRIDGE_2_COMPLETE': if (G.st > T.celebrate) setState('FINAL_RUN'); break;
+      /* AND IT HANDS ON TO WHATEVER IS LEFT OF THE OLD JOURNEY. The diagonal level is
+         crossing one; the crossings still to be replaced follow it, starting at phase
+         index 0. When the last of them has been replaced this becomes the run home
+         on its own — `phases` being empty is the end of the list, not a special case. */
+      case 'BRIDGE_2_COMPLETE':
+        if (G.st > T.celebrate) {
+          G.l2 = null; G.gapsThisPhase = null; G.gapA = null; G.gapB = null;
+          G.phasesDone = Math.max(G.phasesDone, 1);
+          G.phase = 0;
+          setState(L1.phases.length ? 'PHASE_RUN' : 'FINAL_RUN');
+        }
+        break;
       case 'PHASE_INTRO':
         /* Read, then act. The panel owns the first beat by itself; when it slides
            away the ropes lower their chunks in, and only then is the phase playable. */
@@ -9168,8 +9367,34 @@ export function createGame(canvas, hooks = {}) {
         ground.drawLips(fx, G.worldX);
         break;
       case 'blocks': if (G.l1) drawHangingShapes(fx, false, true); break;
+      /* PART 2's SLAB, ALONE. Drawn onto the focus canvas above the blur sheet so the
+         block the learner is working on is the one sharp thing on the screen. It is the
+         same draw call the main canvas would make — one object, one renderer — and the
+         main canvas skips it while this is running (see p2FocusOn / drawL2), so there is
+         never a second copy underneath. */
+      case 'slab': if (G.l2) drawL2(fx); break;
     }
     fx.restore();
+  }
+
+  /* IS THE FOCUS LAYER SHOWING THE SLAB?
+     True from the moment it starts travelling to the middle until the answer resolves —
+     the beats where the block is the subject and the world behind it should be pushed
+     back. Deliberately NOT during the overview: that beat exists so the whole picture
+     can be read, and blurring the picture you are asking someone to read defeats it. */
+  function p2FocusOn() {
+    const L = G.l2;
+    if (!L || L.seated) return false;
+    /* AND NOT WHILE THE SLAB IS BEING LOST. A wrong cut sends it back to the pillar and
+       into the river, and the whole point of that beat is that the learner watches the
+       WORLD react — the block tumbling past the ice, the splash, Momo trembling at the
+       edge. Holding the blur through it would keep all of that behind frosted glass and
+       leave the child looking at a sharp block falling through a soft nothing. So the
+       focus drops the instant the slab is lost, the scene comes back, and it is put up
+       again with the replacement. Reported as exactly this: the wrong cut never "showed
+       back to normal screen". */
+    if (L.fall || L.respawn > 0) return false;
+    return ['LEVEL_2_FOCUS', 'LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state);
   }
 
   /* THE CELEBRATION SHEET. 36 frames of 754x434 in a 6x6 grid, authored at 100ms a frame
@@ -9298,7 +9523,13 @@ export function createGame(canvas, hooks = {}) {
        here too, and only when they have LANDED does it hand over to the crossing's own
        renderer (drawRepairedPieces), which draws under him — because by then they are
        the ground he is about to walk on. */
-    if (G.l2) drawL2(ctx);
+    /* ONE SLAB, NEVER TWO. While the focus layer is showing it sharp above the blur,
+       the main canvas leaves it out entirely — drawing it here as well would put a
+       blurred copy directly under a sharp one, which is the double edge and ghost
+       outline that layering like this produces if you forget. Outside those beats
+       (the overview, the fall, the flight into the holes) the focus layer is down and
+       the slab is drawn here as normal. */
+    if (G.l2 && !p2FocusOn()) drawL2(ctx);
     drawTaps(ctx);                    // over everything: it is the player's own mark
     ctx.restore();
   }
@@ -9329,19 +9560,79 @@ export function createGame(canvas, hooks = {}) {
        has three right answers (the three main diagonals) and never points at one. */
   const L2 = CFG.levelTwo;
 
+  /* THE SLAB'S GEOMETRY, AND IT COMES OFF THE PICTURE.
+
+     option-shapes.js is generated by tracing the delivered artwork, so this ring is the
+     outline a child actually sees. polygons.js also defines a shape under the same name
+     and it is a DIFFERENT hexagon — fine for Part 1, where the question is how many
+     sides, and wrong here, where the corner handles are drawn on the picture and dragged
+     between. One function so there is one answer, and everything downstream — the
+     handles, the hit test, the cut, the halves, the holes they are cut to — is derived
+     from it and cannot drift from what is on screen. */
+  /* THE RING AND THE PICTURE THAT GOES ON IT, built together and never apart.
+
+     paintGlacierChunk applies translate(-off), scale(k), rotate(rot) to the artwork and
+     clips it to the ring, so the two only line up if the same numbers made both. That
+     is why this returns a pair rather than a ring: seatedChunk earns this by rotating a
+     shape onto its longest edge, and the note there records what it cost to get wrong —
+     a picture sitting thirteen pixels off its own outline. There is no rotation here
+     (the slab hangs as drawn), so the whole transform is the centring and the scale. */
+  function cutShapeAndArt() {
+    const rec = optionShapes[L2.shape];
+    const raw = rec ? rec.points : regularHexagon(1);
+    const R = L2.hexR;
+    const b = polyBounds(raw);
+    const c = { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 };
+    return {
+      pts: raw.map(p => ({ x: (p.x - c.x) * R, y: (p.y - c.y) * R })),
+      art: rec ? { id: L2.shape, rot: 0, scale: R, off: { x: c.x * R, y: c.y * R },
+                   box: { x: b.x0, y: b.y0, w: b.w, h: b.h } } : null
+    };
+  }
+  function cutRing() { return cutShapeAndArt().pts; }
+
+  /* HOW WIDE A HOLE THE SHORTEST MAIN DIAGONAL CAN BRIDGE.
+
+     Every main diagonal is a correct answer, so the crossing has to be spannable by
+     whichever one is chosen — which means it is cut to the SHORTEST of them, and the
+     longer ones simply take a deeper seat on the lips. Measured off the ring rather
+     than written down, so re-cutting the artwork re-sizes the crevasses by itself
+     instead of quietly leaving a constant that no longer matches the picture. */
+  function minMainCut() {
+    const pts = cutRing();
+    const n = pts.length;
+    let m = Infinity;
+    for (let i = 0; i < n; i++) {
+      const j = i + n / 2;
+      if (!Number.isInteger(j) || j >= n) continue;      // odd n has no "opposite" corner
+      m = Math.min(m, Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y));
+    }
+    return Number.isFinite(m) ? m : 2 * L2.hexR;
+  }
+
   /* THE TWO CREVASSES, cut to the halves that will bridge them.
 
-     Sized from the hexagon rather than picked: a main diagonal is 2R long, so a half's
-     cut edge is 2R and the hole under it is that less the bearing it takes on each lip.
-     This is the same relationship Level 1's layoutPhase uses — the ditch is cut from the
-     piece, never the other way round — which is what makes the mend read as a bridge
-     and not as a block dropped into a hole.
+     The ditch is cut FROM the piece, never the other way round — the same relationship
+     Level 1's layoutPhase keeps, and what makes the mend read as a bridge rather than
+     as a block dropped in a hole.
 
      Laid out from the same lead as Level 1's group, so the pair sits under where the
      slab is standing and clear of the character. */
+  /* A CREVASSE HAS A NECK AND A VOID, and getting that wrong is what made this one look
+     wrong. Reported as "the ditch design is not natural like the other old levels" — and
+     it was a plain straight-sided box, because of one field.
+
+     Part 1 cuts a hole whose OPENING at the walking line is plug-wide (`throat`) and
+     whose sides then flare out below it to a wider void (`x1 - x0`, the mouth). The
+     renderer derives the whole undercut from the ratio of the two — `mk = (x1-x0)/throat`
+     in _ditchPath — so setting throat equal to the full width, as this did, makes mk 1
+     and there is no undercut left to draw: a rectangle with square shoulders, sitting in
+     ice that everywhere else overhangs. Mirroring Part 1's arithmetic is the fix, and it
+     is why hexR is 139 — that is the only size at which two flared crevasses wide enough
+     to be unjumpable still fit between the character and the right edge. */
   function layoutLevelTwo(originX) {
-    const R = L2.hexR;
-    const gapW = Math.round(2 * R * (1 - 2 * L2.bearing));
+    const throatW = Math.round(minMainCut() * (1 - 2 * L2.bearing));
+    const gapW = Math.round(throatW * (L1.mouth || 1));      // the visible cut: the MOUTH
     const groupW = gapW * 2 + L2.ditchGap;
     const rowMid = (CFG.mammothX + L1.clearOfPlayer + (CFG.W - 60)) / 2;
     const lead = clamp(
@@ -9351,7 +9642,12 @@ export function createGame(canvas, hooks = {}) {
     );
     ground.gaps = ground.gaps.filter(g => g.repaired);
     const gaps = [];
-    let x = originX + lead;
+    /* THE NEAR LIP IS THE NECK, NOT THE VOID. x0 is the edge of the cavity underneath,
+       which sits inside the platform; the opening the character stops at starts half an
+       overhang further in. Without this shift he halts an overhang short of the edge he
+       is supposed to be standing on — the same correction layoutPhase makes. */
+    const ins0 = (gapW - throatW) / 2;
+    let x = originX + lead - ins0;
     for (let i = 0; i < 2; i++) {
       /* The record is Level 1's, field for field, because everything downstream reads
          it: ground.drawDitch paints the undercut and the water, drawCracks runs the
@@ -9359,12 +9655,15 @@ export function createGame(canvas, hooks = {}) {
          the current crossing, and drawRepairedPieces draws whatever is seated in it.
          A second shape of gap record would mean a second copy of all of that. */
       const g = ground.addGap({
-        x0: x, x1: x + gapW, throat: gapW, open: 0, repaired: false,
+        x0: x, x1: x + gapW, throat: throatW, open: 0, repaired: false,
         crack: 0, crackPts: makeCrack(),
         bridge: 0, splashes: null, slots: [], pieces: []
       });
-      // one slot, the whole crevasse: a half IS its hole, so there is nothing to share out
-      g.slots.push({ gapIndex: i, x0: x, x1: x + gapW, full: true, filled: false, reserved: false, kind: null });
+      /* One slot, and it spans the THROAT — the neck the half actually wedges at, inset
+         inside the wider mouth. Spanning the mouth instead would seat the piece to the
+         void rather than to the opening, which is the same mistake in a second place. */
+      const ins = (gapW - throatW) / 2;
+      g.slots.push({ gapIndex: i, x0: x + ins, x1: x + ins + throatW, full: true, filled: false, reserved: false, kind: null });
       gaps.push(g);
       x += gapW + L2.ditchGap;
     }
@@ -9374,19 +9673,33 @@ export function createGame(canvas, hooks = {}) {
   /* The slab, standing on the pillar between the two holes. It is twice as wide as what
      it is balanced on, which is the picture the level opens with: plainly too big for
      where it is, and exactly the right size for the two holes either side. */
-  function buildLevel2() {
+  function buildLevel2(keepScore) {
     if (!G.gapA || !G.gapB) return;
-    G.attempts = 0; G.idle = 0;
+    if (!keepScore) { G.attempts = 0; }
+    G.idle = 0;
     const R = L2.hexR;
+    const { pts, art } = cutShapeAndArt();
+    /* IT SITS ON THE PILLAR, ON ITS OWN FEET. The rest height is measured off the ring
+       rather than assumed from R — the traced outline is not symmetric, so half its
+       drawn height is not half its width, and a fixed drop left it either buried in the
+       ice or hovering above it. */
+    const b = polyBounds(pts);
     const cx = (G.gapA.x1 + G.gapB.x0) / 2 - G.worldX;
-    const cy = CFG.surfaceY - Math.sin(Math.PI / 3) * R - L2.homeLift;
+    const cy = CFG.surfaceY - b.y1 - L2.homeLift;
     G.l2 = {
-      R, pts: regularHexagon(R),
+      R, pts, art,
       home: { x: cx, y: cy }, pos: { x: cx, y: cy },
       scale: 1, focusT: 0,
       dragFrom: -1, dragStart: null, dragPt: null, dragId: undefined,
       pieces: null, split: 0, planned: false, locked: false, chipped: false,
-      badLine: null, cornerPulse: 0, wrong: 0, cut: null
+      badLine: null, cornerPulse: 0, wrong: G.l2 ? G.l2.wrong : 0, cut: null,
+      /* THE POP. Rises 0 -> 1 while the slab announces itself, and drives both the
+         glow and a small swell in place. Separate from `focusT` (the travel to centre)
+         so the two read as two beats — noticed, then picked up — rather than one move. */
+      pop: 0, glow: 0,
+      /* THE FALL, when a wrong cut tips it into the river, and the replacement coming
+         down behind it. Both null in the ordinary case; see loseSlab(). */
+      fall: null, respawn: 0
     };
   }
 
@@ -9417,13 +9730,67 @@ export function createGame(canvas, hooks = {}) {
       two pieces that can each bridge a hole. See the note on CFG.levelTwo. */
   function isMainDiagonal(i, j) { return Math.abs(i - j) === 3; }
 
+  /* A WRONG CUT, and how badly it goes depends on which wrong thing was done.
+
+     The nudge and the amber line are the same for all three. What differs is whether
+     the slab survives it: a SIDE is the misunderstanding this level exists to correct,
+     so the slab shears, tips and goes into the water and another is sent down. A short
+     diagonal is still a diagonal and only wobbles — dropping it would punish the child
+     for having understood the idea. A stroke that reached no corner is a slip, not an
+     answer, and costs nothing at all. CFG.levelTwo.wrongDrops is the switch. */
   function rejectCut(kind, a, b) {
     const L = G.l2;
     L.wrong++;
     L.badLine = { a, b, t: 0, kind };
     G.signSay = L2.instructions[kind] || '';
     audio.reject();
+    if ((L2.wrongDrops || {})[kind]) loseSlab(a, b);
+    else {
+      // it holds: a shove and a shiver, so the miss is still felt
+      L.shake = 1;
+      mammoth.jolt(reduced ? 0.2 : 0.4);
+    }
     setState('LEVEL_2_WRONG_FEEDBACK');
+  }
+
+  /* THE SLAB GOES IN THE RIVER — the owner's ask, and the joke of the level.
+
+     It shears along the line that was drawn, tips off the pillar and tumbles into the
+     meltwater with a splash; the mammoth watches it go and trembles. Then another slab
+     is lowered onto the pillar and the question is asked again.
+
+     THE REPLACEMENT IS THE POINT, not a detail. This level has exactly one object in
+     it, so destroying that object on a wrong answer would make the level unwinnable —
+     the one thing a wrong answer must never do (§16 of the brief, and Part 1's own
+     rule that a wrong cut removes nothing but itself). The fall is the feedback; the
+     new slab is what keeps it a game. `wrong` is carried across the rebuild so the
+     count is of the learner's attempts and not of the slabs. */
+  function loseSlab(a, b) {
+    const L = G.l2;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const away = mid.x < L.pos.x ? 1 : -1;      // it tips away from where it was weakened
+    L.fall = {
+      /* TWO BEATS, and the first one is what was missing. The slab is at centre stage
+         at 1.66 when the wrong cut lands, and dropping it from there is a block falling
+         through empty sky — the holes, the river and Momo are all somewhere else. So it
+         goes BACK first: the view unfocuses, the slab returns to the pillar it was
+         standing on at the size it was standing there, and only then does it tip. The
+         child sees where it was, watches it go, and sees what it fell into. */
+      phase: 'return', t: 0,
+      spin: away * rand(1.6, 2.6),
+      vx: away * rand(40, 110),
+      from: { x: L.pos.x, y: L.pos.y, scale: L.scale },
+      splashed: false
+    };
+    L.dragPt = null; L.dragFrom = -1; L.dragId = undefined;
+    /* THE SHEAR, on the line that was drawn. It cracks where the learner cut, which is
+       the one piece of feedback that says WHY it is falling rather than just that it is. */
+    L.shear = { a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, t: 0 };
+    audio.crack();
+    particles.chips(mid.x, mid.y, 10, -170);
+    shake(reduced ? 1.2 : 3, 200);
+    hitStop(CFG.juice.stopHit * 0.5);
+    punch(CFG.juice.punchHit * 0.6, 260, mid.x, mid.y);
   }
 
   function attemptCut(i, j, end) {
@@ -9457,6 +9824,12 @@ export function createGame(canvas, hooks = {}) {
     const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;
     L.pieces.forEach(pc => {
       pc.cx = pc.x; pc.cy = pc.y;
+      /* The slab's picture, moved back by this half's centroid so it stays where it was
+         painted. toPiece() centred `local` on that centroid; shifting `off` by the same
+         amount undoes it for the artwork alone. See drawL2Piece. */
+      pc.art = L.art ? Object.assign({}, L.art, {
+        off: { x: L.art.off.x + pc.x, y: L.art.off.y + pc.y }
+      }) : null;
       const side = Math.sign((pc.cx - vi.x) * nx + (pc.cy - vi.y) * ny) || 1;
       pc.sep = { x: nx * side, y: ny * side };
       pc.rotTarget = rand(-0.06, 0.06);
@@ -9525,15 +9898,118 @@ export function createGame(canvas, hooks = {}) {
   function updateL2(dt) {
     const L = G.l2; if (!L) return;
     L.cornerPulse = Math.max(0, L.cornerPulse - dt * 1.4);
+    L.shake = Math.max(0, (L.shake || 0) - dt * 3.4);
+    if (L.shear) { L.shear.t += dt; if (L.shear.t > 0.9) L.shear = null; }
     if (L.badLine) { L.badLine.t += dt; if (L.badLine.t > 0.65) L.badLine = null; }
+
+    /* THE SLAB ANNOUNCES ITSELF BEFORE IT TRAVELS. During the overview it is part of the
+       scenery; the moment the question is coming it glows and swells where it stands, and
+       only then does it move. Two beats — noticed, then picked up — because a shape that
+       simply slides to the middle reads as the game confiscating it. */
+    if (G.state === 'LEVEL_2_OVERVIEW') {
+      const p = clamp((G.st - (L2.overviewMs - (L2.glowMs || 620))) / (L2.glowMs || 620), 0, 1);
+      L.glow = easeOut(p);
+      L.pop = easeBackOut(clamp((G.st - (L2.overviewMs - (L2.popMs || 420))) / (L2.popMs || 420), 0, 1));
+      L.scale = 1 + (L2.popK - 1) * L.pop;
+      return;
+    }
+
+    /* THE FALL. A wrong cut has tipped it off the pillar; it tumbles, hits the meltwater
+       and is gone, and another is lowered in its place. Nothing else in the level runs
+       while this does — the slab is not there to be cut. */
+    if (L.fall) {
+      const f = L.fall;
+      f.t += dt;
+      const wy = CFG.surfaceY + CFG.levelOne.waterDepth;
+
+      /* BEAT ONE: BACK TO THE WORLD. The blur is already down (p2FocusOn drops it the
+         moment `fall` exists), and the slab travels from centre stage back to the
+         pillar at the size it stood there — so by the time it tips, the picture is the
+         ordinary scene with a block teetering over a hole in it. 260ms: long enough to
+         follow, short enough that it reads as recoiling rather than as another move. */
+      if (f.phase === 'return') {
+        const e = easeInOut(clamp(f.t / 0.26, 0, 1));
+        L.pos.x = lerp(f.from.x, L.home.x, e);
+        L.pos.y = lerp(f.from.y, L.home.y, e);
+        L.scale = lerp(f.from.scale, 1, e);
+        L.spin = 0;
+        // a shiver on the way back, so it plainly is not going to survive this
+        L.shake = Math.max(L.shake || 0, 0.7);
+        if (f.t >= 0.26) {
+          f.phase = 'drop'; f.t = 0;
+          f.from = { x: L.home.x, y: L.home.y, scale: 1 };
+          audio.crack();
+          particles.chips(L.home.x, L.home.y + 40, 8, -120);
+        }
+        return;
+      }
+
+      // BEAT TWO: it goes. Gravity is the game's own, so it falls like everything else.
+      L.pos.x = f.from.x + f.vx * f.t;
+      L.pos.y = f.from.y + 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
+      L.spin = f.spin * f.t;
+      if (!f.splashed && L.pos.y >= wy) {
+        f.splashed = true;
+        audio.splash();
+        /* A BLOCK THIS SIZE MAKES A MESS. The splash is thrown wide and a second, later
+           burst gives it the two-stage look water actually has — the crown, then the
+           fallback. Frost on the lip above it, so the crossing itself registers the hit. */
+        particles.splash(L.pos.x, wy, reduced ? 12 : 30);
+        particles.frost(L.pos.x, wy - 20, reduced ? 3 : 7);
+        shake(reduced ? 1 : 3, 240);
+        punch(CFG.juice.punchHit * 0.5, 260, L.pos.x, wy);
+        /* AND HE REACTS, WHERE IT CAN BE SEEN. The owner asked for the mammoth to
+           tremble on a wrong answer; the fright he already has is exactly that
+           performance — the same one the ground giving way produces, which is the right
+           size for watching your bridge sink. It only reads because the focus layer is
+           down by now (see p2FocusOn): trembling behind a blur sheet is trembling
+           nobody sees, which is what the report was about. */
+        mammoth.scare = 0;
+        mammoth.startle(reduced ? 0.55 : 1);
+      }
+      // once it is under the water it is gone; bring the next one down
+      if (L.pos.y > wy + 260) { rebuildSlab(); }
+      return;
+    }
+
+    /* THE REPLACEMENT, lowering onto the pillar. It comes down from above the frame so
+       it plainly ARRIVES rather than appearing, which is what tells the child they get
+       another go rather than that the last second was undone. */
+    if (L.respawn > 0) {
+      L.respawn = Math.max(0, L.respawn - dt * 1000 / (L2.respawnMs || 1100));
+      const e = easeOut(1 - L.respawn);
+      L.pos.x = L.home.x;
+      L.pos.y = lerp(-260, L.home.y, e);
+      L.scale = 1;
+      if (L.respawn <= 0) {
+        L.pos.y = L.home.y;
+        audio.clunk();
+        particles.poof(L.pos.x, CFG.surfaceY, reduced ? 2 : 4, 0.7);
+      }
+      return;
+    }
+
     if (['LEVEL_2_FOCUS', 'LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state)) {
-      const p = G.state === 'LEVEL_2_FOCUS' ? clamp(G.st / T.focus, 0, 1) : 1;
+      const p = G.state === 'LEVEL_2_FOCUS' ? clamp(G.st / (L2.focusMs || T.focus), 0, 1) : 1;
       const e = easeInOut(p);
       L.focusT = e;
+      L.glow = Math.max(0, (L.glow || 0) - dt * 1.6);
       L.pos.x = lerp(L.home.x, CFG.W * L2.focusX, e);
       L.pos.y = lerp(L.home.y, CFG.H * L2.focusY, e);
-      L.scale = lerp(1, L2.focusK, e);
+      L.scale = lerp(L2.popK, L2.focusK, e);
     }
+  }
+
+  /* Another slab onto the pillar, with the attempt count carried over: the number that
+     matters is how many tries the LEARNER has had, not how many blocks the river has
+     eaten. Rebuilt rather than reset so nothing from the ruined one can survive. */
+  function rebuildSlab() {
+    const wrong = G.l2 ? G.l2.wrong : 0;
+    buildLevel2(true);
+    if (!G.l2) return;
+    G.l2.wrong = wrong;
+    G.l2.respawn = 1;
+    G.l2.pos.y = -260;
   }
 
   /* THE ANSWER, in four beats: it parts, it is held apart long enough to be seen as two
@@ -9602,13 +10078,29 @@ export function createGame(canvas, hooks = {}) {
       L.seated = true;
       L.pieces.forEach(pc => {
         const g = pc.gap; if (!g || !pc.seatPts) return;
+        const sl = (g.slots && g.slots[0]) || { x0: g.x0, x1: g.x1 };
         const sb = polyBounds(pc.seatPts);
+        /* THE PICTURE TURNS WITH THE PIECE. seatPts is `local` rotated by seatRot to put
+           the cut edge level; paintGlacierChunk lands an artwork point at
+           k*R(rot)*p - off, so turning the piece means adding seatRot to `rot` AND
+           turning `off` by the same angle — miss the second and the texture slides off
+           the outline the moment the half rotates into place. */
+        const sr = pc.seatRot || 0, cs = Math.cos(sr), sn = Math.sin(sr);
+        const art = pc.art ? Object.assign({}, pc.art, {
+          rot: sr,
+          off: { x: pc.art.off.x * cs - pc.art.off.y * sn,
+                 y: pc.art.off.x * sn + pc.art.off.y * cs }
+        }) : null;
         g.pieces.push({
-          kind: 'half', pts: pc.seatPts, seed: (pc.local.length * 131) | 0, art: null,
+          kind: 'half', pts: pc.seatPts, seed: (pc.local.length * 131) | 0, art,
           topLocal: sb.y0, rot0: 0, rot: 0,
           grow: 0, fit: pc.fit || 1, impact: 1,
-          cx: (g.x0 + g.x1) / 2, cy: CFG.surfaceY,
-          x0: g.x0, x1: g.x1, full: true
+          /* SEATED ON THE NECK, not on the middle of the void. The mouth is 1.6x wider
+             than the throat, so their centres coincide but their LANES do not:
+             drawKeystone bounds a plug by x0/x1, and handing it the mouth would let the
+             half paint out across the overhang it is supposed to be resting under. */
+          cx: (sl.x0 + sl.x1) / 2, cy: CFG.surfaceY,
+          x0: sl.x0, x1: sl.x1, full: true
         });
         g.slots.forEach(s => { s.filled = true; });
         g.repaired = true; g.bridge = 0;
@@ -9623,13 +10115,26 @@ export function createGame(canvas, hooks = {}) {
      same one Level 1's chunks fall back to when a shape has no delivered artwork. There
      is no picture for a piece the learner has just invented with a cut, and there could
      not be: the two halves depend on which diagonal was chosen. */
+  /* A HALF, STILL MADE OF THE SAME ICE.
+
+     The two pieces have to carry the slab's own painted texture, or the moment it comes
+     apart the material changes and it reads as the block being swapped for two different
+     blocks rather than as one block breaking. Keeping it is a shift and nothing more:
+     toPiece() re-centres each half on its own centroid, so the artwork — whose transform
+     is in the WHOLE slab's coordinates — is moved back by exactly that centroid and then
+     clipped to the half's outline. Same picture, same place, cut in two.
+
+     pieceArt is built once per piece (in attemptCut) rather than per frame; the maths is
+     trivial but it is the kind that gets a sign wrong under a deadline, so it lives in
+     one place. */
   function drawL2Piece(ctx, pc) {
     ctx.save();
     ctx.translate(pc.x + (pc.offset || 0) * (pc.sep ? pc.sep.x : 0),
                   pc.y + (pc.offset || 0) * (pc.sep ? pc.sep.y : 0));
     ctx.rotate(pc.rot || 0);
     ctx.scale(pc.scale || 1, pc.scale || 1);
-    paintIce(ctx, pc.local, ICE_PIECE);
+    if (pc.art) paintGlacierChunk(ctx, { pts: pc.local, art: pc.art, seed: 13 }, false, 1 / (pc.scale || 1));
+    else paintIce(ctx, pc.local, ICE_PIECE);
     ctx.restore();
   }
 
@@ -9638,11 +10143,53 @@ export function createGame(canvas, hooks = {}) {
     if (L.pieces) { L.pieces.forEach(pc => drawL2Piece(ctx, pc)); return; }
     if (L.seated) return;              // the halves belong to the crossing now
 
+    /* THE SLAB ITSELF — the DELIVERED BLOCK, painted, not the drawn ice material.
+       paintGlacierChunk takes a record with `pts` and `art` and is the same call the
+       hanging options in Part 1 go through, so this block is made of exactly what every
+       other block in the game is made of. `false` for `installed`: it is still loose,
+       so it keeps the drop shadow a seated plug does not have. */
+    const shakeX = (L.shake || 0) ? Math.sin(G.t * 46) * 7 * L.shake : 0;
     ctx.save();
-    ctx.translate(L.pos.x, L.pos.y);
+    ctx.translate(L.pos.x + shakeX, L.pos.y);
+    if (L.spin) ctx.rotate(L.spin);
     ctx.scale(L.scale, L.scale);
-    paintIce(ctx, L.pts, ICE_PIECE);
+    /* THE GLOW THAT SAYS "THIS ONE". It rises during the overview's last beat and fades
+       once the slab has travelled — the moment of being singled out, not a permanent
+       decoration. A shadow on the alpha rather than a stroke, so it lights the shape
+       along its own painted edge instead of drawing a ring around it. */
+    if (L.glow > 0.01) {
+      ctx.shadowColor = `rgba(150,225,255,${(0.9 * L.glow).toFixed(3)})`;
+      ctx.shadowBlur = 42 * L.glow;
+    }
+    paintGlacierChunk(ctx, { pts: L.pts, art: L.art, seed: 11 }, false, 1 / (L.scale || 1));
+    /* THE SHEAR, drawn ON the falling slab. A wrong cut cracks it along the line that
+       was actually drawn, so the block does not merely fall — it fails where the
+       learner cut it. Inside the same transform as the block, in the block's own
+       coordinates, so it turns and shrinks with it all the way down. */
+    if (L.shear) {
+      const k = clamp(L.shear.t / 0.18, 0, 1);
+      const inv = 1 / (L.scale || 1);
+      // the endpoints were captured in stage space; bring them into the slab's frame
+      const toLocal = p => ({ x: (p.x - L.pos.x) * inv, y: (p.y - L.pos.y) * inv });
+      const a = toLocal(L.shear.a), b = toLocal(L.shear.b);
+      ctx.save();
+      ctx.globalAlpha = clamp(1 - (L.shear.t - 0.3) / 0.6, 0, 1);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(20,70,120,0.85)';
+      ctx.lineWidth = 7 * inv;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(lerp(a.x, b.x, k), lerp(a.y, b.y, k));
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 3 * inv;
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.restore();
+
+    // nothing to take hold of while it is falling or arriving
+    if (L.fall || L.respawn > 0) return;
 
     const pts = hexScreenPts();
     /* EVERY CORNER, ALWAYS, AND ALL THE SAME. The learner has to see there is something
@@ -9650,19 +10197,91 @@ export function createGame(canvas, hooks = {}) {
        answers and singling any corner out would hand one of them over. The pulse raises
        all six together; only the one under the finger is brighter, and that is feedback
        about the finger, not about the answer. */
+    /* THEY ARE KNOBS OF ICE, not dots. Reported as "dot point not look gamify" — and a
+       flat white circle with a blue ring is exactly that: a debug marker. These are
+       handles a child is meant to want to grab, so each one is a little bead of the same
+       ice the slab is made of — a soft halo, a rounded body shading white to pale blue,
+       a highlight up and to the left, and a cold rim.
+
+       THE BREATH IS SHARED, not per-corner. All six rise and fall on one clock, so the
+       row reads as "these are all live" — six independent pulses would make one of them
+       the brightest at any moment, and on a level with three correct answers the eye
+       reads the brightest thing as the hint. The only corner ever treated differently is
+       the one under the finger, and that is feedback about the finger. */
     {
       const a = Math.max(L.cornerPulse, 0.34);
-      const r0 = 11 * L.scale, r1 = 15 * L.scale;
+      const breath = 0.5 + 0.5 * Math.sin(G.t * 2.3);
+      const R0 = 15 * L.scale, R1 = 21 * L.scale;
       pts.forEach((p, i) => {
         const held = L.dragFrom === i && !!L.dragPt;
-        const alpha = held ? 0.95 : 0.42 * a + 0.16;
-        ctx.beginPath(); ctx.arc(p.x, p.y, held ? r1 : r0, 0, 6.2832);
-        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-        ctx.fill();
-        ctx.lineWidth = 3 * L.scale;
-        ctx.strokeStyle = `rgba(45,130,181,${(alpha * 0.9).toFixed(3)})`;
+        const r = (held ? R1 : R0) * (1 + (held ? 0 : 0.06 * breath));
+        const alpha = held ? 1 : 0.62 * a + 0.3;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        // the halo: what makes it read as lit rather than drawn on
+        ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.9, 0, 6.2832);
+        const halo = ctx.createRadialGradient(p.x, p.y, r * 0.5, p.x, p.y, r * 1.9);
+        halo.addColorStop(0, `rgba(160,230,255,${(0.5 + 0.25 * breath).toFixed(3)})`);
+        halo.addColorStop(1, 'rgba(160,230,255,0)');
+        ctx.fillStyle = halo; ctx.fill();
+        // the bead
+        const g2 = ctx.createRadialGradient(p.x - r * 0.35, p.y - r * 0.4, r * 0.1, p.x, p.y, r);
+        g2.addColorStop(0, '#FFFFFF');
+        g2.addColorStop(0.55, '#E8F8FF');
+        g2.addColorStop(1, '#9AD9F5');
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.2832);
+        ctx.fillStyle = g2; ctx.fill();
+        ctx.lineWidth = 3.5 * L.scale;
+        ctx.strokeStyle = held ? '#2D82B5' : 'rgba(45,130,181,0.85)';
         ctx.stroke();
+        // the catchlight, which is what makes a circle read as a bead
+        ctx.beginPath();
+        ctx.arc(p.x - r * 0.33, p.y - r * 0.38, r * 0.26, 0, 6.2832);
+        ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fill();
+        ctx.restore();
       });
+    }
+
+    /* THE TUTORIAL'S DEMONSTRATION, on the canvas rather than in the DOM.
+     *
+     * Part 1's cut lesson animates a hand element across a rope. A diagonal cannot be
+     * taught that way: the hand's travel is a horizontal CSS translate in the element's
+     * own units, so aiming it down a slanted line would either stop being responsive or
+     * need a second animation per angle. The canvas already draws every other thing that
+     * points at a cut — the marching dashes, the guide, Part 1's own demo stroke — and it
+     * is resolution-independent by construction, so the line goes here.
+     *
+     * IT SHOWS ONE MAIN DIAGONAL AND GIVES NOTHING AWAY. All three are correct, so which
+     * one is drawn cannot be a leak; what it teaches is the GESTURE — corner to opposite
+     * corner — which is exactly what the instruction already says in words.
+     *
+     * It stops the moment the learner tries anything (G.attempts), because after that
+     * they are answering rather than watching, and a demonstration over the top of a real
+     * attempt is the game talking during the reply. */
+    if (L.demo && !L.pieces && G.state === 'LEVEL_2_ACTIVE' && !G.attempts) {
+      const n = L.pts.length, j = n / 2;
+      if (Number.isInteger(j)) {
+        const a = pts[0], b = pts[j];
+        const t = (G.t % 1.6) / 1.6;
+        ctx.save();
+        ctx.lineCap = 'round';
+        // the path, faint and marching
+        ctx.setLineDash([16, 14]);
+        ctx.lineDashOffset = -G.t * 90;
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.setLineDash([]);
+        // and a finger running it, so the direction is unambiguous
+        const e = easeInOut(clamp(t * 1.35, 0, 1));
+        const fx = lerp(a.x, b.x, e), fy = lerp(a.y, b.y, e);
+        const fade = Math.sin(Math.min(1, t * 1.35) * Math.PI);
+        ctx.globalAlpha = 0.85 * fade;
+        ctx.beginPath(); ctx.arc(fx, fy, 15, 0, 6.2832);
+        ctx.fillStyle = '#FFFFFF'; ctx.fill();
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(45,130,181,0.9)'; ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // the line being drawn, following the finger
@@ -9963,6 +10582,28 @@ export function createGame(canvas, hooks = {}) {
     /** The run's obstacle plan for a stretch index, and the leap in px — for the difficulty test. */
     _runPlan: i => ({ plan: (CFG.obstacle.runs || [])[Math.min(i, (CFG.obstacle.runs || []).length - 1)] || null, leap: obstacles ? obstacles.leap : 0, speed: CFG.runSpeed }),
     _force(s) { obstacles.reset(); setState(s); },
+    /** STRAIGHT TO PART 2, for reviewing a level without playing Part 1 first.
+     *
+     *  Part 2 begins after the seventh crossing, which is about five minutes of play —
+     *  far too long a loop to iterate a level on, and long enough that "the new level
+     *  is not there" is the obvious conclusion when it simply has not been reached yet.
+     *
+     *  It enters through the COLLAPSE (GLACIER_BREAK_2) rather than dropping straight
+     *  into the puzzle, so what is reviewed is the real sequence — the ice gives way,
+     *  he skids and recoils, the scene is held to be read, the slab lights up and comes
+     *  forward, the question is asked. Jumping past that would hide exactly the beats
+     *  this level was asked to have.
+     *
+     *  ?p2=1 on the URL calls it (see main.js). Playtest control, like ?skip and ?fast. */
+    skipToPartTwo() {
+      if (G.state === 'BOOT' || G.complete) return false;
+      G.phase = L1.phases.length; G.phasesDone = L1.phases.length;
+      G.l1 = null; G.gapsThisPhase = null; G.l2 = null;
+      G.oops = false; G.hitObstacle = null; G.hitReturn = null; G.hitFx = 0;
+      obstacles.reset();
+      setState('GLACIER_BREAK_2');
+      return true;
+    },
     /** TEMPORARY, for reviewing the ending without playing seven phases: every crossing
         is counted as mended and the run home starts with the friend a short way ahead, so
         the real sequence plays — arrival, cross-fade into the dance, confetti, the banner
@@ -10009,6 +10650,10 @@ export function createGame(canvas, hooks = {}) {
       pieces: (g.pieces || []).length,
       filled: (g.slots || []).every(s => s.filled)
     }) : null),
+    /** Show or hide the diagonal demonstration on the slab. The tutorial turns it on
+        for its cut step and off when the step is done; nothing else writes it, and it
+        draws only while the level is live and untouched (see drawL2). */
+    _l2Demo(on) { if (G.l2) G.l2.demo = !!on; return !!G.l2; },
     /** Try a cut between two corner indices, exactly as a drag between them would.
         Returns false if the level is not live. */
     _l2Cut(i, j) {

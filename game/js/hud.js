@@ -255,6 +255,11 @@ export class Hud {
     this._plain = !!h.signBanner;
     // a tutorial sentence is a wide banner; a question sits in its left band (see the CSS)
     if (el) el.classList.toggle('banner', !!h.signBanner);
+    /* PART 2 CENTRES THE QUESTION. Part 1's plank lives in the left band to stay clear
+       of the hanging row; Part 2's crossing has one block, brought to the middle of the
+       stage, so the left band is not where the eye is and a sign parked there reads as
+       abandoned. A class on the same element — same board, same type, moved. */
+    if (el) el.classList.toggle('centered', !!h.signCentre);
     const outOfSync = message && (el.hidden || el.classList.contains('leaving'));
     if (message !== this.lastMessage || outOfSync) {
       const isNewLine = message !== this.lastMessage;

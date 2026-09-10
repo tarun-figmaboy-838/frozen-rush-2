@@ -16,7 +16,9 @@
 import { test, expect } from '@playwright/test';
 import { boot, G, waitState, jsErrors, playLevelTwo } from './helpers.mjs';
 
-/** Put the game at the start of Level 2's puzzle, without playing Level 1 first. */
+/** Put the game at the start of Level 2's puzzle, without playing Level 1 first.
+    Waits through the scene-reading beat and the focus move, so callers land in the
+    state where the slab is actually live. */
 async function enterLevelTwo(page) {
   await page.evaluate(() => {
     const g = window.iceAgeGame, G = g.debug();
@@ -25,6 +27,17 @@ async function enterLevelTwo(page) {
     g._force('GLACIER_BREAK_2');
   });
   await waitState(page, ['LEVEL_2_ACTIVE'], 60_000);
+  return G(page);
+}
+
+/** Stop at the scene-reading beat instead of playing through it. */
+async function enterOverview(page) {
+  await page.evaluate(() => {
+    const g = window.iceAgeGame, G = g.debug();
+    G.phase = 7; G.phasesDone = 7; G.l1 = null; G.gapsThisPhase = null;
+    g._force('GLACIER_BREAK_2');
+  });
+  await waitState(page, ['LEVEL_2_OVERVIEW'], 60_000);
   return G(page);
 }
 
@@ -42,9 +55,17 @@ test.describe('Level 2 — the shape and its holes', () => {
     const [a, b] = r.gaps;
     expect(a.w, 'both holes are the same size — the halves are congruent').toBe(b.w);
 
-    /* UNJUMPABLE. The same floor Level 1's crevasses are held to: under 400px and a
-       leap carries it, which would make the puzzle optional. */
-    expect(a.w, 'too wide to jump').toBeGreaterThan(400);
+    /* NOT THE 400px FLOOR, AND ON PURPOSE. Level 1's crevasses are held above 400
+       because a leap carries anything narrower — but that is a rule about a control,
+       and jumping is switched OFF for the whole of this level, from the collapse to the
+       mend. What matters here instead is that the hole is cut to the shape: the holes
+       come from the SHORTEST main diagonal, so whichever of the three the learner
+       chooses still bridges. Asserting the real property rather than the inherited one.
+
+       The jump being off is asserted below, because it is what makes this safe. */
+    expect(a.w, 'the hole is cut from the shape, not picked').toBeGreaterThan(300);
+    const jump = await page.evaluate(() => window.iceAgeGame.debug().jumpEnabled);
+    expect(jump, 'nothing can jump this crossing: the control is off').toBe(false);
 
     /* AND BOTH ON THE STAGE. Two holes plus the pillar between them is the widest
        thing this layout ever builds, and it has to fit between the character and the
@@ -76,6 +97,144 @@ test.describe('Level 2 — the shape and its holes', () => {
     expect(l2.focusT, 'the focus finished').toBeGreaterThan(0.98);
     expect(l2.scale, 'and it grew').toBeGreaterThan(1.1);
     expect(Math.abs(l2.pos.x - 960), 'centred across the stage').toBeLessThan(40);
+  });
+});
+
+/* THE THREE THINGS THE OWNER ASKED FOR, on top of the cut that was already here:
+   the whole scene is shown before the question, the slab announces itself, and a wrong
+   cut loses it to the river. The last of those is the one with a trap in it — a level
+   with one object cannot destroy that object and stay winnable — so most of these are
+   about the recovery rather than the fall. */
+test.describe('Level 2 — the scene is read before it is asked about', () => {
+  test.setTimeout(180_000);
+
+  test('the whole picture is up, with the controls locked and no question yet', async ({ page }) => {
+    const errors = await boot(page, { speed: 900, fast: 2 });
+    await enterOverview(page);
+    const r = await page.evaluate(() => {
+      const g = window.iceAgeGame, G = g.debug();
+      return {
+        state: G.state,
+        jump: G.jumpEnabled,
+        instruction: (G.instruction || '') + (G.signSay || ''),
+        slab: !!G.l2,
+        gaps: g._l2Gaps().filter(Boolean).length,
+        shown: (document.getElementById('instruction-text') || {}).textContent || ''
+      };
+    });
+    expect(r.state).toBe('LEVEL_2_OVERVIEW');
+    expect(r.slab, 'the slab is already standing there to be seen').toBe(true);
+    expect(r.gaps, 'and both holes are open').toBe(2);
+    expect(r.jump, 'the controls are locked').toBe(false);
+    expect(r.instruction, 'the question has not been asked yet').toBe('');
+    expect(r.shown.trim(), 'nothing on the plank either').toBe('');
+    expect(jsErrors(errors), 'the game threw').toEqual([]);
+  });
+
+  test('a cut cannot be made during the overview', async ({ page }) => {
+    await boot(page, { speed: 900, fast: 2 });
+    await enterOverview(page);
+    const took = await page.evaluate(() => window.iceAgeGame._l2Cut(0, 3));
+    expect(took, 'the level refuses input while the scene is being read').toBe(false);
+    expect(await page.evaluate(() => window.iceAgeGame.state())).toBe('LEVEL_2_OVERVIEW');
+  });
+
+  test('the slab lights up and swells before it travels', async ({ page }) => {
+    await boot(page, { speed: 900, fast: 2 });
+    await enterOverview(page);
+    // by the end of the beat it is glowing and a little bigger, still in place
+    const end = await page.evaluate(async () => {
+      const g = window.iceAgeGame;
+      while (g.state() === 'LEVEL_2_OVERVIEW' && (g.debug().l2.pop || 0) < 0.9) {
+        await new Promise(r => requestAnimationFrame(r));
+      }
+      const L = g.debug().l2;
+      return { pop: L.pop, glow: L.glow, scale: L.scale, x: Math.round(L.pos.x), home: Math.round(L.home.x) };
+    });
+    expect(end.glow, 'it is lit').toBeGreaterThan(0.3);
+    expect(end.scale, 'and swollen').toBeGreaterThan(1.0);
+    expect(Math.abs(end.x - end.home), 'but has not moved yet').toBeLessThan(6);
+  });
+
+  test('the question arrives with the move, and the slab comes to the middle', async ({ page }) => {
+    await boot(page, { speed: 900, fast: 2 });
+    await enterLevelTwo(page);
+    const r = await page.evaluate(() => {
+      const L = window.iceAgeGame.debug().l2;
+      return {
+        x: L.pos.x, scale: L.scale,
+        shown: (document.getElementById('instruction-text') || {}).textContent || ''
+      };
+    });
+    expect(Math.abs(r.x - 960), 'centred').toBeLessThan(40);
+    expect(r.scale, 'and enlarged').toBeGreaterThan(1.1);
+    expect(r.shown.toLowerCase(), 'the question is up').toContain('diagonal');
+  });
+});
+
+test.describe('Level 2 — a wrong cut loses the slab to the river', () => {
+  test.setTimeout(180_000);
+
+  /* THE FALL IS THE JOKE; THE REPLACEMENT IS WHAT KEEPS IT A GAME. This level has one
+     object in it, so destroying it on a wrong answer would make the level unwinnable —
+     the one thing a wrong answer must never do. */
+  test('a side tips it into the water, and another slab is sent down', async ({ page }) => {
+    const errors = await boot(page, { speed: 900, fast: 2 });
+    await enterLevelTwo(page);
+    const before = await page.evaluate(() => window.iceAgeGame._l2().corners.length);
+
+    await page.evaluate(() => window.iceAgeGame._l2Cut(0, 1));   // a side
+    // it is falling
+    const falling = await page.evaluate(async () => {
+      const g = window.iceAgeGame;
+      const t0 = Date.now();
+      while (Date.now() - t0 < 4000 && !g.debug().l2.fall) await new Promise(r => requestAnimationFrame(r));
+      return !!g.debug().l2.fall;
+    });
+    expect(falling, 'the slab is on its way to the river').toBe(true);
+
+    // and the level comes back, live, with a whole slab on the pillar
+    await waitState(page, ['LEVEL_2_ACTIVE'], 40_000);
+    const after = await page.evaluate(() => {
+      const g = window.iceAgeGame, L = g.debug().l2;
+      return { corners: g._l2().corners.length, fall: !!L.fall, respawn: L.respawn, wrong: L.wrong };
+    });
+    expect(after.corners, 'a whole slab is back').toBe(before);
+    expect(after.fall, 'nothing still falling').toBe(false);
+    expect(after.respawn, 'and it has finished arriving').toBe(0);
+    expect(after.wrong, 'the attempt was counted against the learner, not the slab').toBe(1);
+
+    // and it is still winnable, which is the whole point
+    expect(await page.evaluate(() => window.iceAgeGame._l2Cut(0, 3))).toBe(true);
+    expect(await page.evaluate(() => window.iceAgeGame.state())).toBe('LEVEL_2_SUCCESS');
+    expect(jsErrors(errors), 'the game threw').toEqual([]);
+  });
+
+  /* A SHORT DIAGONAL IS STILL A DIAGONAL. Dropping the slab for it would punish a child
+     who has understood the idea and only picked one that cannot span. */
+  test('a short diagonal wobbles it but never drops it', async ({ page }) => {
+    await boot(page, { speed: 900, fast: 2 });
+    await enterLevelTwo(page);
+    await page.evaluate(() => window.iceAgeGame._l2Cut(0, 2));
+    const r = await page.evaluate(() => {
+      const L = window.iceAgeGame.debug().l2;
+      return { fall: !!L.fall, sign: window.iceAgeGame.debug().signSay };
+    });
+    expect(r.fall, 'it holds').toBe(false);
+    expect(r.sign.toLowerCase(), 'and is nudged, not scolded').not.toContain('side');
+  });
+
+  test('no cut can be started while the slab is in the air', async ({ page }) => {
+    await boot(page, { speed: 900, fast: 2 });
+    await enterLevelTwo(page);
+    await page.evaluate(() => window.iceAgeGame._l2Cut(0, 1));   // knock it off
+    const duringFall = await page.evaluate(async () => {
+      const g = window.iceAgeGame;
+      const t0 = Date.now();
+      while (Date.now() - t0 < 4000 && !g.debug().l2.fall) await new Promise(r => requestAnimationFrame(r));
+      return g._l2Cut(0, 3);          // must be refused
+    });
+    expect(duringFall, 'a falling slab cannot be cut').toBe(false);
   });
 });
 
@@ -231,12 +390,19 @@ test.describe('Level 2 — the mend', () => {
         const p = g.pieces[0];
         // the widest the seated silhouette gets, against the hole it has to cover
         const xs = p.pts.map(q => q.x * p.fit);
-        return { span: Math.max(...xs) - Math.min(...xs), hole: g.x1 - g.x0 };
+        /* AGAINST THE THROAT, NOT THE MOUTH. A crevasse is an undercut: the opening at
+           the walking line is the throat and the void below it flares out 1.6x wider
+           (see layoutLevelTwo). The half bridges the OPENING — that is what "no
+           daylight" means — and it is not supposed to span the cavern underneath, which
+           nothing could. This asserted against the mouth and so demanded a piece half
+           again as wide as the hole it plugs. */
+        return { span: Math.max(...xs) - Math.min(...xs), throat: g.throat, mouth: g.x1 - g.x0 };
       });
     });
-    for (const { span, hole } of r) {
-      expect(span, `a ${Math.round(span)}px half over a ${Math.round(hole)}px hole`)
-        .toBeGreaterThanOrEqual(hole);
+    for (const { span, throat, mouth } of r) {
+      expect(throat, 'the crevasse is undercut, not a box').toBeLessThan(mouth);
+      expect(span, `a ${Math.round(span)}px half over a ${Math.round(throat)}px opening`)
+        .toBeGreaterThanOrEqual(throat);
     }
   });
 
@@ -245,7 +411,7 @@ test.describe('Level 2 — the mend', () => {
     await enterLevelTwo(page);
     const r = await playLevelTwo(page, { budgetMs: 150_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state).toBe(false);
-    expect(['FINAL_RUN', 'COMPLETE']).toContain(r.state);
+    expect(['PHASE_RUN', 'FINAL_RUN', 'COMPLETE'], 'the crossing handed on').toContain(r.state);
     expect(r.trail.join(' '), 'the answer beat played').toContain('LEVEL_2_SUCCESS');
     expect(r.trail.join(' '), 'and the crossing celebrated').toContain('BRIDGE_2_COMPLETE');
     expect(jsErrors(errors), 'the game threw').toEqual([]);
@@ -256,7 +422,7 @@ test.describe('Level 2 — the mend', () => {
     await enterLevelTwo(page);
     const r = await playLevelTwo(page, { wrongFirst: true, budgetMs: 150_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state).toBe(false);
-    expect(['FINAL_RUN', 'COMPLETE']).toContain(r.state);
+    expect(['PHASE_RUN', 'FINAL_RUN', 'COMPLETE'], 'the crossing handed on').toContain(r.state);
     expect(r.trail.join(' ')).toContain('LEVEL_2_WRONG_FEEDBACK');
     expect(jsErrors(errors), 'the game threw').toEqual([]);
   });

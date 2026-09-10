@@ -193,7 +193,12 @@ export async function playLevelTwo(page, { wrongFirst = false, diagonal = 0, bud
           g._l2Cut(i, j);            // a main diagonal: the answer
         }
       }
-      if (s === 'FINAL_RUN' || s === 'COMPLETE') break;
+      /* THE CROSSING IS OVER WHEN IT HANDS ON, and what it hands on TO depends on how
+         much of the old journey is left. The diagonal level is crossing ONE now, so it
+         is normally followed by PHASE_RUN and the crossings still to be replaced; only
+         when none remain does it lead to the run home. This loop answers the diagonal
+         crossing and nothing after it, so it stops at either. */
+      if (s === 'PHASE_RUN' || s === 'FINAL_RUN' || s === 'COMPLETE') break;
       await new Promise(r => requestAnimationFrame(r));
     }
     const G = g.debug();

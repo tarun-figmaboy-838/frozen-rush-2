@@ -8,8 +8,8 @@
 export const ASSET_V = {
   "assets/art/Bubble.svg": "5f1ee1ef",
   "assets/art/cover.webp": "e0c7a5db",
-  "assets/audio/bgm-ice-hunt.mp3": "045fc178",
-  "assets/audio/bgm-ice-hunt.ogg": "a503f547",
+  "assets/audio/bgm-ice-hunt.mp3": "7c459447",
+  "assets/audio/bgm-ice-hunt.ogg": "9ee115a7",
   "assets/audio/dragon-studio-cartoon-blinking-372481.mp3": "e1ba0c6b",
   "assets/audio/dragon-studio-cartoon-blinking-372481.ogg": "f5305723",
   "assets/audio/dragon-studio-heavy-boulder-thud-515257.mp3": "97c6bfa5",
@@ -58,7 +58,6 @@ export const ASSET_V = {
   "assets/env/rock-tall.webp": "760283f8",
   "assets/env/rock-wide.webp": "6247692d",
   "assets/env/rope-tied.webp": "f9b3e721",
-  "assets/option-shape/1.png": "24fbe8e1",
   "assets/option-shape/concaveHeptagon.webp": "d943871c",
   "assets/option-shape/concaveHexagon.webp": "38aae90c",
   "assets/option-shape/concavePentagon.webp": "25cd2560",

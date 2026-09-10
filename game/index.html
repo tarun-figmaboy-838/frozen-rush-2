@@ -31,6 +31,34 @@
     <div class="stage" id="stage">
       <canvas id="game-canvas" aria-label="Ice Age mammoth runner game"></canvas>
 
+      <!-- THE PART 2 FOCUS LAYER.
+
+           Crossing 1 asks the learner to work ON one block, so that block has to be the
+           only sharp thing on the screen. The whole game is drawn on ONE canvas, though,
+           so there is nothing to blur independently — blur the canvas and the block goes
+           with it.
+
+           Same answer the tutorial already uses, and for the same reason: blur
+           EVERYTHING and draw the subject back on top. #p2-veil is a sheet over the
+           canvas that blurs and dims what is behind it; #p2-focus is a transparent
+           canvas above the veil that the engine paints the slab alone onto
+           (game.renderFocus(el, 'slab')), so the block is sharp and nothing else is.
+
+           A hole masked in the veil was the obvious alternative and is the wrong shape
+           of solution — the hole has to track a moving, growing object every frame and
+           its soft rim has to be inflated to keep the object out of the blur. Blurring
+           and redrawing is one instruction each way and cannot drift.
+
+           IT IS NOT A SECOND COPY OF THE BLOCK. The engine stops drawing the slab on the
+           main canvas while this layer is showing it, so there is exactly one on screen
+           at any moment — no double edge, no ghost, no second hit target.
+
+           Both start hidden and rest VISIBLE, like the tutorial's layer: nothing here is
+           parked at opacity 0 where a dropped keyframe would leave it permanently
+           invisible while every attribute still reads as intended. -->
+      <div class="p2-veil" id="p2-veil" aria-hidden="true" hidden></div>
+      <canvas class="p2-focus" id="p2-focus" width="1920" height="1080" aria-hidden="true" hidden></canvas>
+
       <div class="hud">
         <!-- The hint / sound / pause cluster that used to sit top-right has been
              removed on request. Nothing replaces it: the stage is now entirely

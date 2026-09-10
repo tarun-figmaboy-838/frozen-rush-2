@@ -6,6 +6,10 @@
      index.html?sound=0        start muted
      index.html?reduced=1      reduced-motion mode (less shake, fewer particles)
      index.html?skip=1         skip the cover/select screens and run immediately
+     index.html?p2=1           straight to PART 2 — begins the run and jumps to the
+                               collapse that opens Part 2's first level, so the whole
+                               sequence plays without the seven Part 1 crossings first.
+                               The tutorial is suppressed with it (it teaches Part 1).
      index.html?tutorial=0     never show the first-play tutorial
      index.html?tutorial=1     always show it, however many times it has been seen
      index.html?fast=4         fast-forward: simulation steps per rendered frame (1–8).
@@ -116,6 +120,13 @@ const game = createGame(canvas, {
   hdArt: wantHd(),
   renderScaleForced: params.has('rs'),   // a forced scale is a request; the fps guard leaves it alone
   onReady: () => {
+    /* STRAIGHT TO PART 2. Part 2 begins after Part 1's seventh crossing — about five
+       minutes of play — which is far too long a loop to review one of its levels on.
+       ?p2=1 begins the run and jumps to the collapse that opens Part 2, so the whole
+       sequence still plays: the ice gives way, he recoils, the scene is held to be
+       read, the slab lights up, the question is asked. The tutorial is skipped with it,
+       because it teaches Part 1's controls and would freeze the game over the top. */
+    if (flag('p2', false)) { game.begin(); game.skipToPartTwo(); return; }
     if (flag('skip', false)) { game.begin(); startTutorial(); return; }
     /* THE COVER IS ALREADY UP (see below); the art has finished loading, so PLAY goes live.
        Before this the cover itself waited for the whole art set — five to six seconds of
@@ -188,6 +199,46 @@ function startTutorial() {
       return;
     }
     requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/* THE PART 2 FOCUS LAYER, driven on its own frame.
+ *
+ * Crossing 1 asks the learner to work ON one block, so that block has to be the only
+ * sharp thing on screen. The whole game is one canvas, so the trick is the tutorial's:
+ * blur everything with a sheet, then draw the subject back on top of it, sharp.
+ *
+ * WHY ITS OWN LOOP AND NOT onHud. onHud only fires when the state object CHANGES, so it
+ * is not a per-frame signal — it can raise and lower the sheet, but the canvas above it
+ * has to be repainted every frame while the slab is growing, travelling and being
+ * dragged on. The same reason the tutorial keeps a loop of its own.
+ *
+ * It is cheap when nothing is happening: one boolean read per frame, and the canvas is
+ * only cleared and redrawn while the layer is actually up.
+ */
+{
+  const veil = document.getElementById('p2-veil');
+  const focus = document.getElementById('p2-focus');
+  let wasOn = false;
+  const tick = () => {
+    requestAnimationFrame(tick);
+    if (!veil || !focus) return;
+    let on = false;
+    try { on = !!game.debug().p2Focus; } catch (e) { on = false; }
+    /* The engine publishes the flag onto its own state object rather than only through
+       the HUD payload, so this loop can read it without waiting for a change event. */
+    if (on !== wasOn) {
+      wasOn = on;
+      veil.hidden = !on;
+      focus.hidden = !on;
+      // leave nothing behind on the way out, or the last frame of the slab lingers
+      if (!on) {
+        const fx = focus.getContext('2d');
+        if (fx) fx.clearRect(0, 0, focus.width, focus.height);
+      }
+    }
+    if (on) game.renderFocus(focus, 'slab');
   };
   requestAnimationFrame(tick);
 }

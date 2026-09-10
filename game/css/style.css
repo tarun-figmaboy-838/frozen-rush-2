@@ -731,3 +731,79 @@ a:hover { color: var(--ice-pale); }
      it, on every phone. */
   .instruction { --sign-h: max(26px, calc(min(100vh, 100vw * 0.5625) * 0.0929)); }
 }
+
+/* ============================ PART 2: THE FOCUS LAYER ============================
+
+   Crossing 1 asks the learner to work ON one block, and until this existed the whole
+   scene stayed sharp behind it — the reported fault was exactly that: "bg not look
+   blur, the user cant focus on game play".
+
+   The game is drawn on ONE canvas, so there is no world layer to blur on its own.
+   The answer is the tutorial's, which is already proven here: blur EVERYTHING and draw
+   the subject back on top. #p2-veil blurs and dims the canvas behind it; #p2-focus is
+   a transparent canvas above it that the engine paints the slab alone onto. The
+   instruction sits above both, so the words never soften.
+
+   The engine stops drawing the slab on the main canvas while this is up, so there is
+   one block on screen and not two — no double edge and no ghost. */
+.p2-veil {
+  position: absolute;
+  inset: 0;
+  /* The SAME numbers the tutorial's veil settled on, and for the same reason recorded
+     there: a heavier dim stops reading as "this part is in focus" and starts reading as
+     "the game has been replaced". The child should still plainly see Momo, the two holes
+     and the ice — just pushed back a step. */
+  background: rgba(6, 26, 52, 0.3);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  z-index: 6;
+  /* Eased, so the world softens rather than being replaced between two frames — the
+     camera pulling focus, which is what the move is. */
+  animation: p2VeilIn 320ms ease-out both;
+}
+.p2-veil[hidden] { display: none; }
+@keyframes p2VeilIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* THE SLAB, SHARP, ABOVE THE BLUR. A full-stage transparent canvas: the engine draws
+   the block onto it in the same stage coordinates it uses everywhere, so nothing has to
+   be kept in sync as the block grows and travels. */
+.p2-focus {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;          /* the drag is read by the game canvas underneath */
+  z-index: 7;
+  /* A cold rim so the block reads as lit rather than as a cut-out sitting on a blur.
+     NOT ANIMATED: this is a drop-shadow on a full-stage alpha channel, and animating it
+     re-blurs 1920x1080 every frame — the tutorial's note records that measured at 1.5fps
+     on a software renderer. Static, the browser filters it once and composites. */
+  filter: drop-shadow(0 0 clamp(6px, 0.6vw, 14px) rgba(150, 225, 255, 0.85))
+          drop-shadow(0 0 clamp(16px, 1.6vw, 30px) rgba(90, 190, 240, 0.5));
+}
+.p2-focus[hidden] { display: none; }
+
+/* THE QUESTION GOES TO THE MIDDLE for Part 2, and only for Part 2.
+
+   Part 1's plank lives in the empty left band because the option row is centred on the
+   safe area and a centred sign would reach the leftmost rope (see the note above). Part
+   2's crossing 1 has no row — it has one block, which the focus layer has just brought
+   to the middle of the stage — so the left band is no longer where the eye is, and the
+   sign reads as abandoned over there. Reported as "the instruction pannel not on center".
+
+   A modifier on the existing element, not a second panel: same board, same type, same
+   sizing units, moved. Everything Part 1 relies on is untouched when the class is absent. */
+.instruction.centered {
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92%;
+  /* HIGHER THAN PART 1's BOARD, and it has to be. The slab is enlarged to 1.66 in the
+     middle of the stage and its top edge reaches y 170; the board's own top is pinned
+     4.3 stage units down, which put the two within a few pixels of each other and read
+     as the sign resting on the ice. 1.9 units lifts it into the top strip on its own,
+     clear of the block it is asking about. */
+  top: calc(1.9 * var(--u) - 51 * var(--k));
+  /* Above the focus layer: the words are the question and must never be softened. */
+  z-index: 8;
+}
