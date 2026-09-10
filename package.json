@@ -1,0 +1,18 @@
+{
+  "name": "frozen-rush-2",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Frozen Rush part 2 — a 2D Ice Age runner where geometry repairs the broken ice path. Level 1 asks which polygon; Level 2 asks where to cut one.",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:level2": "playwright test tests/level-two.spec.mjs --workers=1",
+    "bundle": "node tools/build-bundle.mjs",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "sharp": "^0.35.4"
+  }
+}

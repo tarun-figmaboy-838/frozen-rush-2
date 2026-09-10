@@ -1,0 +1,43 @@
+{
+  "out": "assets/audio",
+  "format": "preview-hq-mp3",
+
+  "defaults": {
+    "minDuration": 0.05,
+    "maxDuration": 2.5,
+    "minRating": 3,
+    "singleEvent": true,
+    "sort": "downloads_desc",
+    "pageSize": 12,
+    "take": 0
+  },
+
+  "sounds": {
+    "coin":       { "query": "coin pickup collect game" },
+    "gem":        { "query": "sparkle chime collect crystal" },
+    "powerUp":    { "query": "power up arcade ascending" },
+    "levelUp":    { "query": "level complete fanfare win", "maxDuration": 4 },
+    "correct":    { "query": "correct answer chime positive" },
+    "wrong":      { "query": "wrong answer buzzer negative" },
+
+    "jump":       { "query": "cartoon jump hop" },
+    "boing":      { "query": "boing spring bounce cartoon" },
+    "swoosh":     { "query": "whoosh swipe fast" },
+    "slice":      { "query": "blade slice swipe sharp" },
+    "land":       { "query": "thud land soft impact" },
+
+    "pop":        { "query": "pop bubble short" },
+    "splat":      { "query": "splat squish wet" },
+    "squeak":     { "query": "squeak toy rubber" },
+    "honk":       { "query": "horn honk cartoon" },
+
+    "click":      { "query": "ui click button", "maxDuration": 0.6 },
+    "tick":       { "query": "clock tick countdown", "maxDuration": 0.6 },
+    "menuWhoosh": { "query": "menu transition whoosh ui" },
+
+    "laser":      { "query": "laser zap shoot retro" },
+    "explode":    { "query": "explosion cartoon boom", "maxDuration": 3 },
+    "hurt":       { "query": "hurt damage hit game" },
+    "gameOver":   { "query": "game over lose descending", "maxDuration": 4 }
+  }
+}

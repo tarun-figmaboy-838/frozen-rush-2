@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Ice Age Mammoth Runner</title>
+<meta name="description" content="A 2D Ice Age runner where geometry repairs the broken ice path." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/screens.css" />
+<!-- THE PRESSED BUTTON ART, FETCHED UP FRONT.
+
+     For both picture buttons the press IS a different image, and a background-image
+     that no rule has yet applied is not requested until the moment it is needed. So
+     the very first tap of PLAY, and the first tap of JUMP, swapped to an image that
+     had not arrived — the button went blank for as long as the fetch took, which on a
+     phone is exactly the tap where the player is deciding whether the game responds at
+     all. Preloading is 100kB and removes the flash entirely. -->
+<!-- the tab and home-screen icons: the character's face, cut from his idle sheet -->
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#0a2450" />
+<!-- No Try Again preload. That card is gone: a crash now plays its animation out and
+     the run resumes at the nearest checkpoint, so the button can never appear and this
+     was 1.1MB fetched on every load for nothing. -->
+</head>
+<body>
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <canvas id="game-canvas" aria-label="Ice Age mammoth runner game"></canvas>
+
+      <div class="hud">
+        <!-- The hint / sound / pause cluster that used to sit top-right has been
+             removed on request. Nothing replaces it: the stage is now entirely
+             gameplay apart from the instruction card.
+
+             What went with it, so it is on the record: there is no in-game mute, no
+             pause, and no way to bring the instruction back. Sound and motion can
+             still be set from the URL (?sound=0, ?reduced=1) and the pause panel below
+             is still wired, but nothing opens it any more. -->
+
+        <!-- how far through the six repairs: diamonds only, no captions -->
+
+        <div class="instruction" id="instruction" hidden>
+          <div class="instruction-pill" id="instruction-pill">
+            <!-- The sentence, and only the sentence. It used to be paired with a
+                 drawn polygon; that was removed on request, so the words carry the
+                 whole instruction and are set large enough to be the thing you look
+                 at. Still the only learner-facing text in a phase. -->
+            <span class="instruction-text" id="instruction-text" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <!-- NO JUMP BUTTON. A tap anywhere on the stage already jumped (engine.js:
+             onDown), so the button was a second way to do one thing — and on a phone it
+             was a target in the corner competing with the one instruction that matters,
+             which is "touch the screen". Removed on request: the whole stage is the
+             control now, the tutorial's fourth line teaches it with a tapping hand in
+             open sky, and Space / ArrowUp / W still jump for a keyboard.
+
+             What went with it: the pressed-art swap, the tap ring, the pulse that
+             re-taught the control after a crash, and hud.flashJump(). The engine's own
+             touch ring answers a tap wherever it lands, in every state, which is the
+             feedback the button's ring used to give in one corner. -->
+
+        <!-- TEMPORARY review control: jumps to the ending so it can be checked without
+             playing seven phases. Not part of the game; remove with game.skipToEnd(). -->
+        <button class="btn-skip-end" id="btn-skip-end" type="button" hidden>Skip to ending</button>
+
+        <!-- a brief mark over the crossing: cause and effect, without a modal -->
+
+        <!-- shown only after a long idle: demonstrates the cut, never performs it -->
+        <div class="hand-hint" id="hand-hint" aria-hidden="true" hidden></div>
+
+        <!-- THE FIRST-PLAY TUTORIAL LAYER.
+
+             One spotlight and one line of text, driven by js/tutorial.js. The dim is
+             a huge box-shadow on #tut-spot rather than a mask or four separate
+             panels: a shadow spreads from the element own rounded edge, so the lit
+             area is a real circle with a soft rim and there is nothing to keep in
+             sync as it moves.
+
+             The layer starts hidden, and every element inside it rests VISIBLE —
+             none of this is parked at opacity 0 waiting for an animation, because a
+             dropped keyframe or a reduced-motion setting would then leave a coach
+             mark that is present, positioned, and permanently invisible.
+
+             It is not aria-hidden: it is the only instruction a first-time player
+             gets, so it has to reach a screen reader. -->
+        <div class="tutorial" id="tutorial" hidden>
+          <!-- THE VEIL. One element over the whole stage that BLURS and darkens what is
+               behind it, with a hole masked out where the tutorial is pointing — so the
+               focus is simply the part of the game that is still sharp.
+
+               This replaced a lit circle with a gold ring around it. A ring draws a
+               hard line on top of the artwork and reads as a UI decoration stuck over
+               the scene; blurring everything else says the same thing using only the
+               game's own picture, which is what a camera does when it pulls focus. -->
+          <div class="tut-veil" id="tut-veil" aria-hidden="true"></div>
+          <!-- THE FOCUS, ABOVE THE BLUR: the subject of the step, drawn ALONE by the
+               engine onto this transparent canvas (game.renderFocus), which the
+               stylesheet then glows along its alpha — so the character, the rock or
+               the row of blocks is lit along its own outline, and nothing else comes
+               with it. A copied rectangle of the game canvas lived here before and
+               brought the sky behind the subject along with it. -->
+          <canvas class="tut-focus" id="tut-focus" width="1920" height="1080" aria-hidden="true" hidden></canvas>
+          <!-- THE SPEECH BUBBLE — the supplied Bubble.svg, drawn as geometry so it fits any
+               sentence: js/bubble.js builds the rounded body and the swept tail for the
+               box the words need, with the tail on the edge that faces the subject. The
+               shape is one SVG layer under the words; nothing is stretched. -->
+          <div class="tut-bubble" id="tut-bubble" role="status" aria-live="polite">
+            <svg class="tut-shape" id="tut-shape" aria-hidden="true"><path class="tut-face" d=""/></svg>
+            <span class="tut-text" id="tut-text"></span>
+          </div>
+          <!-- The hand is the whole interaction. No button: a tapping hand over the
+               thing being explained is understood by a child who cannot read the
+               sentence yet, and it points at WHERE to tap rather than sitting in a box
+               saying "Got it". It is the supplied touch.png, already used for the swipe
+               hint, so the two gestures are the same hand. -->
+          <div class="tut-hand" id="tut-hand" aria-hidden="true" hidden></div>
+          <button class="tut-skip" id="tut-skip" type="button">Skip</button>
+        </div>
+
+        <div class="overlay pause-panel" id="paused" hidden>
+          <div class="card">
+            <h1>Paused</h1>
+            <div class="pause-row">
+              <button class="icon-btn" id="btn-restart" type="button" aria-label="Start over" data-icon="restart">
+                <span class="icon-btn-face"></span><span class="icon-btn-glyph"></span>
+              </button>
+              <button class="icon-btn" id="btn-sound2" type="button" aria-label="Sound" aria-pressed="true" data-icon="sound-on">
+                <span class="icon-btn-face"></span><span class="icon-btn-glyph"></span>
+              </button>
+            </div>
+            <button class="btn-chunky btn-resume" id="btn-resume" type="button">
+              <span class="btn-chunky-face"><span class="btn-chunky-label">Resume</span></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- NO OUCH CARD. There was one: a panel with the character, "Ouch!" and a
+             TRY AGAIN button, shown 1.1s after a crash.
+
+             It is gone because it was a modal interrupting a game. The player has
+             already been told they crashed — by the impact, the stars, and the
+             character sitting down dazed — so a panel asking them to confirm it added
+             a tap that said nothing, and it popped up DURING the knockout animation,
+             talking over the feedback it was the consequence of.
+
+             A crash now plays the full 36-frame knockout, holds the dazed sit, and
+             then resumes at the nearest checkpoint on its own — see OBSTACLE_HIT in
+             engine.js. There is no interface for failing any more, which is what a
+             runner should look like. -->
+
+        <!-- THE REWARD SCREEN. It carries `card-fun` — the cartoon treatment the Ouch
+             card used to have all to itself, which was the wrong way round: the failure
+             panel was the celebration-shaped one and the payoff for seven crossings was
+             a flat ice slab with a paragraph of prose and a green button belonging to no
+             button family in the game.
+
+             The Ouch card is gone (a crash recovers by itself now), so this is the only
+             panel left in the game and it should be the biggest thing in it.
+
+             The copy is shorter on purpose: "Seven crossings repaired. The mammoth made
+             it to nightfall." is a narrator describing the achievement to someone else.
+             A child who just finished it wants to be told THEY did it. -->
+        <!-- THE ENDING. Two pieces, deliberately apart.
+
+             The card used to be one centred panel holding the heading, the copy and the
+             button — and it sat exactly over the middle of the stage, which is where
+             the mammoth is standing next to the friend who was waiting for him. The
+             meeting is the reward; covering it with the announcement of the reward is
+             the wrong way round.
+
+             So the words go high, the button goes low, and the whole middle band of the
+             screen is left for the two characters and the confetti. No hero image on it
+             either: the real character is on the canvas behind, celebrating, and a
+             second still picture of him on the panel was competing with that. -->
+        <div class="overlay overlay-ending" id="complete" hidden>
+          <!-- NO PANEL HERE ANY MORE. The ending used to open with a banner across the top —
+               "You did it!" waving a letter at a time, "Momo crossed the Frozen Pass!" under it,
+               both spoken. It was removed on request, and the reason is the dance: the two of
+               them are the payoff, and a card over the top third of the stage with words moving
+               in it takes the eye off the thing the child has just earned. The camera pushes in
+               on them instead (engine.js, the COMPLETE case), and the only thing left on the
+               screen is Play again. -->
+          <!-- Play again stands ON the ice to the right of the friends, like a signpost at
+               the end of the road — the only thing to do, in the empty half of the stage. -->
+          <button class="btn-chunky btn-replay" id="btn-replay" type="button">
+            <span class="btn-chunky-face"><span class="btn-chunky-label">Play again</span></span>
+          </button>
+        </div>
+
+        <div class="overlay rotate" id="rotate" hidden>
+          <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <rect x="15" y="6" width="18" height="30" rx="3.5" stroke="#A9E7FA" stroke-width="2.6" />
+            <path d="M10 40 A16 16 0 0 0 38 40" stroke="#A9E7FA" stroke-width="2.6" stroke-linecap="round" />
+            <path d="M34 36 L38 40 L34 44" stroke="#A9E7FA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <p>Rotate your device</p>
+        </div>
+
+        <!-- Cover: the supplied FROZEN RUSH banner, with drifting snow and a PLAY button -->
+        <div class="screen cover" id="cover" hidden>
+          <div class="cover-art" aria-hidden="true"></div>
+          <!-- FALLING FLAKES OVER THE BANNER. Fourteen empty spans, because a flake has to
+               TURN as it falls and a background layer cannot rotate: each one is its own
+               element with its own column, size, speed and spin, all set from :nth-child in
+               screens.css so the markup stays this. The flake itself is a data-URI SVG in
+               the stylesheet — the layer still costs no asset and no request. -->
+          <div class="cover-snow" aria-hidden="true"
+            ><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+            ><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+          ></div>
+          <!-- NOT a .btn-chunky. It used to carry that class to inherit the button
+               family's rim and gloss, and then override all of it — but the family's
+               HOVER rule (`.btn-chunky:hover`, specificity 0-2-0) outranks a plain
+               `.btn-play` (0-1-0), so on hover the family's navy keyline came back and,
+               with the radius zeroed for the art, drew a hard RECTANGLE around the
+               button. Overriding state by state is whack-a-mole; the fix is that the
+               picture buttons are their own family. -->
+          <button class="btn-art btn-play" id="btn-play" type="button" aria-label="Play"><span class="btn-play-face" aria-hidden="true"></span></button>
+          <!-- shown while the art loads behind the cover; PLAY is held until it is in -->
+          <p class="cover-loading" id="cover-loading" hidden>Loading…</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW THE CODE IS LOADED, and why it is not just one script tag.
+
+       The game is written as ES modules, and a browser fetches a module with CORS even
+       from a file:// page — which file:// refuses outright:
+
+         Access to script at 'file:///.../js/main.js' from origin 'null' has been
+         blocked by CORS policy: Cross origin requests are only supported for protocol
+         schemes: chrome, chrome-untrusted, data, http, https.
+
+       So opening this file by double-clicking it used to give a permanently blank dark
+       stage, with the real reason only visible in the console. A classic <script> has
+       no such restriction, so off the disk we load the concatenated build instead.
+
+       Over http:// nothing changes: the modules are loaded, exactly as before, so the
+       files in js/ stay the source of truth and editing them takes effect immediately.
+       The bundle is a build artefact (tools/build-bundle.mjs) and a test fails if it
+       has drifted from the modules, so the two can never silently disagree.
+
+       `nomodule` is not the mechanism here — that targets browsers WITHOUT module
+       support, which is a different question from the page's origin. -->
+  <!-- THE SOUND KIT. A classic script that defines window.SFX: forty-five synthesised
+       effects with measured trims, per-sound voice caps, pitch jitter and a musical
+       key. It has no imports and loads the same way on file:// and http://, so it
+       sits outside the module/bundle switch below. The engine reaches it through
+       AudioManager.kit() and keeps its own palette as the fallback. -->
+  <script src="js/sfx.js"></script>
+  <!-- game feel for the DOM controls (supplied juice.js): additive Web Animations, so it
+       never fights the CSS or the canvas. Sound and its own particles are off — the
+       engine already owns both. -->
+  <script src="js/juice.js"></script>
+  <script>
+    (function () {
+      var s = document.createElement('script');
+      if (location.protocol === 'file:') {
+        s.src = 'js/game.bundle.js';
+      } else {
+        s.type = 'module';
+        s.src = 'js/main.js';
+      }
+      document.head.appendChild(s);
+    })();
+  </script>
+  <!-- POSITIONED, or nobody reads it. This paragraph used to sit in normal flow after
+       a .stage-wrap with `min-height: 100vh`, inside a body with `overflow: hidden` —
+       so it was laid out below the fold of a document that cannot scroll. A visitor
+       with JavaScript off saw a blank dark stage and no explanation at all. Fixed and
+       centred, it is the only thing on the page. -->
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:99;display:flex;align-items:center;
+                justify-content:center;background:#061a38;padding:24px">
+      <p style="color:#EAF9FF;font:600 18px/1.5 system-ui,sans-serif;text-align:center;margin:0">
+        This game needs JavaScript enabled.
+      </p>
+    </div>
+  </noscript>
+</body>
+</html>

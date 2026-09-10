@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sfx.js — sound board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #17121f;
+    --panel:   #201929;
+    --edge:    #322842;
+    --ink:     #ece6f4;
+    --dim:     #968aa8;
+
+    --reward:    #63e0a4;
+    --movement:  #5ec8ff;
+    --cartoon:   #ffbf47;
+    --interface: #b490ff;
+    --drama:     #ff6f7d;
+    --comedy:    #ff9d4d;
+    --gesture:   #4ad6c0;
+
+    --hue: var(--interface);
+
+    --sans: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 28px 22px 64px;
+  }
+
+  /* ---- top bar ---------------------------------------------------- */
+
+  .bar {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding-bottom: 18px;
+  }
+  .mark {
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
+  }
+  .bar p {
+    margin: 0;
+    color: var(--dim);
+    font-size: 0.86rem;
+    max-width: 46ch;
+  }
+
+  /* ---- hero: the scope -------------------------------------------- */
+
+  .scope {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .scope canvas {
+    display: block;
+    width: 100%;
+    height: 190px;
+  }
+  .readout {
+    position: absolute;
+    left: 18px;
+    bottom: 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    pointer-events: none;
+  }
+  .readout .now {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--hue);
+    transition: color 140ms linear;
+  }
+  .readout .fam {
+    font-size: 0.82rem;
+    color: var(--dim);
+  }
+  .idle .readout .now { color: var(--dim); }
+
+  /* ---- key and comic timing ----------------------------------------- */
+
+  function announce(name, famName, hex, code) {
+    root.style.setProperty('--hue', hex);
+    scopeEl.classList.remove('idle');
+    nowName.textContent = name;
+    nowFam.textContent = famName;
+    snippet.textContent = code;
+    lastHit = performance.now();
+    lastHex = hex;
+    startScope();
+  }
+
+  keySel.addEventListener('change', function () {
+    var v = keySel.value;
+    var set = SFX.key(v || null);
+    announce(set || 'chromatic',
+             v ? 'sustained notes snap to this scale' : 'no quantisation',
+             '#b490ff',
+             v ? "SFX.key('" + v + "')" : 'SFX.key(null)');
+  });
+  SFX.key(keySel.value || null);
+
+  document.getElementById('gag').addEventListener('click', function () {
+    var punched = SFX.gag('coin', 'sadTrombone');
+    announce(punched ? 'sadTrombone' : 'coin',
+             punched ? 'the pattern breaks \u2014 that is the joke'
+                     : 'setup \u2014 press twice more',
+             '#ff9d4d',
+             "SFX.gag('coin', 'sadTrombone')");
+  });
+
+  document.getElementById('esc').addEventListener('click', function () {
+    var n = SFX.escalate('coin');
+    announce('coin \u00d7' + n, 'each repeat steps up the scale; pause to reset',
+             '#63e0a4', "SFX.escalate('coin')");
+  });
+
+  document.getElementById('windup').addEventListener('click', function () {
+    SFX.sequence(['ratchet', 0.52, 'boing']);
+    announce('ratchet \u2192 boing', 'anticipation, then payoff',
+             '#4ad6c0', "SFX.sequence(['ratchet', 0.52, 'boing'])");
+  });
+
+  document.getElementById('badum').addEventListener('click', function () {
+    SFX.sequence(['drumroll', 1.22, 'rimshot']);
+    announce('drumroll \u2192 rimshot', 'the setup sits 5 dB under the payoff',
+             '#ff9d4d', "SFX.sequence(['drumroll', 1.22, 'rimshot'])");
+  });
+
+  /* ---- voice-over stand-in ------------------------------------------ */
+  /* No real clip to ship, so this synthesises something speech-shaped on the
+     voice bus. The point is the ducking: fire cues while it runs and hear
+     them drop back. Your actual clips go through Pack.speak(). */
+
+  var voiceLive = false;
+
+  function playVoice() {
+    if (voiceLive) return;
+    var ctx = SFX.unlock();
+    if (!ctx) return;
+    voiceLive = true;
+
+    var LEN = 3.2;
+    var t0 = ctx.currentTime + 0.05;
+    var dest = SFX.voiceBus();
+
+    var src = ctx.createOscillator();
+    src.type = 'sawtooth';
+    src.frequency.setValueAtTime(125, t0);
+
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+
+    // Two formants and a syllable envelope: enough to read as a voice
+    // through a phone speaker, which is all this needs to do.
+    var f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 620; f1.Q.value = 5;
+    var f2 = ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 1180; f2.Q.value = 7;
+
+    var mix = ctx.createGain();
+    mix.gain.value = 0.9;
+
+    for (var i = 0; i < 11; i++) {
+      var at = t0 + i * 0.29;
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(0.34, at + 0.05);
+      env.gain.exponentialRampToValueAtTime(0.06, at + 0.20);
+      src.frequency.setValueAtTime(105 + Math.random() * 55, at);
+      f1.frequency.setValueAtTime(430 + Math.random() * 380, at);
+      f2.frequency.setValueAtTime(950 + Math.random() * 750, at);
+    }
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + LEN);
+
+    src.connect(env);
+    env.connect(f1); f1.connect(mix);
+    env.connect(f2); f2.connect(mix);
+    mix.connect(dest);
+    src.start(t0);
+    src.stop(t0 + LEN + 0.05);
+
+    var release = SFX.duck();
+    scopeEl.classList.add('ducked');
+    voiceBtn.textContent = 'Speaking\u2026';
+    nowFam.textContent = 'effects ducked to 25%';
+
+    src.onended = function () {
+      release();
+      voiceLive = false;
+      scopeEl.classList.remove('ducked');
+      voiceBtn.textContent = 'Play voice-over';
+      lastHit = performance.now();
+      startScope();
+    };
+
+    lastHit = performance.now();
+    lastHex = '#ffbf47';
+    startScope();
+  }
+
+  voiceBtn.addEventListener('click', playVoice);
+
+  /* ---- controls ---------------------------------------------------- */
+
+  .controls {
+    display: flex;
+    gap: 26px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 16px 2px 4px;
+    border-bottom: 1px solid var(--edge);
+    margin-bottom: 26px;
+  }
+  .knob {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.84rem;
+    color: var(--dim);
+  }
+  .knob output {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.1em;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 130px;
+    height: 3px;
+    background: var(--edge);
+    border-radius: 2px;
+    outline-offset: 6px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: var(--ink);
+    cursor: grab;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 15px; height: 15px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ink);
+    cursor: grab;
+  }
+
+  .ghost {
+    font: inherit;
+    font-size: 0.84rem;
+    color: var(--dim);
+    background: none;
+    border: 1px solid var(--edge);
+    border-radius: 2px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .ghost:hover { color: var(--ink); border-color: var(--dim); }
+  .ghost[aria-pressed="true"] { color: var(--drama); border-color: var(--drama); }
+  select.ghost { font: inherit; font-size: 0.84rem; padding: 5px 8px; }
+
+  /* ---- families ---------------------------------------------------- */
+
+  .family { margin-bottom: 30px; }
+  .family h2 {
+    margin: 0 0 11px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .family h2::before {
+    content: "";
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--fam);
+  }
+
+  .keys { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .key {
+    font: inherit;
+    font-size: 0.92rem;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-left: 2px solid var(--fam);
+    border-radius: 2px;
+    padding: 9px 15px;
+    cursor: pointer;
+    transition: background 90ms linear, transform 90ms ease;
+  }
+  .key:hover { background: #2a2136; }
+  .key:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
+  .key.hit {
+    background: var(--fam);
+    color: #16111d;
+    transform: translateY(1px);
+    transition: none;
+  }
+
+  /* ---- code strip -------------------------------------------------- */
+
+  .strip {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 34px;
+    padding: 13px 16px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+  }
+  .ducked .readout .fam { color: var(--drama); }
+  .strip code {
+    flex: 1;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86rem;
+    color: var(--hue);
+    overflow-x: auto;
+    white-space: nowrap;
+    transition: color 140ms linear;
+  }
+
+  .note {
+    margin-top: 26px;
+    color: var(--dim);
+    font-size: 0.85rem;
+    max-width: 68ch;
+  }
+  .note code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    color: var(--ink);
+  }
+
+  @media (max-width: 560px) {
+    .readout .now { font-size: 1.45rem; }
+    .scope canvas { height: 150px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <span class="mark">sfx.js</span>
+    <p>Forty-five effects, synthesised in the browser and loudness-matched by measurement. Tap one. Change the key and hear the pitched cues move into it. Start the voice-over and keep tapping to hear the effects duck under.</p>
+  </header>
+
+  <section class="scope idle" id="scope">
+    <canvas id="wave"></canvas>
+    <div class="readout">
+      <span class="now" id="nowName">silence</span>
+      <span class="fam" id="nowFam">pick a sound below</span>
+    </div>
+  </section>
+
+  <div class="controls">
+    <label class="knob">
+      Volume
+      <input type="range" id="vol" min="0" max="100" value="60">
+      <output id="volOut">60%</output>
+    </label>
+    <label class="knob">
+      Pitch
+      <input type="range" id="pitch" min="50" max="200" value="100">
+      <output id="pitchOut">1.00×</output>
+    </label>
+    <button class="ghost" id="mute" aria-pressed="false">Mute</button>
+    <button class="ghost" id="surprise">Play something</button>
+    <button class="ghost" id="voice">Play voice-over</button>
+    <label class="knob">
+      Key
+      <select id="key" class="ghost">
+        <option value="">off</option>
+        <option value="C pentatonic" selected>C pentatonic</option>
+        <option value="C major">C major</option>
+        <option value="A minor">A minor</option>
+        <option value="D minor">D minor</option>
+        <option value="F lydian">F lydian</option>
+        <option value="C blues">C blues</option>
+        <option value="C wholeTone">C whole tone</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="controls">
+    <span class="knob">Comic timing</span>
+    <button class="ghost" id="gag">Rule of three</button>
+    <button class="ghost" id="esc">Escalating streak</button>
+    <button class="ghost" id="windup">Wind-up, then payoff</button>
+    <button class="ghost" id="badum">Set up a punchline</button>
+  </div>
+
+  <div id="families"></div>
+
+  <div class="strip">
+    <code id="snippet">SFX.play('coin')</code>
+    <button class="ghost" id="copy">Copy</button>
+  </div>
+
+  <p class="note">
+    Drop <code>sfx.js</code> next to your build and call <code>SFX.play(name)</code>. A set key quantises
+    sustained notes to that scale, so cues sit in your music instead of against it \u2014 pentatonic is the safe
+    default, since nothing in it can clash. Glides are never quantised: a jump sweep is a gesture, not a note.
+    Levels come from
+    <code>tools/measure-loudness.js</code>, which renders each sound offline and trims it to a per-family
+    target, so a UI tick sits under an explosion by design rather than by accident. Speech routed through
+    <code>SFX.voiceBus()</code> ducks the effects automatically; <code>Pack.speak()</code> does it for you.
+  </p>
+
+</div>
+
+<script src="sfx.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var FAMILIES = [
+    { name: 'Pickups and rewards', hue: 'var(--reward)',    hex: '#63e0a4',
+      sounds: ['coin', 'gem', 'powerUp', 'levelUp', 'sparkle', 'correct'] },
+    { name: 'Movement',            hue: 'var(--movement)',  hex: '#5ec8ff',
+      sounds: ['jump', 'doubleJump', 'boing', 'swoosh', 'slice', 'land'] },
+    { name: 'Cartoon',             hue: 'var(--cartoon)',   hex: '#ffbf47',
+      sounds: ['pop', 'bubble', 'squeak', 'splat', 'honk', 'slideWhistle'] },
+    { name: 'Interface',           hue: 'var(--interface)', hex: '#b490ff',
+      sounds: ['click', 'select', 'tick', 'wrong', 'error', 'menuWhoosh'] },
+    { name: 'Drama',               hue: 'var(--drama)',     hex: '#ff6f7d',
+      sounds: ['laser', 'explode', 'hurt', 'gameOver', 'alarm', 'powerDown'] },
+    { name: 'Comedy',              hue: 'var(--comedy)',    hex: '#ff9d4d',
+      sounds: ['sadTrombone', 'rimshot', 'drumroll', 'bonk', 'doink',
+               'cuckoo', 'rubberChicken', 'kazoo'] },
+    { name: 'Comic gestures',      hue: 'var(--gesture)',   hex: '#4ad6c0',
+      sounds: ['ratchet', 'anticipate', 'zip', 'recordScratch',
+               'ricochet', 'pianoRun', 'fallingWhistle'] }
+  ];
+
+  var root      = document.documentElement;
+  var host      = document.getElementById('families');
+  var scopeEl   = document.getElementById('scope');
+  var nowName   = document.getElementById('nowName');
+  var nowFam    = document.getElementById('nowFam');
+  var snippet   = document.getElementById('snippet');
+  var volIn     = document.getElementById('vol');
+  var volOut    = document.getElementById('volOut');
+  var pitchIn   = document.getElementById('pitch');
+  var pitchOut  = document.getElementById('pitchOut');
+  var muteBtn   = document.getElementById('mute');
+  var copyBtn   = document.getElementById('copy');
+  var surprise  = document.getElementById('surprise');
+  var voiceBtn  = document.getElementById('voice');
+  var keySel    = document.getElementById('key');
+
+  var everySound = [];
+
+  /* ---- build the pads --------------------------------------------- */
+
+  FAMILIES.forEach(function (fam) {
+    var sec = document.createElement('section');
+    sec.className = 'family';
+    sec.style.setProperty('--fam', fam.hue);
+
+    var h = document.createElement('h2');
+    h.textContent = fam.name;
+    sec.appendChild(h);
+
+    var keys = document.createElement('div');
+    keys.className = 'keys';
+
+    fam.sounds.forEach(function (name) {
+      everySound.push({ name: name, fam: fam });
+      var b = document.createElement('button');
+      b.className = 'key';
+      b.type = 'button';
+      b.textContent = name;
+      b.addEventListener('click', function () { fire(name, fam, b); });
+      keys.appendChild(b);
+    });
+
+    sec.appendChild(keys);
+    host.appendChild(sec);
+  });
+
+  /* ---- firing ------------------------------------------------------ */
+
+  function currentPitch() { return pitchIn.value / 100; }
+
+  function fire(name, fam, btn) {
+    var p = currentPitch();
+    SFX.play(name, { pitch: p });
+
+    root.style.setProperty('--hue', fam.hue);
+    scopeEl.classList.remove('idle');
+    nowName.textContent = name;
+    nowFam.textContent = fam.name.toLowerCase();
+    snippet.textContent = p === 1
+      ? "SFX.play('" + name + "')"
+      : "SFX.play('" + name + "', { pitch: " + p.toFixed(2) + " })";
+
+    if (btn) {
+      btn.classList.add('hit');
+      setTimeout(function () { btn.classList.remove('hit'); }, 130);
+    }
+
+    lastHit = performance.now();
+    lastHex = fam.hex;
+    startScope();
+  }
+
+  surprise.addEventListener('click', function () {
+    var pick = everySound[Math.floor(Math.random() * everySound.length)];
+    var btn = Array.prototype.find.call(
+      document.querySelectorAll('.key'),
+      function (b) { return b.textContent === pick.name; }
+    );
+    fire(pick.name, pick.fam, btn);
+    if (btn) btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  /* ---- key and comic timing ----------------------------------------- */
+
+  function announce(name, famName, hex, code) {
+    root.style.setProperty('--hue', hex);
+    scopeEl.classList.remove('idle');
+    nowName.textContent = name;
+    nowFam.textContent = famName;
+    snippet.textContent = code;
+    lastHit = performance.now();
+    lastHex = hex;
+    startScope();
+  }
+
+  keySel.addEventListener('change', function () {
+    var v = keySel.value;
+    var set = SFX.key(v || null);
+    announce(set || 'chromatic',
+             v ? 'sustained notes snap to this scale' : 'no quantisation',
+             '#b490ff',
+             v ? "SFX.key('" + v + "')" : 'SFX.key(null)');
+  });
+  SFX.key(keySel.value || null);
+
+  document.getElementById('gag').addEventListener('click', function () {
+    var punched = SFX.gag('coin', 'sadTrombone');
+    announce(punched ? 'sadTrombone' : 'coin',
+             punched ? 'the pattern breaks \u2014 that is the joke'
+                     : 'setup \u2014 press twice more',
+             '#ff9d4d',
+             "SFX.gag('coin', 'sadTrombone')");
+  });
+
+  document.getElementById('esc').addEventListener('click', function () {
+    var n = SFX.escalate('coin');
+    announce('coin \u00d7' + n, 'each repeat steps up the scale; pause to reset',
+             '#63e0a4', "SFX.escalate('coin')");
+  });
+
+  document.getElementById('windup').addEventListener('click', function () {
+    SFX.sequence(['ratchet', 0.52, 'boing']);
+    announce('ratchet \u2192 boing', 'anticipation, then payoff',
+             '#4ad6c0', "SFX.sequence(['ratchet', 0.52, 'boing'])");
+  });
+
+  document.getElementById('badum').addEventListener('click', function () {
+    SFX.sequence(['drumroll', 1.22, 'rimshot']);
+    announce('drumroll \u2192 rimshot', 'the setup sits 5 dB under the payoff',
+             '#ff9d4d', "SFX.sequence(['drumroll', 1.22, 'rimshot'])");
+  });
+
+  /* ---- voice-over stand-in ------------------------------------------ */
+  /* No real clip to ship, so this synthesises something speech-shaped on the
+     voice bus. The point is the ducking: fire cues while it runs and hear
+     them drop back. Your actual clips go through Pack.speak(). */
+
+  var voiceLive = false;
+
+  function playVoice() {
+    if (voiceLive) return;
+    var ctx = SFX.unlock();
+    if (!ctx) return;
+    voiceLive = true;
+
+    var LEN = 3.2;
+    var t0 = ctx.currentTime + 0.05;
+    var dest = SFX.voiceBus();
+
+    var src = ctx.createOscillator();
+    src.type = 'sawtooth';
+    src.frequency.setValueAtTime(125, t0);
+
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+
+    // Two formants and a syllable envelope: enough to read as a voice
+    // through a phone speaker, which is all this needs to do.
+    var f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 620; f1.Q.value = 5;
+    var f2 = ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 1180; f2.Q.value = 7;
+
+    var mix = ctx.createGain();
+    mix.gain.value = 0.9;
+
+    for (var i = 0; i < 11; i++) {
+      var at = t0 + i * 0.29;
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(0.34, at + 0.05);
+      env.gain.exponentialRampToValueAtTime(0.06, at + 0.20);
+      src.frequency.setValueAtTime(105 + Math.random() * 55, at);
+      f1.frequency.setValueAtTime(430 + Math.random() * 380, at);
+      f2.frequency.setValueAtTime(950 + Math.random() * 750, at);
+    }
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + LEN);
+
+    src.connect(env);
+    env.connect(f1); f1.connect(mix);
+    env.connect(f2); f2.connect(mix);
+    mix.connect(dest);
+    src.start(t0);
+    src.stop(t0 + LEN + 0.05);
+
+    var release = SFX.duck();
+    scopeEl.classList.add('ducked');
+    voiceBtn.textContent = 'Speaking\u2026';
+    nowFam.textContent = 'effects ducked to 25%';
+
+    src.onended = function () {
+      release();
+      voiceLive = false;
+      scopeEl.classList.remove('ducked');
+      voiceBtn.textContent = 'Play voice-over';
+      lastHit = performance.now();
+      startScope();
+    };
+
+    lastHit = performance.now();
+    lastHex = '#ffbf47';
+    startScope();
+  }
+
+  voiceBtn.addEventListener('click', playVoice);
+
+  /* ---- controls ---------------------------------------------------- */
+
+  volIn.addEventListener('input', function () {
+    SFX.volume(volIn.value / 100);
+    volOut.textContent = volIn.value + '%';
+  });
+
+  pitchIn.addEventListener('input', function () {
+    pitchOut.textContent = currentPitch().toFixed(2) + '\u00d7';
+  });
+
+  muteBtn.addEventListener('click', function () {
+    var m = SFX.mute();
+    muteBtn.setAttribute('aria-pressed', String(m));
+    muteBtn.textContent = m ? 'Muted' : 'Mute';
+  });
+
+  copyBtn.addEventListener('click', function () {
+    var text = snippet.textContent;
+    var done = function () {
+      copyBtn.textContent = 'Copied';
+      setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1200);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); }
+      catch (e) { copyBtn.textContent = 'Select it'; }
+      document.body.removeChild(ta);
+    }
+  });
+
+  /* ---- the scope --------------------------------------------------- */
+  /* Draws only while a sound is sounding: motion answers an action,
+     rather than idling for decoration. */
+
+  var canvas = document.getElementById('wave');
+  var g2d = canvas.getContext('2d');
+  var buf = null;
+  var running = false;
+  var lastHit = 0;
+  var lastHex = '#968aa8';
+
+  function resize() {
+    var dpr = window.devicePixelRatio || 1;
+    var r = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(r.width * dpr));
+    canvas.height = Math.max(1, Math.floor(r.height * dpr));
+    g2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!running) flat();
+  }
+  window.addEventListener('resize', resize);
+
+  function flat() {
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    g2d.clearRect(0, 0, w, h);
+    g2d.strokeStyle = '#322842';
+    g2d.lineWidth = 1;
+    g2d.beginPath();
+    g2d.moveTo(0, h / 2);
+    g2d.lineTo(w, h / 2);
+    g2d.stroke();
+  }
+
+  function startScope() {
+    if (running) return;
+    running = true;
+    requestAnimationFrame(draw);
+  }
+
+  function draw() {
+    var an = SFX.analyser();
+    if (!an) { running = false; flat(); return; }
+    if (!buf || buf.length !== an.fftSize) buf = new Uint8Array(an.fftSize);
+    an.getByteTimeDomainData(buf);
+
+    var w = canvas.clientWidth, h = canvas.clientHeight, mid = h / 2;
+    g2d.clearRect(0, 0, w, h);
+
+    // baseline
+    g2d.strokeStyle = '#322842';
+    g2d.lineWidth = 1;
+    g2d.beginPath();
+    g2d.moveTo(0, mid); g2d.lineTo(w, mid);
+    g2d.stroke();
+
+    // waveform
+    var step = buf.length / w;
+    g2d.strokeStyle = lastHex;
+    g2d.lineWidth = 1.8;
+    g2d.lineJoin = 'round';
+    g2d.beginPath();
+    for (var x = 0; x < w; x++) {
+      var v = (buf[Math.floor(x * step)] - 128) / 128;
+      var y = mid + v * (mid - 12) * 1.6;
+      if (x === 0) g2d.moveTo(x, y); else g2d.lineTo(x, y);
+    }
+    g2d.stroke();
+
+    if (voiceLive) lastHit = performance.now();
+
+    if (performance.now() - lastHit > 1600) {
+      running = false;
+      scopeEl.classList.add('idle');
+      nowFam.textContent = 'pick a sound below';
+      flat();
+      return;
+    }
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  flat();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# THE ONE THAT ACTUALLY APPLIES.
+#
+# docs/DEPLOY.md recommends setting Vercel's Root Directory to `game`. Vercel reads
+# .vercelignore from the root of the PROJECT, not of the repository — so with that
+# setting the .vercelignore at the repo root is never read at all. The root one stays
+# for the other case (Root Directory left unset, where the repo root IS the project).
+#
+# THIS FILE IS NOW EMPTY OF RULES, and that is the point. It used to carry four globs
+# excluding source art that lived inside this folder:
+#
+#   assets/GIF               3 delivered GIFs                   7.6MB
+#   assets/char/*-gif.png    un-sliced character sheets         9.8MB
+#   assets/option-shape/*.png the delivered blocks              23MB
+#   assets/art/cover.png     the cover render                   2.5MB
+#
+# 43MB of build inputs that no URL in the game ever requests, sitting in the folder
+# that gets uploaded, kept off the CDN only by these globs being correct in two
+# separate files. Any new source file dropped in the wrong folder shipped silently.
+#
+# All of it now lives in art-source/ instead, which is outside this folder entirely,
+# so there is nothing here to exclude: game/ contains only what the game loads. The
+# tools that consume the source art read it from art-source/ (see
+# tools/build-option-shapes.mjs, slice-char.mjs, gif-to-grid.mjs, assets.mjs).
+#
+# Keep it that way. If something in here needs excluding, that is the signal it is in
+# the wrong folder.

@@ -1,0 +1,22 @@
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+.vercel/
+
+# Generated intermediates. tools/gif-to-grid.mjs rebuilds these from the GIFs in
+# art-source/gif/, which ARE committed — so they are ~10MB of PNG that a checkout
+# does not need. Regenerate with:
+#   node tools/gif-to-grid.mjs sprite-max-px-frames-36-rows-6-cols-6.gif   run-gif.png
+#   node tools/gif-to-grid.mjs sprite-max-px-frames-36-rows-6-cols-6-2.gif jump-gif.png
+#   node tools/gif-to-grid.mjs sprite-max-px-frames-36-rows-6-cols-6-3.gif skid-gif.png
+#   node tools/slice-char.mjs
+# and the tremble grid from the owner's delivered sheet (tremble-src.png IS committed):
+#   node tools/sheet-to-grid.mjs tremble-src.png tremble-new.png --rows=3 --cols=4
+art-source/char-sheets/*-gif.png
+art-source/char-sheets/tremble-new.png
+
+# Evidence frames for a QA report — regenerate with: node tools/qa-evidence.mjs
+qa-report/
+art-source/char-sheets/idle-sheet.png

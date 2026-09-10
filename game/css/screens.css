@@ -1,0 +1,1266 @@
+/* Cover + character select.
+
+   Asset folders mean something here, and the test suite enforces it:
+     assets/art   painted illustration  -> WebP
+     assets/sky   painted backgrounds   -> WebP
+     assets/char  sprite sheets         -> WebP
+     assets/env   painted world pieces  -> WebP
+     assets/ui    interface             -> SVG only, because it has to stay sharp at
+                                           any scale and be recoloured and animated.
+   Both live inside the same 16:9 stage as the game and over the same world, so
+   pressing PLAY reframes into gameplay instead of cutting to an unrelated screen. */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+.screen[hidden] { display: none; }
+.screen.leaving { animation: screenOut 420ms ease both; }
+/* screenOut scales as well as fades, so it needs silencing too — the screen still has
+   to end up hidden, which .hidden does on its own once the timer fires. */
+@media (prefers-reduced-motion: reduce) {
+  .screen.leaving { animation: none; opacity: 0; }
+}
+@keyframes screenOut { to { opacity: 0; transform: scale(1.04); } }
+
+/* ---------- cover ----------
+   THE WHOLE BANNER, UNCROPPED. It was `center/cover` with a slow drift that scaled
+   from 1.06 to 1.12, and between them they cut the title art about ten per cent in
+   from every edge — the top of the logo and the mammoth's feet went outside the frame.
+
+   `contain` fits the art inside the stage instead of filling it, and the drift is
+   gone: any transform that scales above 1 crops, so there is no version of that
+   animation that is compatible with showing the banner whole. The banner and the stage
+   are both 16:9, so in practice it fills the frame edge to edge anyway; the flat
+   background behind it is only there for a viewport that is not. */
+.cover { background: #0a2450; }
+/* WHILE THE ART LOADS: PLAY is visible but held, dimmed a touch, with a quiet note under it. */
+.cover.loading .btn-play { filter: saturate(0.7) brightness(0.82); cursor: progress; }
+.cover-loading {
+  position: absolute;
+  left: 50%;
+  bottom: 2.2%;
+  transform: translateX(-50%);
+  margin: 0;
+  font: 700 clamp(12px, calc(1.3 * var(--u)), 44px)/1 "Baloo 2", system-ui, sans-serif;
+  color: rgba(234, 249, 255, 0.92);
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 6px rgba(6, 32, 60, 0.6);
+  pointer-events: none;
+  animation: coverLoadingPulse 1.2s ease-in-out infinite;
+}
+@keyframes coverLoadingPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cover-loading { animation: none; } }
+.cover-art {
+  position: absolute;
+  inset: 0;
+  background: url("../assets/art/cover.webp?v=e0c7a5db") center/contain no-repeat;
+}
+/* SNOW OVER THE BANNER — real six-armed flakes, falling and turning.
+
+   It was six radial-gradient dots on one drifting element, which is the cheapest possible
+   snow and looks it: dots, all moving as one sheet, at one speed. The cover is the first
+   thing anyone sees and the game is called Frozen Rush, so it gets the snowfall; the PLAY
+   world keeps a sparse one (see Atmosphere in engine.js — asked for: less in game, no
+   clutter over what the player is reading).
+
+   FOURTEEN ELEMENTS, NOT A BACKGROUND, for one reason: a flake has to TURN as it falls, and
+   a background layer cannot rotate. Each <i> is one flake with its own column, size, fall
+   time, head start and spin direction, all set below. The flake is a data-URI SVG, so the
+   layer still costs no asset and no request. Under reduced motion nothing falls. */
+.cover-snow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cover-snow i {
+  position: absolute;
+  top: 0;
+  left: var(--x);
+  /* 2.0 stage units at s:1 (was 3.4 — reviewed as big, and as sitting ON the banner rather
+     than falling inside it). The biggest flake is now about 44px on a 1920 stage, the
+     smallest 17px, and the far ones are blurred a little (--blur, per flake) so the layer
+     has depth: crisp near, soft far, which is how snow in a picture actually looks. */
+  width: calc(2.0 * var(--u) * var(--s));
+  aspect-ratio: 1;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='3.2' stroke-linecap='round'%3E%3Cg%3E%3Cpath d='M24 24V6'/%3E%3Cpath d='M24 12.5l-4.4 4.4M24 12.5l4.4 4.4' stroke-width='2.6'/%3E%3Cpath d='M24 19l-3 3M24 19l3 3' stroke-width='2.2'/%3E%3C/g%3E%3Cg transform='rotate(60 24 24)'%3E%3Cpath d='M24 24V6'/%3E%3Cpath d='M24 12.5l-4.4 4.4M24 12.5l4.4 4.4' stroke-width='2.6'/%3E%3Cpath d='M24 19l-3 3M24 19l3 3' stroke-width='2.2'/%3E%3C/g%3E%3Cg transform='rotate(120 24 24)'%3E%3Cpath d='M24 24V6'/%3E%3Cpath d='M24 12.5l-4.4 4.4M24 12.5l4.4 4.4' stroke-width='2.6'/%3E%3Cpath d='M24 19l-3 3M24 19l3 3' stroke-width='2.2'/%3E%3C/g%3E%3Cg transform='rotate(180 24 24)'%3E%3Cpath d='M24 24V6'/%3E%3Cpath d='M24 12.5l-4.4 4.4M24 12.5l4.4 4.4' stroke-width='2.6'/%3E%3Cpath d='M24 19l-3 3M24 19l3 3' stroke-width='2.2'/%3E%3C/g%3E%3Cg transform='rotate(240 24 24)'%3E%3Cpath d='M24 24V6'/%3E%3Cpath d='M24 12.5l-4.4 4.4M24 12.5l4.4 4.4' stroke-width='2.6'/%3E%3Cpath d='M24 19l-3 3M24 19l3 3' stroke-width='2.2'/%3E%3C/g%3E%3Cg transform='rotate(300 24 24)'%3E%3Cpath d='M24 24V6'/%3E%3Cpath d='M24 12.5l-4.4 4.4M24 12.5l4.4 4.4' stroke-width='2.6'/%3E%3Cpath d='M24 19l-3 3M24 19l3 3' stroke-width='2.2'/%3E%3C/g%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='3' fill='%23ffffff'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: calc(0.26 + 0.40 * var(--s));      /* the nearer it is, the more solid: 0.44 .. 0.72 */
+  filter: blur(var(--blur, 0px)) drop-shadow(0 0 calc(0.3 * var(--u)) rgba(180, 224, 255, 0.7));
+  will-change: transform;
+  animation: coverFlakeFall var(--t) linear var(--d) infinite;
+}
+/* It falls the whole height of the cover and a little past it, drifts sideways as it goes,
+   and turns once — the drift and the turn are what separate falling from scrolling. */
+@keyframes coverFlakeFall {
+  from { transform: translate3d(0, -14vh, 0) rotate(0deg); }
+  to   { transform: translate3d(calc(3 * var(--u)), 112vh, 0) rotate(var(--spin)); }
+}
+.cover-snow i:nth-child(1) { --x: 4%; --s: 0.62; --t: 13s; --d: -1s; --spin: 360deg; --blur: 0.7px; }
+.cover-snow i:nth-child(2) { --x: 11%; --s: 1; --t: 17s; --d: -7s; --spin: -360deg; --blur: 0px; }
+.cover-snow i:nth-child(3) { --x: 19%; --s: 0.48; --t: 11s; --d: -4s; --spin: 360deg; --blur: 1.1px; }
+.cover-snow i:nth-child(4) { --x: 26%; --s: 0.82; --t: 15s; --d: -12s; --spin: -360deg; --blur: 0.35px; }
+.cover-snow i:nth-child(5) { --x: 33%; --s: 0.55; --t: 12s; --d: -9s; --spin: 360deg; --blur: 0.7px; }
+.cover-snow i:nth-child(6) { --x: 41%; --s: 1.15; --t: 19s; --d: -2s; --spin: -360deg; --blur: 0px; }
+.cover-snow i:nth-child(7) { --x: 48%; --s: 0.7; --t: 14s; --d: -15s; --spin: 360deg; --blur: 0.35px; }
+.cover-snow i:nth-child(8) { --x: 56%; --s: 0.45; --t: 10s; --d: -6s; --spin: -360deg; --blur: 1.1px; }
+.cover-snow i:nth-child(9) { --x: 63%; --s: 0.95; --t: 16s; --d: -11s; --spin: 360deg; --blur: 0px; }
+.cover-snow i:nth-child(10) { --x: 70%; --s: 0.6; --t: 13s; --d: -3s; --spin: -360deg; --blur: 0.7px; }
+.cover-snow i:nth-child(11) { --x: 78%; --s: 1.05; --t: 18s; --d: -8s; --spin: 360deg; --blur: 0px; }
+.cover-snow i:nth-child(12) { --x: 85%; --s: 0.52; --t: 11s; --d: -14s; --spin: -360deg; --blur: 1.1px; }
+.cover-snow i:nth-child(13) { --x: 92%; --s: 0.78; --t: 15s; --d: -5s; --spin: 360deg; --blur: 0.35px; }
+.cover-snow i:nth-child(14) { --x: 97%; --s: 0.66; --t: 12s; --d: -10s; --spin: -360deg; --blur: 0.7px; }
+
+/* ---------- text buttons (PLAY, Try Again, Replay) ----------
+   Built to the supplied reference: a glossy coloured pill inside a METALLIC RIM.
+   The depth comes from the rim and from a soft gloss bloom near the top — not
+   from an extruded base, which none of the references have and which made these
+   read as stacked blocks.
+
+     .btn-chunky        the metal rim: a light band with a darker outer edge
+     .btn-chunky-face   the body, deepening downward, with a radial gloss bloom
+                        seated near the top. The bloom fades to nothing before the
+                        middle: an earlier version used a hard stop at 47%, which on
+                        a wide pill reads as a seam across the button rather than as
+                        gloss, and the seam sat right behind the label. */
+.btn-chunky,
+.btn-primary {
+  --cap: clamp(3px, 0.31vw, 6px);
+  --r: 999px;
+  /* BEGIN — green. Brighter and more saturated than before: this is the button the
+     game is entered through, and against an ice world that is itself very light a
+     mid-tone green reads as muted rather than as the one thing to press. */
+  /* BEGIN — a vivid green with a wide value range. The previous set spanned only a
+     few steps from top to bottom, which reads as one flat colour with a shade on it.
+     --halo is the button's own light, thrown softly around it. */
+  --gloss:   .92;
+  --top:     #C8FFDC;
+  --body-a:  #35E877;
+  --body-b:  #06BE4F;
+  --edge:    #027A31;
+  --ink:     #045C27;
+  --halo:    rgba(24, 214, 108, 0.55);
+
+  position: relative;
+  display: inline-block;
+  border: none;
+  padding: clamp(4px, 0.42vw, 8px);
+  border-radius: var(--r);
+  /* The metal rim — chrome rather than grey. Flat mid-grey drains the colour it
+     surrounds, which was most of why these read as dull; running it from near-white
+     through silver to a dark edge keeps the same part and brightens everything inside
+     it. The last shadow is the button's OWN light: a coloured halo is the standard cue
+     that a control is live, and it is what the set was missing. */
+  background: linear-gradient(180deg, #FDFEFF 0%, #DCE4EA 38%, #A9B4BE 74%, #7E8A95 100%);
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 1),
+    inset 0 clamp(-3px, -0.31vw, -2px) 0 rgba(74, 86, 96, 0.5),
+    0 0 0 clamp(1px, 0.1vw, 2px) #8894A0,
+    /* the navy keyline every other element in this game carries */
+    0 0 0 clamp(4px, 0.44vw, 9px) #14496F,
+    0 clamp(6px, 0.63vw, 12px) clamp(12px, 1.25vw, 24px) rgba(4, 18, 40, 0.42),
+    0 0 clamp(14px, 1.5vw, 28px) var(--halo, transparent);
+  transition: box-shadow 160ms ease;
+}
+/* SECOND GO — Try Again is a retry, not a beginning */
+.btn-retry {
+  /* Violet. Blue-on-blue read poorly against an ice world, and it was too close
+     to the sky to find at a glance. Violet is the one warm-cool hue no other role
+     uses here: green begins a run, amber is the in-world verb, ice is the aside.
+     A retry needs to be unmistakable and calm, not alarming. */
+  --gloss:   .92;
+  --top:     #F0E4FF;
+  --body-a:  #B583FF;
+  --body-b:  #8434FF;
+  --edge:    #5C10CC;
+  --ink:     #400E96;
+  --halo:    rgba(146, 74, 255, 0.55);
+}
+
+.btn-chunky-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 1.05vw, 20px) clamp(32px, 3.2vw, 62px);
+  border-radius: var(--r);
+  /* The gloss is a RADIAL bloom near the top, fading out before the middle. It used
+     to be a hard stop at 47%, which on a wide pill reads as a seam across the button
+     rather than as gloss - and the seam sat right behind the label. */
+  background:
+    radial-gradient(122% var(--gloss-h, 88%) at 50% -10%,
+      rgba(255, 255, 255, var(--gloss, .88)) 0%,
+      rgba(255, 255, 255, calc(var(--gloss, .88) * 0.42)) 38%,
+      rgba(255, 255, 255, 0) 74%),
+    linear-gradient(180deg, var(--top) 0%, var(--body-a) 42%, var(--body-b) 80%, var(--edge) 100%);
+  /* a thin bright line just inside the top — where a gel key's highlight really is —
+     plus a deepened lower lip for contrast. Neither crosses the middle. */
+  box-shadow:
+    inset 0 clamp(2px, 0.21vw, 4px) 0 rgba(255, 255, 255, 0.9),
+    inset 0 clamp(-8px, -0.8vw, -5px) 0 rgba(0, 0, 0, 0.24);
+  transition: filter 110ms ease, box-shadow 110ms ease, background 110ms ease;
+}
+.btn-chunky-label {
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  font-size: clamp(21px, calc(2.3 * var(--u)), 88px);
+  letter-spacing: .02em;
+  color: #FFFFFF;
+  -webkit-text-stroke: clamp(2px, calc(0.24 * var(--u)), 10px) var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 clamp(2px, calc(0.21 * var(--u)), 8px) 0 rgba(0, 0, 0, 0.3);
+}
+.btn-chunky:hover .btn-chunky-face { filter: brightness(1.1) saturate(1.06); }
+/* the halo swelling is most of what makes the set feel alive under a pointer */
+.btn-chunky:hover,
+.btn-primary:hover {
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 1),
+    inset 0 clamp(-3px, -0.31vw, -2px) 0 rgba(74, 86, 96, 0.5),
+    0 0 0 clamp(1px, 0.1vw, 2px) #8894A0,
+    0 0 0 clamp(4px, 0.44vw, 9px) #14496F,
+    0 clamp(6px, 0.63vw, 12px) clamp(12px, 1.25vw, 24px) rgba(4, 18, 40, 0.42),
+    0 0 clamp(22px, 2.3vw, 44px) var(--halo, transparent);
+}
+/* PRESSED IS A LIGHT STATE, not a movement. A thumb covers the button at the moment
+   it would travel, so the feedback would be hidden exactly when it is needed; and a
+   control that moves is harder to hit. The whole face darkens instead. */
+.btn-chunky:active .btn-chunky-face,
+.btn-chunky.pressed .btn-chunky-face {
+  --gloss: .34;
+  --gloss-h: 56%;
+  filter: brightness(.82) saturate(1.14);
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 0.45),
+    inset 0 clamp(-8px, -0.8vw, -5px) 0 rgba(0, 0, 0, 0.24),
+    inset 0 0 clamp(14px, 1.5vw, 28px) rgba(0, 0, 0, 0.3);
+}
+.btn-chunky:active, .btn-chunky.pressed { animation: none; }
+.btn-chunky:focus-visible,
+.btn-primary:focus-visible {
+  outline: clamp(3px, 0.31vw, 5px) solid #FFD34A;
+  outline-offset: clamp(3px, 0.31vw, 6px);
+}
+/* playBreathe and every .btn-start rule went with the character-select screen and the
+   CSS-built PLAY pill. The picture buttons are their own family (.btn-art, below) and
+   .btn-start has had no element in the markup for a long time. */
+
+/* Replay wears the same rim and gloss — it is the same act */
+.btn-primary { padding: clamp(3px, 0.31vw, 6px); }
+.btn-primary-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(8px, 0.85vw, 16px) clamp(22px, 2.1vw, 40px);
+  border-radius: var(--r);
+  background:
+    radial-gradient(122% var(--gloss-h, 88%) at 50% -10%,
+      rgba(255, 255, 255, var(--gloss, .88)) 0%,
+      rgba(255, 255, 255, calc(var(--gloss, .88) * 0.42)) 38%,
+      rgba(255, 255, 255, 0) 74%),
+    linear-gradient(180deg, var(--top) 0%, var(--body-a) 42%, var(--body-b) 80%, var(--edge) 100%);
+  box-shadow:
+    inset 0 clamp(2px, 0.21vw, 3px) 0 rgba(255, 255, 255, 0.9),
+    inset 0 clamp(-7px, -0.7vw, -4px) 0 rgba(0, 0, 0, 0.24);
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: clamp(15px, 1.45vw, 28px);
+  letter-spacing: .02em;
+  -webkit-text-stroke: clamp(1.5px, 0.16vw, 3px) var(--ink);
+  paint-order: stroke fill;
+  transition: filter 110ms ease, box-shadow 110ms ease, background 110ms ease;
+}
+.btn-primary:hover .btn-primary-face { filter: brightness(1.07); }
+.btn-primary:active .btn-primary-face,
+.btn-primary.pressed .btn-primary-face {
+  --gloss: .34;
+  --gloss-h: 56%;
+  filter: brightness(.82);
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 0.45),
+    inset 0 clamp(-7px, -0.7vw, -4px) 0 rgba(0, 0, 0, 0.24),
+    inset 0 0 clamp(12px, 1.25vw, 22px) rgba(0, 0, 0, 0.3);
+}
+/* position lives with the rest of the .btn-play rules at the end of this file */
+
+/* ---------- character select: REMOVED ----------
+   The whole select screen went when the roster came down to one explorer — a screen
+   that asks a question with one answer is a tap the player has to make before the game
+   will start. Its stylesheet stayed behind: 339 lines of .select, .sel-aurora,
+   .sel-snow, .card-pick, .card-burst, .select-title and .btn-start rules for elements
+   that have not been in index.html for a long time. Deleted here.
+
+   The one survivor is .card-hero just below, which the Ouch panel still uses. */
+
+/* The scissors cursor’s stylesheet was here — .cursor, .cur-half, .cur-blade,
+   .cur-loop, .cur-arm, .cur-rivet and .stage.cursor-on. The pointer is now an
+   ordinary CSS cursor on #game-canvas and the "where to cut" it existed to say is
+   drawn on the ropes themselves, so all of it is gone. */
+
+/* ================== THE TUTORIAL LAYER ==================
+
+   A spotlight, a dialogue box and a Skip, positioned by js/tutorial.js in percentages
+   of the stage so one set of stage coordinates is correct at every viewport size.
+
+   EVERY ELEMENT HERE HAS A REAL BOX, and that is not a throwaway remark: this file was
+   written, the markup was added, the script was wired, and the stylesheet was missed
+   because an earlier edit script died before it got here. The result would have been a
+   tutorial that was present, unhidden, correctly positioned and 0x0 — indistinguishable
+   from logic that never fires, which is the most expensive kind of bug available here.
+   The verdict mark in style.css had exactly that fault and was invisible for months.
+*/
+.tutorial {
+  position: absolute;
+  inset: 0;
+  /* 40: over the canvas and the jump button, and deliberately BELOW the .overlay
+     panels at 45. The tutorial ending with the game (see tutorial.js) is what stops
+     the two coexisting at all, but relying on DOM order for that was luck — the panels
+     happen to be declared after this element, and moving either in the markup would
+     have put a blur sheet over the ending card. */
+  z-index: 40;
+  overflow: hidden;
+}
+.tutorial[hidden] { display: none; }
+
+/* THE VEIL — a pulled focus, not a spotlight.
+
+   backdrop-filter blurs and darkens whatever is behind this element, and the mask
+   punches a soft hole in it where the tutorial is pointing. Inside the hole the veil
+   is fully transparent, so the game is sharp and at full brightness; outside it the
+   picture is blurred and dimmed. Nothing is drawn ON the artwork at all — no ring, no
+   outline, no hard edge anywhere.
+
+   The hole is an ellipse whose centre and radii come from four custom properties the
+   script sets. A mask gradient is the only way to do this in one element: a hole built
+   from four surrounding panels needs all four kept in step as it moves, and they show
+   their seams the moment they are blurred.
+
+   NOTE the mask polarity. Where the mask is OPAQUE the veil is painted; where it is
+   transparent the veil is not. So the gradient runs transparent in the middle to black
+   outside — the opposite of what it looks like it should be, and getting it backwards
+   blurs only the thing you are pointing at.
+
+   If backdrop-filter is unsupported the element still paints its own background, so
+   the fallback is a plain dark veil with the same hole: dimmer, not broken. */
+.tut-veil {
+  position: absolute;
+  inset: 0;
+  /* THE WHOLE SCREEN, with no hole in it. A masked hole was tried first and it is the
+     wrong shape of solution: the hole has to be kept in step with a moving target, its
+     soft rim needs inflating to keep the object out of the blur, and the mask polarity
+     is inverted from what it reads as — all of that to end up with a lit circle again.
+     Blurring everything and drawing the focus back on top is one instruction each way
+     and cannot drift. */
+  /* 30% and a light blur. It was 50% with brightness(0.6) on top, which is nearly a
+     black screen: the game behind was barely legible, so the layer stopped reading as
+     "this part is in focus" and started reading as "the game has been replaced". The
+     sheet only has to push the surroundings back a step. Brightness is left alone —
+     the 30% fill is the darkening, and doing it twice was most of the problem. */
+  background: rgba(6, 26, 52, 0.3);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  pointer-events: none;
+  /* Eased in, so the world softens rather than being replaced between two frames. It
+     is the same idea as a camera pulling focus, and it is the difference between the
+     step feeling staged and feeling like a hard cut. */
+  animation: tutVeilIn 260ms ease-out both;
+}
+@keyframes tutVeilIn { from { opacity: 0; } to { opacity: 1; } }
+/* THE FOCUS — THE SUBJECT GLOWING ALONG ITS OWN OUTLINE.
+
+   This canvas holds one thing: the subject of the step, drawn alone by the engine
+   (renderFocus) with nothing behind it. drop-shadow follows the element's ALPHA, so on
+   a canvas that is transparent everywhere but the subject, the glow is the subject's
+   silhouette and nothing else — the character lit along his outline, not a spot or a
+   panel with him in it.
+
+   Two shadows, tight and wide: the tight one is the edge light that says "this one",
+   the wide one is the warmth that lifts him off the dimmed scene. Gold, because gold
+   is what this game uses for "yours to act on" — the button, the cut line, the rim of
+   the dialogue box. A slow breath on the glow keeps a frozen frame from looking dead. */
+.tut-focus {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 clamp(5px, 0.5vw, 10px) rgba(255, 201, 77, 0.95))
+          drop-shadow(0 0 clamp(14px, 1.5vw, 28px) rgba(255, 186, 56, 0.6));
+  /* NO ANIMATION ON THIS GLOW. It is a drop-shadow on a full-stage canvas, and animating
+     it means re-blurring 1920x1080 of alpha every frame: measured at 1.5 frames a second
+     on a software renderer, which starved the whole game while a tutorial step was up.
+     Static, the browser filters it once and composites the result. The lifted button
+     keeps its breath - it is a small element. */
+}
+@keyframes tutFocusBreathe {
+  0%, 100% { filter: drop-shadow(0 0 clamp(5px, 0.5vw, 10px) rgba(255, 201, 77, 0.95))
+                     drop-shadow(0 0 clamp(14px, 1.5vw, 28px) rgba(255, 186, 56, 0.55)); }
+  50%      { filter: drop-shadow(0 0 clamp(7px, 0.7vw, 14px) rgba(255, 210, 100, 1))
+                     drop-shadow(0 0 clamp(20px, 2.1vw, 40px) rgba(255, 186, 56, 0.75)); }
+}
+.tut-focus[hidden] { display: none; }
+
+/* NO .tut-lift. It raised a DOM control above the blur sheet and glowed it, for the one
+   step that introduced the JUMP button. The button is gone (index.html) and every subject
+   the tutorial has left is drawn on the canvas, where showFocus re-renders it alone. */
+
+/* THE HAND. It taps, on the spot being explained, and it IS the instruction to tap —
+   there is no button. Same supplied art as the swipe hint, so a child learns one hand
+   that means "your finger goes here". */
+.tut-hand {
+  position: absolute;
+  /* SMALLER (asked for). 5.6 stage units was a hand as wide as the block it was
+     sweeping over; 3.6 demonstrates the gesture without hiding what the gesture is
+     about. The tap hand below is smaller again. */
+  width: clamp(40px, calc(3.6 * var(--u)), 110px);
+  aspect-ratio: 300 / 360;
+  --tip-x: 20%; --tip-y: 4%;
+  /* THE FINGERTIP IS THE POINT, NOT THE MIDDLE OF THE HAND.
+     The art is 300x360 with the index finger's tip about 20% across and 4% down, so a
+     hand centred on the cut line (translate -50% -50%) put its tip half a hand-height
+     ABOVE the line and a fifth of a hand-width beside it — reported as the hand not
+     being on the dashes. Translating by the tip's own place in the box lands the tip on
+     the point the engine gives, at any size. One image change is one edit here. */
+  translate: calc(-1 * var(--tip-x)) calc(-1 * var(--tip-y));
+  background: url("../assets/ui/icons/touch.png?v=d05ff66d") center / contain no-repeat;
+  filter: drop-shadow(0 clamp(3px, calc(0.31 * var(--u)), 12px) clamp(6px, calc(0.63 * var(--u)), 24px) rgba(4, 20, 44, 0.6));
+  pointer-events: none;
+}
+.tut-hand[hidden] { display: none; }
+/* ONE GESTURE NOW: the sweep, on the rope of the answer. There was a TAP hand too, on the
+   JUMP button and then in open sky, and both are gone — the button with the control it
+   pointed at, and the sky one on request: a hand tapping one spot teaches that the spot is
+   the control, when the whole stage is. The jump is taught in words on Momo instead
+   (tutorial.js, step 4). The ripple went with it, since a contact ring belongs to a tap and
+   on a sweep it reads as a series of them. */
+.tut-hand[data-gesture="sweep"] { animation: tutSweep 1.5s cubic-bezier(.4, 0, .3, 1) infinite; }
+/* The vertical part of every step is the FINGERTIP anchor (--tip-y), not -50%: the tip
+   sweeps ALONG the dashed cut line instead of the hand's waist sweeping along it while
+   the tip travels through the sky above. */
+@keyframes tutSweep {
+  0%   { translate: -170% calc(-1 * var(--tip-y)); rotate: -14deg; opacity: 0; }
+  14%  { translate: -140% calc(-1 * var(--tip-y)); rotate: -12deg; opacity: 1; }
+  66%  { translate: 40% calc(-1 * var(--tip-y));   rotate: 10deg;  opacity: 1; }
+  84%  { translate: 70% calc(-1 * var(--tip-y));   rotate: 12deg;  opacity: 0; }
+  100% { translate: -170% calc(-1 * var(--tip-y)); rotate: -14deg; opacity: 0; }
+}
+/* tutTap, tutTapRing and the ::after ring that carried them went with the tap hand. */
+
+/* NO SPOTLIGHT ELEMENT ANY MORE. There was a .tut-spot: a transparent circle whose own
+   huge box-shadow supplied the dim, with a gold outline round it.
+
+   It is gone because the ring was the problem. An outline is a hard line drawn ON TOP
+   of the artwork, so however well placed it reads as interface stuck over the scene —
+   and it had to be re-solved twice, once when a percentage height made it an ellipse
+   and again when a circle big enough to enclose the block row swallowed half the
+   screen. .tut-veil says the same thing with the game’s own picture instead: what is
+   being pointed at is simply the part still in focus.
+*/
+/* THE DIALOGUE BOX — A STONE TABLET, built to the supplied reference.
+
+   What the reference actually is, as construction rather than as a mood: a warm tan
+   slab with a mottled stone surface, generously rounded corners, NO keyline at all,
+   and a hard dark shadow offset down and to the right. The tail is a swept fold at
+   ONE END of the bottom edge, not a triangle in the middle.
+
+   Two of those are load-bearing and easy to get wrong:
+
+   NO OUTLINE. Every previous version of this box had a keyline, and the keyline is
+   what made it read as interface: a drawn border says "this is a UI element", while a
+   slab with only a shadow says "this is an object sitting there". The separation is
+   done entirely by the offset shadow.
+
+   ONE SHADOW OVER BOTH PARTS. The face and the tail are two elements, so shadowing
+   them separately would draw a shadow along the seam between them — which is exactly
+   the "detached" look. The filter sits on their shared parent instead, and a
+   drop-shadow follows the union of the subtree alpha, so the two shapes cast one
+   shadow as a single silhouette.
+
+   Tan on an ice field is also the strongest contrast available, and stone belongs in
+   this world in a way a glossy blue panel never did. */
+.tut-bubble {
+  position: absolute;
+  translate: -50% -50%;
+  /* The cap is where the sentence WRAPS; the box is then shrunk to the widest line it wrapped
+     to, by Tutorial.hugWords — CSS cannot do that second part, and without it a balanced
+     three-line sentence sat in a box 82px wider than its longest line.
+
+     A SHARE OF THE STAGE, NOT OF THE VIEWPORT. It was 62vw, and the stage is letterboxed: a
+     844x390 phone gets a 693px stage inside a 844px window, so 62vw was 72% of the ice and the
+     longest line ran to 464px on one line with the box hanging 77px off the left edge — the
+     first two words were cut off the screen. 46% resolves against #tutorial, which is the
+     stage, so the same sentence wraps to two readable lines wherever it is read. Desktop is
+     unchanged: 46% of 1920 is past the 500px cap. */
+  width: max-content;
+  /* 600, not 500: at desktop size "Oh no! The path is broken." needs ~720px with its padding on one line; capped at
+     500 it wrapped and left "broken." alone on a second line under a box twice its width. */
+  /* WIDE ENOUGH TO STAY SHORT. The box is placed above the thing it points at when there is
+     room, and a two- or three-line box is too tall to fit above the rope's cut line — so it
+     went below, over the very piece the sentence names. A wider cap keeps "Use the right ice
+     piece to fix the path." on one line, short enough to sit above the rope with only sky
+     behind it. hugWords still shrinks the box to its words, so shorter lines do not grow. */
+  max-width: min(66%, 1120px);
+  /* A PHONE HAS NO SKY ABOVE THE ROPES — the box goes below the pieces there (see ropeBox's
+     belowY) — and a one-line box that wide would span most of the stage with a tail to match.
+     Narrower on a phone, so it wraps to two lines and sits neatly under the row. */
+  @media (max-width: 1200px) { max-width: 48%; }
+  padding: clamp(15px, 1.6vw, 30px) clamp(21px, 2.2vw, 41px);
+  text-align: center;
+  rotate: -1.1deg;
+  /* Pops in, then wobbles gently — a still speech bubble reads as a label; one that
+     breathes reads as someone talking. Rotation only, so the words stay legible. */
+  animation: tutBubbleIn 380ms cubic-bezier(.2, 1.8, .35, 1) both, tutWobble 3.4s ease-in-out 420ms infinite;
+}
+@keyframes tutWobble {
+  0%, 100% { rotate: -1.4deg; }
+  50%      { rotate: -0.4deg; }
+}
+.tut-bubble[hidden] { display: none; }
+
+/* THE SHAPE LAYER is one SVG under the words, drawn by js/bubble.js for the box the
+   words need: the supplied Bubble.svg construction — a rounded body, a swept tail off
+   the edge that faces the subject, flat yellow, black keyline. Positioned at the top of
+   the box; for a tail on top the script flips the SVG (never the text) and lifts it by
+   the tail's length. One hard shadow under the whole silhouette, body and tail as one. */
+.tut-shape {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  /* a cool shadow, now the bubble is ice rather than yolk */
+  /* a cool shadow with a hint of the keyline's blue, so a white bubble still lifts off snow */
+  filter: drop-shadow(clamp(4px, 0.42vw, 8px) clamp(6px, 0.63vw, 12px) 0 rgba(24, 88, 130, 0.28));
+}
+.tut-face {
+  /* WHITE INSIDE, A BRIGHT ICY-BLUE KEYLINE (asked for; frost-and-navy was the step before).
+     White is the cleanest ground for the words, and the bright blue line is the game's own ice —
+     between CFG.colors.cyanIce and edge, so it stays visible against both the pale sky and the
+     snow. Kept in step with BUBBLE in js/bubble.js, which draws the same shape. */
+  fill: #FFFFFF;
+  stroke: #3FB3E8;
+  stroke-width: 7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* THE WORDS sit above the shape layer, and take none of its shadow. Dark brown rather
+   than navy: on tan, navy reads as a colour borrowed from somewhere else, and the
+   contrast is worse. */
+.tut-text {
+  position: relative;
+  z-index: 1;
+  /* Deep navy on near-white ice, which is the highest contrast this palette offers —
+     roughly 12:1, well past what a child learning to read needs. Brown on tan measured
+     about half that and was the readability complaint. */
+  /* READABLE FOR A CHILD FIRST. Black ink on the asset's yellow is the highest contrast
+     in the game; the size is up a step and the lines airier, and the box's max-width
+     keeps a line to about 30 characters, which is what a new reader can hold. The comedy
+     is in the shape, the pop and the wobble — not in the letters. */
+  font: 800 clamp(22px, calc(2.35 * var(--u)), 88px)/1.32 "Baloo 2", system-ui, sans-serif;
+  color: #0C3352;                       /* the navy the ice is inked with: about 11:1 on frost */
+  text-wrap: balance;
+  letter-spacing: .004em;
+  /* One white line under each glyph, which lifts the letters off the ice without an
+     outline. An outline would fight the amber rim for attention. */
+  text-shadow: none;
+}
+/* THE WORDS RISE ONE AFTER ANOTHER — 55ms apart, a small lift and a settle — so a new
+   sentence is spoken rather than pasted. The one key word (.pow) is heavier, deep blue
+   and tilted: a single comic accent that also tells a child which word matters. */
+.tut-text .w {
+  display: inline-block;
+  /* eased, with no overshoot (asked for): the words settle rather than snap */
+  animation: tutWordIn 460ms cubic-bezier(.33, .1, .25, 1) both;
+  /* ITS OWN DELAY, NOT ITS INDEX TIMES A STEP.
+     --wdly is when THIS word is spoken, measured off the recording by
+     tools/vo-bake-words.mjs and written per word by Tutorial.setWords. The old form was
+     index x step, which can only ever describe an even rate — and nobody speaks at an even
+     rate, so the text ran ahead on "is" and fell behind on "obstacles". --wd survives as
+     the fallback for a take with no per-word timings baked, and for the silent reveal. */
+  animation-delay: var(--wdly, calc(var(--i, 0) * var(--wd, 55ms)));
+}
+/* THE REVEAL WAITS FOR THE VOICE, AND HOLDS WITH IT.
+   A CSS animation runs on wall clock and the voice does not: the line can be queued behind
+   another (AudioManager.say holds rather than overlaps), the context can still be opening,
+   or the game can pause mid-sentence and suspend the audio. Any of those and the words walk
+   away from the speech. So the whole reveal is parked until the voice for this line is
+   actually running, and parked again the moment it is not — Tutorial.update sets this from
+   what the audio reports about itself, never from its own clock. */
+.tut-text.waiting .w { animation-play-state: paused; }
+.tut-text .pow {
+  font-weight: 900;
+  /* BRIGHT ORANGE, AND NOTHING BEHIND IT (asked for, after icy blue read as too quiet and an
+     amber highlighter card read as a sticker). The one warm colour on an ice-blue stage, so the
+     key word is the thing the eye lands on; deep enough to hold about 4:1 on white at this
+     size and weight. The tilt and the small shadow it always had do the rest. */
+  color: #F26100;
+  rotate: -3deg;
+  scale: 1.08;
+  margin: 0 .16em;                     /* the 8% scale eats the word space; give it back */
+  text-shadow: .06em .06em 0 rgba(0, 0, 0, 0.14);
+}
+@keyframes tutWordIn {
+  0%   { opacity: 0; translate: 0 .38em; scale: .88; }
+  100% { opacity: 1; translate: 0 0; scale: 1; }
+}
+.tut-text .pow { animation-name: tutWordIn, tutPow; animation-duration: 460ms, 700ms; animation-timing-function: cubic-bezier(.2, 1.6, .4, 1), ease-out; animation-fill-mode: both, both; }
+@keyframes tutPow { 0%, 100% { scale: 1.08; } 40% { scale: 1.22; } }
+@media (prefers-reduced-motion: reduce) { .tut-text .w { animation: none; } .tut-text .pow { animation: none; scale: 1.08; } }
+/* IT LANDS. A slab of stone arriving should have weight, so it comes in from above,
+   overshoots past its resting angle, and settles — rather than fading up on the spot.
+   Three keyframes instead of two is what buys the settle: without the middle one the
+   easing curve alone cannot overshoot rotation AND scale and come back.
+
+   This is the whole of the added drama. Nothing here touches the game: it is one
+   element's own transform, on a layer with pointer-events off, over a simulation that
+   is already paused for the step. */
+@keyframes tutBubbleIn {
+  0%   { scale: .62; rotate: -11deg; translate: -50% calc(-50% - 34px); }
+  62%  { scale: 1.05; rotate: 1.6deg; translate: -50% calc(-50% + 5px); }
+  100% { scale: 1;   rotate: -1.1deg; translate: -50% -50%; }
+}
+
+/* The old .tut-text block that used to live here is gone. It came AFTER the new one and
+   set color: #0E3E60 — navy, from when the box was blue-white ice — so it won on source
+   order and the stone tablet rendered with navy text. Two rules for one selector, the
+   second silently beating the first, is a cascade collision rather than a colour choice;
+   the tablet's own rule above is the only one now. */
+
+/* NO BUTTON. There was a "Got it" pill here. The hand replaced it: a finger tapping
+   on the thing being explained is understood by a child who cannot read the sentence
+   yet, and it says WHERE to tap rather than sitting in a box claiming comprehension.
+   A tap anywhere on the stage acknowledges a step now. */
+
+/* Skip sits in a corner and is deliberately quiet: findable by an adult, and never
+   competing with the thing the child is being asked to look at. */
+.tut-skip {
+  position: absolute;
+  right: clamp(10px, 1.1vw, 22px);
+  top: clamp(10px, 1.1vw, 22px);
+  font: 700 clamp(11px, 1.15vw, 20px)/1 "Baloo 2", system-ui, sans-serif;
+  color: #EAF9FF;
+  padding: clamp(6px, 0.63vw, 11px) clamp(12px, 1.26vw, 22px);
+  border: 2px solid rgba(234, 249, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(6, 32, 60, 0.5);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.tut-skip:hover { background: rgba(6, 32, 60, 0.72); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The flakes hold still, part way down, rather than being parked at the top of their
+     fall: an element whose only visible state is inside a keyframe disappears the moment
+     the animation does. */
+  .cover-snow i { animation: none; transform: translate3d(0, 42vh, 0); }
+  .tut-veil { -webkit-backdrop-filter: brightness(0.6); backdrop-filter: brightness(0.6); animation: none; }
+  .tut-focus { animation: none; }
+  .tut-bubble { animation: none; scale: 1; rotate: -1.1deg; translate: -50% -50%; }
+  .tut-hand { animation: none; }
+  .tut-hand[data-gesture="sweep"] { animation: none; translate: calc(-1 * var(--tip-x)) calc(-1 * var(--tip-y)); }
+  /* still ARRIVES at its resting values rather than being parked mid-pop */
+  .tut-bubble { animation: none; scale: 1; rotate: -1.4deg; translate: -50% -50%; }
+}
+
+/* THE ENDING LAYOUT. The overlay stops being a centring box and becomes a full-stage
+   frame with something pinned at each end, so the middle stays clear for the two
+   characters standing together. */
+/* `[hidden]` HAS TO WIN, AND !important TOOK THAT AWAY.
+
+   This is the fault behind the ending card and the Play again button appearing over
+   the cover and over live gameplay. `.overlay[hidden] { display: none }` is what hides
+   every panel, and it is ordinary specificity — so `display: block !important` here
+   beat it and the ending panel was rendered permanently, from boot, whatever the
+   hidden attribute said. It sat on top of the PLAY button: elementFromPoint at the
+   centre of PLAY returned this panel's label, so the first tap of the game was
+   landing on an invisible ending screen.
+
+   The !important is needed at all only because .overlay sets `display: flex` to centre
+   its card, and this panel pins one thing at each end instead. So the hidden case is
+   restated below with the same weight. Anything that raises specificity to override a
+   layout rule has to re-assert the hidden rule as well, or it silently un-hides the
+   element it is styling. */
+.overlay-ending[hidden] { display: none !important; }
+.overlay-ending {
+  display: block !important;
+  pointer-events: none;                  /* only the button takes input */
+  /* NO DIM AND NO BLUR. .overlay gives every panel a 42% navy wash and a 3px
+     backdrop blur, which is right for a modal that interrupts the game — and exactly
+     wrong for this one. The ending exists to show the character standing with the
+     friend who was waiting for him while confetti falls; dimming and blurring that is
+     hiding the reward in order to announce it. The card and the button carry their own
+     contrast, so nothing needs a wash behind them. */
+  background: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* PLAY AGAIN, pinned to the bottom of the stage rather than sitting in the panel.
+   It is the only thing to do on this screen, so it gets a place of its own where a
+   thumb already rests — and being out of the card is what let the card move up and
+   uncover the characters. */
+.btn-replay {
+  position: absolute;
+  /* ON THE ICE, right of the two friends: standing on the snow like a signpost at the
+     end of the road, in the half of the stage that was empty. Bottom edge on the
+     walking line (26% up a 1080 stage), so it reads as a thing in the world. */
+  /* BOTTOM CENTRE, the one thing to do, where a thumb already rests.
+
+     LOWER NOW, at 1.4%. It used to be clear of the dance because the dance was a small pair
+     in the middle of a wide stage with a banner above them. The banner is gone and the camera
+     pushes in on the pair, so at 3.5% the button landed across their feet — the one control
+     on the screen sitting on top of the one thing worth looking at. Measured at the ending
+     zoom: their feet reach y 1006 of 1080, and at 1.4% the button top is at y 1010. It stands
+     on the ice below them instead of over them, and it is still a full thumb clear of the
+     bottom edge. */
+  left: 50%;
+  bottom: 1.4%;
+  translate: -50% 0;
+  pointer-events: auto;
+  min-width: clamp(200px, calc(22 * var(--u)), 760px);
+  /* A ONE-SHOT ARRIVAL, NOT A PERPETUAL BOB, and this was a real bug rather than a
+     taste call.
+
+     It carried playBob on an infinite loop, so the button never stopped moving. A
+     thumb aiming at it is aiming at a target that has moved by the time the finger
+     lands, so presses on it miss and the ending panel looks stuck on screen. That is
+     the reported fault. Playwright refused to click it at all, reporting "element is
+     not stable" for thirty seconds, which is the same complaint in machine form and
+     is why no test had caught it.
+
+     A press must never be a movement anyway: on touch the finger covers the control
+     at the moment it would travel. It pops in once to draw the eye, then holds still
+     to be pressed. */
+  /* pop in once, then GLOW rather than move — a glow animates filter, never transform,
+     so the target is still and Playwright's stability check agrees */
+  animation: cardPop 420ms cubic-bezier(.2, 1.5, .4, 1) both, replayGlow 1.8s ease-in-out 700ms infinite;
+}
+@keyframes replayGlow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 201, 77, 0)); }
+  50%      { filter: drop-shadow(0 0 clamp(10px, 1vw, 20px) rgba(255, 201, 77, 0.95)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-replay, .tut-bubble { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) { .btn-replay { animation: none; translate: -50% 0; } }
+/* AND PLAY STOPS PULSING, BUT DOES NOT GO DARK. Switching the animation off would leave
+   the button on its 0% frame, which is the dimmest one — the control the whole cover points
+   at would end up the least lit thing on it. So the pulse is replaced by its bright frame,
+   held still: the same 'this is the button' reading, with nothing moving. */
+@media (prefers-reduced-motion: reduce) {
+  .btn-play-face {
+    animation: none;
+    scale: 1;
+    filter: drop-shadow(0 0 clamp(6px, calc(0.56 * var(--u)), 13px) rgba(255, 228, 158, 0.9))
+            drop-shadow(0 0 clamp(20px, calc(2 * var(--u)), 44px) rgba(255, 196, 62, 0.9))
+            brightness(1.1);
+  }
+}
+
+/* AMBER, NOT GREEN. It carries .btn-chunky for the rim-and-face construction the
+   button family uses, and then overrides the face colour: the family's own face is
+   green, which belongs to no other pixel in this game — the cover, the jump button and
+   every highlight in it are amber on ice blue. A green pill reads as a stock UI kit
+   button dropped onto painted art, which is exactly what it was.
+
+   The press is a DARKENING rather than a movement: on touch a finger covers the
+   control at the moment it would travel, so a moving highlight is hidden exactly when
+   it is needed. */
+.btn-replay .btn-chunky-face {
+  background: linear-gradient(180deg, #FFD262 0%, #F2A93B 52%, #D2851A 100%) !important;
+  border-color: #A8660F !important;
+}
+/* The LABEL too: it inherits the family green, which on an amber face is the one
+   colour combination in the game that is hard to read. White with the same navy stroke
+   the other cartoon lettering uses. */
+.btn-replay .btn-chunky-label {
+  color: #FFFFFF !important;
+  -webkit-text-stroke: clamp(2px, 0.21vw, 4px) #A8660F;
+  paint-order: stroke fill;
+}
+.btn-replay:hover .btn-chunky-face { filter: brightness(1.07); }
+.btn-replay:active .btn-chunky-face { filter: brightness(.88); }
+
+/* ---------- the Ouch panel's character hero ---------- */
+.card-hero {
+  /* BIGGER. It is the only picture on the panel and it was thumbnail-sized, which is
+     most of why the card read as a form with an icon on it. */
+  width: clamp(150px, 16vw, 300px);
+  height: clamp(126px, 13.4vw, 254px);
+  margin-bottom: clamp(-6px, -0.6vw, -2px);
+  background-repeat: no-repeat;
+  background-position-x: 0%;
+  filter: drop-shadow(0 clamp(6px, 0.63vw, 13px) clamp(8px, 0.85vw, 17px) rgba(8,40,72,.45));
+  /* drops in first, then keeps the idle wobble — two animations, not one */
+  animation: heroDrop 520ms cubic-bezier(.2, 1.7, .4, 1) both,
+             heroWobble 900ms ease-in-out 520ms infinite;
+}
+@keyframes heroDrop {
+  from { opacity: 0; translate: 0 -38px; scale: .7; }
+  to   { opacity: 1; translate: 0 0;     scale: 1; }
+}
+@keyframes heroWobble {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50%      { transform: rotate(2.5deg); }
+}
+@media (prefers-reduced-motion: reduce) { .card-hero { animation: none; } }
+
+/* the panels themselves read as game furniture, not a web modal */
+.card {
+  border-width: clamp(4px, 0.42vw, 8px) !important;
+  border-color: #FFFFFF !important;
+  box-shadow:
+    0 0 0 clamp(4px, 0.44vw, 9px) #14496F,
+    0 clamp(14px, 1.5vw, 28px) 0 0 rgba(20,73,111,.35),
+    0 clamp(26px, 2.7vw, 52px) clamp(30px, 3.1vw, 60px) rgba(6,26,56,.55) !important;
+}
+.card h1 {
+  color: #FFFFFF !important;
+  -webkit-text-stroke: clamp(2px, 0.26vw, 5px) #14496F;
+  paint-order: stroke fill;
+  letter-spacing: .02em;
+}
+
+
+/* ================== .btn-art — THE PICTURE BUTTONS ==================
+
+   PLAY (a wide pill) and JUMP (a round cap) are both supplied art, and both work the
+   same way, because that is how the art is drawn: THE PRESS IS ALREADY IN THE PICTURE.
+   PLAY's pressed take has the cap pushed down into its rim; JUMP's is darkened. So
+   swapping the image IS the press.
+
+   THEY ARE THEIR OWN FAMILY, and that is the fix for a real bug rather than a tidy-up.
+   PLAY used to be a `.btn-chunky` so it could inherit the CSS button family, with every
+   part of that family then overridden. But `.btn-chunky:hover` has specificity 0-2-0
+   and a plain `.btn-play` only 0-1-0 — so the moment a pointer touched the button the
+   family's navy keyline (`0 0 0 8px #14496F`) came back, and because the radius had
+   been zeroed for the artwork it drew as a HARD RECTANGLE around the pill. Overriding
+   the family state by state is whack-a-mole; not being in the family is the root fix.
+
+   Both files were padded onto ONE common box by tools/make-buttons.mjs, centred across
+   and aligned on the bottom, so the swap is registered: the rim stays exactly where it
+   is and only the cap moves. Untrimmed, the two takes differed by a few pixels and the
+   button changed size when you pressed it. */
+.btn-art {
+  position: relative;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent center / contain no-repeat;
+  box-shadow: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* the art carries its own rim, gloss, lettering and shading */
+  transition: filter 130ms ease, scale 110ms cubic-bezier(.3, 1.4, .5, 1);
+}
+.btn-art[hidden] { display: none; }
+
+/* NO SHEEN LAYER. There used to be one: an absolutely positioned box per picture
+   button with a white gradient band sweeping across it on a loop, plus a warm flash
+   on the press.
+
+   It could not work, and the reason is worth keeping. A sheen has to be clipped to the
+   SHAPE of the thing it slides over, and a div can only be clipped to a rectangle with
+   a uniform radius. The art on these buttons is a pill with a thick rim, painted at
+   its own inset inside a transparent box — so the band was a straight-edged rectangle
+   lying across a rounded object, with hand-measured insets per button trying to guess
+   where the paint was. What it looked like on screen was a pale panel over one half of
+   the button, not light travelling across it.
+
+   It was also redundant. Both buttons are supplied art that already has its highlight
+   and its gloss painted in by the artist, at the right shape, in the right place. A
+   second CSS gloss on top could only ever fight it.
+
+   So the press is carried by what does follow the paint: the scale squash, the
+   brightness change, the pressed-state artwork where it exists, and the tap ring and
+   sparks, which are drawn OUTSIDE the button where a rectangle is not a problem. */
+
+/* ---------- PLAY ---------- */
+.btn-play {
+  position: absolute;
+  left: 50%;
+  /* LOW, AND CLEAR OF THE ART. At bottom 9% and 496px wide it landed across the
+     mammoth's front feet and hard against the bottom of the RUSH lettering — the
+     busiest part of the banner, so the one control on the screen was the hardest
+     thing on it to pick out. Measured on the cover: the title's letterforms end near
+     y 800 and the feet near y 830, and the flat ice ledge runs from about y 945. Down
+     here the button sits ON that ledge, clear of both, which is also where a player
+     looks for a start button. */
+  /* 7%, raised on request so it is clearly clear of the bottom edge. Measured on the banner:
+     the snow lip is a flat band at y 71% and the ice face runs from there to the bottom, so a
+     button 25% of the stage tall sitting 7% up occupies 68%..93% — standing on the ledge with
+     a comfortable margin of ice beneath it, its top edge just onto the lip, and well clear of
+     the mammoth and the lettering above. At 2.8% it sat almost on the frame edge, which on a
+     phone in landscape is where a browser's own chrome and gesture bar arrive. */
+  bottom: 7%;
+  transform: translateX(-50%);
+  /* BIG, because it is the only thing on the screen to do — 13.5 stage units wide and nearly
+     square, so it stands 25% of the stage tall where the old wide pill stood 8.6%: about
+     two and a half times the area, in a shape the eye lands on rather than reads. It went to
+     16 units first and came back on review ("make little small"); at 13.5 its top edge also
+     clears the banner's snow lip instead of overlapping it. The floor is a generous thumb on
+     the smallest phone (94px at a 693px stage) and the ceiling stops it swallowing a 4K
+     screen. */
+  width: clamp(94px, calc(13.5 * var(--u)), 520px);
+  /* the opaque box of the delivered art — printed by tools/make-buttons.mjs, and it moves
+     whenever the art is re-delivered. This take is 1121 x 1162 — a round snow-capped disc
+     with a play triangle, where the one before it was 1048 x 1101 and the stone-rimmed pair
+     before that was 1764 x 621. Getting this wrong letterboxes the art inside its own
+     element and the button stops matching its hit area. */
+  aspect-ratio: 1121 / 1162;
+  /* THE ART IS PAINTED BY ::before, NOT HERE — see the pulse below. It has to live on a
+     layer of its own so that layer can be SCALED while this element's box, and therefore
+     the hit area, stays exactly where it is. */
+  /* NO PERPETUAL BOB, and this is load-bearing rather than taste: an infinitely animating
+     button is a target that has moved by the time a finger lands on it, and Playwright
+     refuses to click one at all ("element is not stable"), which is why no test caught the
+     last one. Everything alive about this button therefore happens in things that DO NOT
+     change its box — the halo behind it (::before) and the sheen inside it (::after) — and
+     the button itself arrives with a pop and then holds still to be pressed. */
+  /* the pop on arrival and then the pulse, both set together below with the keyframes */
+  filter: drop-shadow(0 clamp(5px, calc(0.52 * var(--u)), 20px) clamp(10px, calc(1 * var(--u)), 40px) rgba(46, 12, 4, 0.5));
+  transition: filter 160ms ease;
+  z-index: 3;
+}
+
+/* NO RING. There was a radial halo behind the button, scaling and fading — asked off:
+   "remove the pulse ring, pulse the button instead". A ring is a second object announcing
+   the control; what should draw the eye is the control.
+
+   SO THE BUTTON PULSES ITSELF — and it does it in LIGHT, not in size. It brightens and its
+   own glow swells, on the button's alpha, so the whole painted shape lifts and settles.
+   Nothing about its box changes, and that is deliberate three times over: an infinitely
+   resizing button is a target that has moved by the time a finger lands on it, Playwright
+   refuses to click one at all ("element is not stable"), and the press has to keep exactly
+   the outer dimensions the resting state has. This is the same call the ending's Play again
+   makes for the same reason — it glows without moving. */
+.btn-play { animation: cardPop 520ms cubic-bezier(.2, 1.6, .35, 1) both; }
+
+/* THE 'PRESS ME' PULSE — the button swells and brightens, settles, and does it again.
+
+   IT SCALES A LAYER, NOT THE ELEMENT, and not the background either. Three mechanisms were
+   tried and only this one is both smooth and safe:
+
+     scale on .btn-play        moves the target. A control that grows under a thumb has
+                               moved by the time the finger lands, Playwright refuses to
+                               click one at all ("element is not stable"), and the press
+                               must keep exactly the resting outer dimensions.
+     background-size %         SHAKES. The image is re-rasterised at a new pixel size every
+                               frame and a centred background rounds to whole pixels, so the
+                               art twitched a pixel left and right as it grew. Reported as
+                               "why shake button?" and it was real.
+     scale on ::before         what is here. A transform on a composited layer is resampled,
+                               not re-rasterised, so it is smooth at any size, and the
+                               element that owns the box and the hit area never moves.
+
+   ONE RISE AND ONE FALL. It was written as a heartbeat (rise, dip, smaller rise, fall) and
+   it stuttered: easing is applied to EVERY segment between keyframes, so each extra stop is
+   a point where the motion stops dead and starts again. Two stops on a sine-shaped curve —
+   cubic-bezier(.45, 0, .55, 1) — never stop moving in between, which is what makes a loop
+   read as breathing rather than ticking.
+
+   Every frame carries the SAME two drop-shadows plus brightness, in the same order: a
+   filter list that changes length between keyframes does not interpolate, it cuts. The
+   button's contact shadow is NOT here — it stays on .btn-play, so the shadow on the ice
+   holds still while the button above it breathes. */
+.btn-play-face {
+  position: absolute;
+  inset: 0;
+  z-index: 0;                      /* under the tap ring and the sparks, which are the pseudos */
+  background: url("../assets/ui/btn-play.webp?v=e75de185") center / contain no-repeat;
+  pointer-events: none;
+  will-change: transform, filter;
+  animation: playPulse 2s cubic-bezier(.45, 0, .55, 1) 520ms infinite;
+}
+@keyframes playPulse {
+  0%, 100% {
+    scale: 1;
+    filter: drop-shadow(0 0 clamp(2px, calc(0.2 * var(--u)), 6px) rgba(255, 218, 130, 0.28))
+            drop-shadow(0 0 clamp(7px, calc(0.7 * var(--u)), 16px) rgba(255, 176, 40, 0.28))
+            brightness(1);
+  }
+  50% {
+    scale: 1.045;
+    filter: drop-shadow(0 0 clamp(6px, calc(0.62 * var(--u)), 14px) rgba(255, 228, 158, 1))
+            drop-shadow(0 0 clamp(24px, calc(2.4 * var(--u)), 52px) rgba(255, 196, 62, 1))
+            brightness(1.16);
+  }
+}
+
+/* NO SHEEN HERE. A masked band of light sweeping the face was written and then found to
+   be dead: .btn-play::after is already the PRESS SPARKS, defined further down this file, and
+   the later rule wins — the sheen never drew a pixel. Recorded rather than left in place,
+   because a rule that looks like it does something and does not is worse than no rule. The
+   button's "alive" is its own pulse above; its press keeps the ring and the sparks it had. */
+
+/* HOVER: brighter and hotter, and the same size. The button keeps ONE outer dimension in
+   every state — resting, hovered and pressed — so nothing on the cover shifts under a
+   pointer and the press cannot be mistaken for the button changing shape. */
+.btn-play:hover .btn-play-face { animation-play-state: paused; }   /* the pulse yields to a pointer */
+.btn-play:hover {
+  filter: drop-shadow(0 clamp(6px, 0.63vw, 13px) clamp(12px, 1.2vw, 26px) rgba(46, 12, 4, 0.5))
+          drop-shadow(0 0 clamp(18px, 1.9vw, 38px) rgba(255, 196, 62, 1))
+          brightness(1.07);
+}
+
+/* THE PRESS. This delivery is a SINGLE take — there is no pressed picture to swap in — so
+   the press is made the way TRY AGAIN's is: the whole face darkens, and it compresses.
+
+   Both, deliberately. The darkening is what survives a thumb covering the button, which is
+   the rule the round in-game controls follow; the compression is what sells a tap on a
+   250px control on a menu screen, which a thumb does not cover. It goes DOWN into the
+   press (0.94) rather than travelling, so the centre of the target never moves. */
+/* THE PRESS: the face darkens, and NOTHING moves or resizes. The compression that was here
+   is gone — the requirement is that the pressed state keeps the resting state's outer
+   dimensions exactly, with no layout shift, and a darkening is also what survives a thumb
+   covering the control (the rule the round in-game buttons follow). */
+.btn-play:active .btn-play-face,
+.btn-play.pressed .btn-play-face { animation: none; scale: 1; filter: none; }
+.btn-play:active,
+.btn-play.pressed {
+  animation: none;
+  scale: 1;
+  filter: brightness(0.84) saturate(1.14)
+          drop-shadow(0 clamp(1px, 0.1vw, 2px) clamp(4px, 0.42vw, 8px) rgba(46, 12, 4, 0.55));
+}
+/* NO OUTLINE ON A PICTURE BUTTON. An outline traces the element's BOX, and these
+   buttons are a transparent box with a rounded painted object inside it — so a yellow
+   keyline drew a hard rectangle floating around a round button, which is exactly the
+   artefact this family was created to get rid of. border-radius does not save it
+   either: the art is a pill inset within its box, so any radius that fits the box is
+   still the wrong shape and the wrong size.
+
+   A halo does fit, because a drop-shadow follows the ALPHA of what is drawn rather
+   than the box. It hugs the painted edge at any shape, it is the same warm gold the
+   game already uses for emphasis, and it reads as the button lighting up. */
+.btn-play:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 clamp(6px, 0.63vw, 12px) clamp(10px, 1vw, 20px) rgba(6, 40, 78, 0.5))
+          drop-shadow(0 0 clamp(4px, 0.42vw, 8px) rgba(255, 255, 255, 0.95))
+          drop-shadow(0 0 clamp(16px, 1.7vw, 34px) rgba(255, 196, 74, 0.9));
+}
+
+/* THE TAP RINGS, on the button's own footprint and expanding away from it so they clear
+   a thumb. Re-triggered by the front end removing and re-adding .pressed, which is what
+   makes a second tap in quick succession show a ring at all. */
+.btn-play::before {
+  content: "";
+  position: absolute;
+  z-index: 1;                      /* above .btn-play-face, which carries the art */
+  inset: 6% 2%;
+  border-radius: 999px;
+  border: clamp(3px, 0.31vw, 6px) solid rgba(255, 198, 92, 0.95);
+  opacity: 0;
+  pointer-events: none;
+}
+.btn-play.pressed::before { animation: playTapRing 520ms cubic-bezier(.2, .7, .3, 1) 1; }
+@keyframes playTapRing {
+  from { opacity: .9; scale: 1; }
+  to   { opacity: 0;  scale: 1.3 1.75; }
+}
+
+/* THE SPARKS. One element, a ring of box-shadow dots, thrown outward by scaling it —
+   cheaper than ten elements and it needs no extra markup. */
+.btn-play::after {
+  content: "";
+  position: absolute;
+  z-index: 1;                      /* above .btn-play-face, which carries the art */
+  left: 50%; top: 50%;
+  width: clamp(7px, 0.73vw, 14px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow:
+     92px    0px 0 0 #FFE7A8,   74px   54px 0 0 #FFC247,
+     28px   87px 0 0 #FFE7A8,  -28px   87px 0 0 #FFB01F,
+    -74px   54px 0 0 #FFE7A8,  -92px    0px 0 0 #FFC247,
+    -74px  -54px 0 0 #FFE7A8,  -28px  -87px 0 0 #FFB01F,
+     28px  -87px 0 0 #FFE7A8,   74px  -54px 0 0 #FFC247;
+}
+.btn-play.pressed::after { animation: playSparks 560ms cubic-bezier(.15, .8, .3, 1) 1; }
+@keyframes playSparks {
+  from { opacity: 1; translate: -50% -50%; scale: 0.28; }
+  60%  { opacity: 1; }
+  to   { opacity: 0; translate: -50% -50%; scale: 1.6; }
+}
+
+/* the invitation: a breath, not a bounce. `scale` rather than `transform`, because
+   transform carries the translateX(-50%) that centres the button. */
+@keyframes playBob {
+  0%, 100% { scale: 1; }
+  50%      { scale: 1.035; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-art,
+  .btn-play,
+  .btn-play.pressed::before,
+  .btn-play.pressed::after { animation: none; }
+  .btn-play:active, .btn-play.pressed { scale: 1; }
+}
+
+/* ---------- TRY AGAIN ----------
+   The supplied art, and a member of the .btn-art family like PLAY and JUMP.
+
+   ONE TAKE ONLY. There is no pressed version of this one, so the press cannot be an
+   image swap — it is a darkening plus a squash instead, which is the same call the round
+   jump button makes and for the same reason. The family's rule is precisely "the press
+   is in the art WHERE THERE IS pressed art"; where there is not, CSS does it. */
+.btn-retry {
+  /* the common box the art was trimmed to */
+  aspect-ratio: 1947 / 635;
+  width: clamp(180px, 19vw, 340px);
+  background-image: url("../assets/ui/btn-tryagain.webp?v=f17bd92f");
+  filter: drop-shadow(0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(6, 40, 78, 0.45));
+  /* it is the only thing to do on this card, so it asks */
+  animation: playBob 2.2s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+.btn-retry:hover {
+  filter: drop-shadow(0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(6, 40, 78, 0.45))
+          drop-shadow(0 0 clamp(12px, 1.3vw, 26px) rgba(64, 190, 255, 0.95));
+}
+.btn-retry:active,
+.btn-retry.pressed {
+  animation: none;
+  scale: 1.03 0.93;
+  filter: brightness(.86) saturate(1.1)
+          drop-shadow(0 clamp(1px, 0.1vw, 2px) clamp(3px, 0.31vw, 6px) rgba(6, 40, 78, 0.5));
+}
+/* NO RING AT ALL ON THIS ONE — see the note on .btn-play:focus-visible.
+
+   The first attempt at this gave the pill a border-radius so the outline would follow
+   it, and that is what put a gold hoop around TRY AGAIN. It was the most visible
+   instance of the problem because the HUD focuses this button the moment the card
+   opens — so it was not a keyboard affordance anybody had asked for, it was a gold
+   ring drawn around the button for every player, mouse and touch included.
+
+   Both halves are fixed. Here, the indicator is the same alpha-following halo the
+   other picture buttons use; in hud.js, the auto-focus now only happens when the
+   player is actually using a keyboard, so a touch player never sees an indicator. */
+.btn-retry { border-radius: 999px; }
+.btn-retry:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(6, 40, 78, 0.45))
+          drop-shadow(0 0 clamp(4px, 0.42vw, 8px) rgba(255, 255, 255, 0.95))
+          drop-shadow(0 0 clamp(14px, 1.5vw, 30px) rgba(255, 196, 74, 0.9));
+}
+
+/* ---------- the cartoon card ----------
+   `card-fun` is the Ouch panel's own treatment. The overlays all shared one flat pale
+   ice slab, which is a fine web modal and the wrong object for this game: the rest of
+   the screen is a warm, round, hand-painted world and the panel that interrupts it read
+   as a dialog box.
+
+   So: a warmer ground, a much rounder corner, a thick white keyline over the navy one
+   the family already carries, and a bounce on the way in. It is the one moment the
+   player has failed at something, so it is deliberately friendly rather than severe —
+   no red, no alarm, and the character sits right at the top of it. */
+/* THE CARD IS A TOY, NOT A DIALOG.
+ *
+ * The previous treatment was already warmer than the ice panels it replaced, and it
+ * still read as a web modal: a near-white rounded square, everything centred, a small
+ * character, and nothing behind any of it. Cream instead of grey is not a game.
+ *
+ * What makes a panel in a children's game feel like a game is not colour, it is
+ * DEPTH and TILT — a thick outline so it reads as a physical object, a shadow it
+ * plainly sits above, a couple of degrees off-square so it looks placed rather than
+ * laid out, and something happening behind the character so the middle of the card
+ * is not empty. All of that is drawn with the panel's own pseudo-elements, so it adds
+ * no markup and no new interface: still one heading and one button. */
+.card-fun {
+  position: relative;
+  overflow: hidden;                        /* the rays and specks stay inside the panel */
+  border-radius: clamp(30px, 3.2vw, 62px) !important;
+  /* warm honey at the top into pale sky, and a fat white rim inside the navy edge */
+  background:
+    radial-gradient(120% 78% at 50% 4%, rgba(255, 246, 214, 0.98), rgba(255, 246, 214, 0) 64%),
+    linear-gradient(180deg, #FFFCEF 0%, #EAF7FF 56%, #BFE4FA 100%) !important;
+  border: clamp(4px, 0.42vw, 8px) solid #17547F !important;
+  box-shadow:
+    inset 0 0 0 clamp(4px, 0.42vw, 9px) rgba(255, 255, 255, 0.95),
+    inset 0 clamp(-14px, -1.2vw, -8px) clamp(18px, 1.9vw, 34px) rgba(96, 176, 214, 0.35),
+    0 clamp(10px, 1vw, 20px) 0 #0E3E60,     /* the slab it sits on */
+    0 clamp(18px, 1.9vw, 36px) clamp(26px, 2.7vw, 52px) rgba(6, 32, 60, 0.45) !important;
+  padding: clamp(20px, 2.2vw, 42px) clamp(30px, 3.2vw, 62px) clamp(24px, 2.5vw, 48px) !important;
+  /* placed, not laid out */
+  rotate: -1.6deg;
+  animation: cardPop 460ms cubic-bezier(.2, 1.6, .38, 1) both;
+}
+/* THE BURST BEHIND THE CHARACTER. Rays from a repeating conic gradient, turning very
+   slowly — the one thing that stops the middle of the card being a blank field. Warm,
+   low contrast, and behind everything: it must never compete with the button. */
+.card-fun::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: clamp(38px, 4vw, 78px);
+  width: clamp(260px, 27vw, 520px); aspect-ratio: 1;
+  translate: -50% -50%;
+  background: repeating-conic-gradient(from 0deg,
+    rgba(255, 201, 92, 0.30) 0deg 9deg, rgba(255, 201, 92, 0) 9deg 24deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 38%, transparent 78%);
+  mask-image: radial-gradient(closest-side, #000 38%, transparent 78%);
+  animation: cardRays 26s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+/* A FEW SPECKS OF SNOW still settling, drawn as three radial dots. Cheap, and it makes
+   the panel feel like part of the same weather as the stage behind it. */
+.card-fun::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,.95) 42%, transparent 44%),
+    radial-gradient(circle, rgba(255,255,255,.75) 42%, transparent 44%),
+    radial-gradient(circle, rgba(255,255,255,.6) 42%, transparent 44%);
+  background-size: 9px 9px, 6px 6px, 12px 12px;
+  background-position: 12% 22%, 82% 34%, 68% 12%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+/* everything real sits above the decoration */
+.card-fun > * { position: relative; z-index: 1; }
+@keyframes cardRays { to { rotate: 360deg; } }
+/* THE HEADING IS THE LOGO OF THIS PANEL. Same cartoon lettering as the button — white
+   with a navy stroke — but bigger, tilted the other way to the card so the two do not
+   look skewed together, and sat on a hard drop rather than a soft blur, which is what
+   makes painted lettering read as painted. */
+.card-fun h1 {
+  font-size: clamp(40px, calc(4.6 * var(--u)), 176px) !important;
+  line-height: 0.92;
+  margin: clamp(2px, calc(0.3 * var(--u)), 12px) 0 clamp(10px, calc(1.1 * var(--u)), 40px) !important;
+  color: #FFFFFF !important;
+  -webkit-text-stroke: clamp(4px, calc(0.42 * var(--u)), 16px) #14496F;
+  paint-order: stroke fill;
+  text-shadow:
+    0 clamp(4px, calc(0.42 * var(--u)), 16px) 0 #14496F,
+    0 clamp(9px, calc(0.95 * var(--u)), 36px) clamp(10px, calc(1 * var(--u)), 40px) rgba(20, 73, 111, 0.35);
+  letter-spacing: .015em;
+  rotate: 1.2deg;
+}
+@keyframes cardPop {
+  from { opacity: 0; scale: .72; }
+  to   { opacity: 1; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The button keeps its resting state and its glow, and stops pulsing. */
+  .btn-play { animation: none; }
+  .card-fun { animation: none; rotate: none; }
+  .card-fun::before { animation: none; }
+  .card-fun h1 { rotate: none; }
+  .card-hero { animation: none; opacity: 1; translate: none; scale: 1; }
+  .btn-retry { animation: none; }
+  .btn-retry:active, .btn-retry.pressed { scale: 1; }
+}

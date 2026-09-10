@@ -1,0 +1,733 @@
+/* Ice Age Mammoth Runner — shell + HUD.
+   The game world itself is drawn on <canvas>; everything here is chrome.
+   All sizes are viewport-relative so the HUD keeps its proportions from a
+   phone in landscape up to a 4K display. */
+
+:root {
+  /* THE STAGE'S OWN UNIT. The stage is 16:9 and letterboxed, so its width is the smaller of the
+     window's width and the width a 16:9 box of the window's height would have. --u is one per
+     cent of that, i.e. one stage unit of the 1920-wide layout the game is drawn in: at a 1920px
+     stage, 1 * var(--u) === 1vw exactly, which is why converting a rule changes nothing at the
+     reference size. Everything the player reads or touches is sized from this, so the interface
+     keeps its proportion on a short wide phone and on a 4K screen alike. */
+  --stage-w: min(100vw, calc(100vh * 16 / 9));
+  --stage-h: calc(var(--stage-w) * 9 / 16);
+  --u: calc(var(--stage-w) / 100);
+  --ice-pale: #DDF7FF;
+  --ice-light: #A9E7FA;
+  --ice-cyan: #68C9EE;
+  --ice-edge: #2D82B5;
+  --ice-edge-deep: #1B5E8C;
+  --deep-1: #123B68;
+  --deep-2: #082B52;
+  --night: #061a38;
+  --frost: #EAF9FF;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--night);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a { color: var(--ice-light); text-decoration: none; }
+a:hover { color: var(--ice-pale); }
+
+/* ---------- stage: locked 16:9, letterboxed, never stretched ---------- */
+.stage-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(120% 120% at 50% 0%, var(--deep-1) 0%, var(--night) 70%);
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: calc(100vh * 16 / 9);
+  max-height: 100vh;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0a2450;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45);
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;          /* swipe gestures belong to the game, not the browser */
+  /* NO CROSSHAIR. There was one on the canvas permanently — presumably put there for
+     the cut gesture — which meant a targeting reticle sat over the title screen, over
+     the cover art, and through every stretch of running: about ninety per cent of the
+     time, with nothing whatsoever to aim at. A crosshair is a promise that precision
+     matters here, and for most of this game it does not.
+
+     AN ARROW, EXCEPT OVER A ROPE THAT CAN BE CUT. The browser's own `pointer` hand is
+     the one every player knows from every link and button, and it means one thing:
+     "this does something". So it appears exactly where a sweep does something — over
+     a hanging rope while the puzzle is live — and nowhere else. A hand shown all the
+     time says nothing, which is the same mistake as the scissors that used to live
+     here (a DOM cursor on its own rAF loop, invisible to every touch player). The
+     switch is made in main.js from the pointer position; this is only the resting state.
+     WHERE to cut is said by the marching cut line (drawCutGuide) for everyone, finger
+     or mouse. */
+  cursor: default;
+}
+.stage.on-rope #game-canvas { cursor: pointer;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;        /* only interactive children opt back in */
+  user-select: none;
+}
+
+.hud button { pointer-events: auto; font-family: inherit; cursor: pointer; }
+
+/* TEMPORARY review control, quiet and out of the way in the bottom-left corner: the
+   same pill as the tutorial's Skip, so it reads as a control for adults, not play. */
+.btn-skip-end {
+  position: absolute;
+  left: clamp(10px, calc(1.1 * var(--u)), 44px);
+  bottom: clamp(10px, calc(1.1 * var(--u)), 44px);
+  font: 700 clamp(11px, calc(1.15 * var(--u)), 40px)/1 "Baloo 2", system-ui, sans-serif;
+  color: #EAF9FF;
+  padding: clamp(6px, calc(0.63 * var(--u)), 22px) clamp(12px, calc(1.26 * var(--u)), 44px);
+  border: 2px solid rgba(234, 249, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(6, 32, 60, 0.5);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-skip-end:hover { background: rgba(6, 32, 60, 0.72); }
+
+/* Pause and Replay are styled with the rest of the button family in screens.css */
+
+/* ---------- instruction panel ----------
+   Moved to the top LEFT. Centred, it sat directly on top of the hanging rig: the
+   ropes and their anchors run down the middle and right of the screen, while the
+   left third above the character is genuinely empty because no option may hang
+   where a cut chunk could land on them. Putting the panel in that real empty space
+   means it never covers gameplay and never has to fight for the same band as the
+   progress track (top centre) or the controls (top right).
+
+   It is also SHRINK TO FIT. As a centred fixed-width pill it carried a pool of dead
+   space around a short sentence, and the empty shape slot padded it further. */
+/* CENTRED, and large enough to be the thing you look at. The sequence gives it the
+   stage alone — the options are held above the screen until it leaves — so it covers
+   nothing while it is up, and it never takes a pointer event either way. */
+.instruction {
+  position: absolute;
+  /* HIGH. It sat at 12%, which put it down among the ropes; up here it has the top
+     band of the sky to itself and the chunks hang well clear below it.
+
+     1.2%, not 3.5%: raised again on request. It also buys back a little of the rope —
+     the sign is centred over the rig, so every millimetre it moves up is a millimetre
+     more of the leftmost rope that the learner can actually see while cutting it. */
+  /* THE EMPTY LEFT BAND, not the middle (asked for: the panel overlapped the hanging
+     options). The option row is centred on the safe area — mammothX + clearOfPlayer (770)
+     to W - 60 — so everything from the left edge to x 770 of the 1920 stage is clear sky
+     above the character's head, and 40% of the stage is exactly that band. Centred, the
+     sign reached the leftmost rope; here it cannot. */
+  /* THE BOARD IS PLACED BY ITS WOOD, not by the top of its picture.
+
+     The delivery before this one was a sign on two ropes that ran up out of the frame, so
+     the picture was mostly transparent rope and top:0 put the wood a third of the way down
+     the stage on its own. This board has no ropes going up — it is lashed at each end, in
+     the plane of the wood — so the same top:0 would have slammed the wood against the very
+     top edge, 90px higher than the composition that was approved.
+
+     So the wood's top edge is pinned where it has always been, 5.176 stage units down, and
+     whatever height of snow sits above it is subtracted. That holds at every stage size,
+     including the ones where --sign-h is clamped and no longer tracks --u.
+
+     NO ROPE IS DRAWN HERE. Whatever the board hangs by is in the picture. */
+  /* 4.3 units, raised from 5.176 on request: the board sits a little higher in the sky
+     band and leaves more of the leftmost rope visible while it is being cut. */
+  top: calc(4.3 * var(--u) - 51 * var(--k));
+  /* On .instruction and not on the pill, because its top above is in these units too.
+     Custom properties inherit, so the pill and the text still read them unchanged. */
+  /* 4.72 stage units of a 478-tall art is a 4.109-unit board — the same board, to the
+     pixel, that 9.4 units of the 652-tall rope art gave. The ceiling is the same number at
+     4K (4.72 x 38.4 = 181), so the panel is the same share of the stage there as at 1920,
+     which is what the interface-share test measures. The floor keeps the wood at the size
+     the old 86px floor gave it: 37.6px of wood is 44px of this art. */
+  --sign-h: clamp(44px, calc(4.72 * var(--u)), 182px);   /* rendered height of the trimmed art */
+  --k: calc(var(--sign-h) / 478);         /* art pixels -> screen */
+  left: 1.6%;
+  transform: none;
+  max-width: 40%;
+  pointer-events: none;
+}
+.instruction[hidden] { display: none; }
+/* A TUTORIAL SENTENCE ON THE PLANK. The questions are three words and live in the left band,
+   clear of the ropes; a teaching line is a whole sentence and does not fit there, so it is
+   centred and allowed the width of the stage. It still sits in the top strip, above the cut
+   line on the ropes, so it never covers a piece or the place the swipe has to happen. */
+.instruction.banner {
+  /* STILL IN THE LEFT BAND (asked for: not centred). A whole sentence does not fit the band at
+     the question size, so the banner sets its own text a fifth smaller — the plank keeps its
+     art, its place and its clearance of the ropes, and the sentence stays on one line. */
+  max-width: 46%;
+}
+.instruction.banner .instruction-text { font-size: calc(193 * var(--k) * 0.78); }
+/* AND IT IS LIT while it speaks (asked for): a soft icy glow around the plank, breathing, so the
+   eye goes to the words being read out. It is the panel that glows, not the words. */
+.instruction.banner .instruction-pill {
+  filter: drop-shadow(0 0 calc(38 * var(--k)) rgba(120, 214, 255, 0.85))
+          drop-shadow(0 0 calc(102 * var(--k)) rgba(63, 179, 232, 0.5));
+  animation: signDrop 760ms linear both, signGlow 1.9s ease-in-out 760ms infinite;
+}
+@keyframes signGlow {
+  0%, 100% { filter: drop-shadow(0 0 calc(26 * var(--k)) rgba(120, 214, 255, 0.6))
+                     drop-shadow(0 0 calc(76 * var(--k)) rgba(63, 179, 232, 0.34)); }
+  50%      { filter: drop-shadow(0 0 calc(50 * var(--k)) rgba(150, 228, 255, 0.95))
+                     drop-shadow(0 0 calc(128 * var(--k)) rgba(63, 179, 232, 0.6)); }
+}
+/* the polygon's name, set apart in the sentence: capitals, heavier, the key-word blue */
+/* THE SENTENCE EASES IN, A WORD AT A TIME (asked for). Smooth in and out, no overshoot —
+   the plank is signage, not a character; the comedy lives in the speech bubble. Each word is
+   an inline-block so the sign still grows sideways and never wraps. */
+.instruction-text .iw {
+  display: inline-block;
+  animation: signWordIn 420ms cubic-bezier(.33, .1, .25, 1) both;
+  animation-delay: calc(var(--i, 0) * var(--wd, 70ms));
+}
+@keyframes signWordIn {
+  from { opacity: 0; transform: translateY(0.34em) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+.instruction-text .key { color: #1E56C4; font-weight: 900; letter-spacing: 0.01em; -webkit-text-stroke: calc(13 * var(--k)) #FFFFFF; paint-order: stroke fill; }
+/* IT IS PULLED BACK UP, and the little dip first is what makes it read as a pull rather
+   than a slide: a hanging thing gathers before it goes. Shorter than the drop, because by
+   then the question is answered and the player wants the run back. It has to finish inside
+   the 300ms the HUD waits before hiding the panel (hud.js: _leaveT). */
+.instruction.leaving {
+  animation: signPullUp 280ms cubic-bezier(.5, -0.3, .8, .6) both;
+}
+/* And the exit is straight up as well — no dip below the mark first, for the same reason the
+   drop no longer overshoots downward: 3.5% down is the ropes' cut ends in the picture. The
+   gather is a brief HOLD instead, which reads as the same intake of breath without moving the
+   panel into the frame, and no rotation. */
+@keyframes signPullUp {
+  0%   { transform: translateY(0); opacity: 1; }
+  20%  { transform: translateY(0); opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  100% { transform: translateY(-230%); opacity: 0; }
+}
+
+/* THE ARRIVAL: a board lowered on two ropes, not a pendulum.
+
+   The first cut swung it in on a pivot above the frame, with a 2.2 degree tilt — reviewed
+   as unnatural, and it was: a sign hung from TWO ropes cannot swing like that; the ropes
+   keep it level. What a two-rope board really does when it is let down is FALL — gathering
+   speed, because gravity — until the ropes go taut, stretch a little past the mark, and
+   then bob it back up and down a couple of times, each bob smaller, with barely a tilt as
+   one rope takes the weight a hair before the other.
+
+   So the fall is ease-IN (each keyframe carries its own curve), the overshoot is vertical,
+   the two return bobs decay 5% -> -2% -> 0.8%, and the tilt is a third of a degree, not two.
+   Slower than before as well: 760ms, because a heavy thing on ropes takes a moment to
+   settle and a quick settle reads as light. */
+/* IT NEVER GOES BELOW ITS REST POSITION, and that is not a style choice — it is what keeps
+   the ropes attached to the top of the frame.
+
+   The element is the plank AND the two ropes above it, and it rests with its top edge on the
+   stage's top edge, so the ropes run off the frame exactly like the ice blocks'. Overshoot it
+   DOWNWARD past that rest — which is what a falling weight really does, and what the first
+   version did by 5% — and the top of the element comes down into the picture, so the ropes'
+   cut ends appear as two floating stubs hanging in the sky. Measured at 5% of a 227px panel
+   that is 11px of exposed rope end, on screen for about 150ms, twice per crossing.
+
+   So the rebound is UPWARD: it falls to the mark, springs back up, and settles down onto it.
+   Every keyframe is at or above 0, the ropes stay off the top of the frame throughout, and it
+   still reads as weight on a rope — a bounce after a drop is a rebound whichever way it goes.
+
+   PURELY VERTICAL, TOO. No rotation (a board on two ropes cannot tilt like a pendulum — the
+   ropes hold it level), no scaling, and nothing sideways: translateY is the only thing that
+   changes, so there is nothing to jitter or snap. */
+@keyframes signDrop {
+  0%   { transform: translateY(-230%); opacity: 0; animation-timing-function: cubic-bezier(.5, 0, .85, .35); }
+  10%  { opacity: 1; }
+  /* the fall, accelerating, arriving on the mark */
+  46%  { transform: translateY(0); animation-timing-function: cubic-bezier(.2, .5, .4, 1); }
+  /* the rebound: up, and back down, twice, each smaller */
+  62%  { transform: translateY(-11%); animation-timing-function: cubic-bezier(.4, 0, .55, 1); }
+  76%  { transform: translateY(0); animation-timing-function: cubic-bezier(.3, .4, .5, 1); }
+  87%  { transform: translateY(-4%); animation-timing-function: cubic-bezier(.4, 0, .55, 1); }
+  95%  { transform: translateY(0); animation-timing-function: cubic-bezier(.3, .4, .5, 1); }
+  98%  { transform: translateY(-1.2%); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* THE SIGN: the owner's hanging plank, in three slices.
+
+   Sliced by tools/make-sign.mjs from art-source/sign-hanging-src.png, which measures the
+   delivery and prints every number below — so a re-delivery is one command, not a hunt
+   through this file.
+
+   WHY THREE SLICES AND NOT ONE PICTURE. The panel grows with its sentence, and the plank
+   has a rope, a knot and a steel eyelet at each end. Scaling the whole picture to fit a
+   sentence squashes those: a rope stretched to 1.6x reads as a smear and the two ends stop
+   matching. So the ends are pinned at their natural aspect and only a slice of plain wood
+   in the middle stretches — grain runs the way it is being stretched, so nobody can tell.
+
+   WHY THE ROPES ARE IN THE PICTURE. The panel is meant to read as a sign hanging over the
+   ice rather than a card floating in the sky. The art keeps the full rope, the panel sits
+   at the top of the stage, and the ropes run off the top of the frame the way the ice
+   blocks' ropes do.
+
+   EVERY NUMBER IS IN ART PIXELS of the trimmed delivery (2083 x 652):
+
+     the plank's wood      y 359..643      (the rest of the height is rope, and transparent)
+     the caps              x 0..304 on the left, x 1776..2083 on the right
+     the ropes             x 63..102 and x 1979..2018
+     SAFE TEXT BOX         y 385..629, between the caps
+
+   --k converts those to screen: one scale for the caps and the padding both, so the ends
+   are never distorted and the words cannot drift off the wood at any size. */
+.instruction-pill {
+  /* Sized to be readable without dominating. It is on screen for the WHOLE of every
+     phase now rather than for a few seconds, so it has to sit alongside the gameplay
+     instead of announcing itself over it. Everything on the plank scales from here
+     through --k. */
+  /* 9.4 stage units. 11.3 put the plank on screen at exactly the size the old flat sign
+     was (7.6 units of an art where the plank was two thirds of the picture); asked to be
+     smaller again, so the plank is now about four fifths of that — 9.4 x (285/652) is a
+     4.1-unit plank against the old 4.95. Everything else — caps, padding, type — follows
+     through --k, so this one number is the whole size of the sign. */
+  /* The ceiling is 9.4 units AT 4K (9.4 x 38.4 = 361), which is the point of it: a cap
+     below that would start clamping on a 4K screen and the sign would be a different share
+     of the stage there than at 1920 — which is exactly what the interface-share test
+     measures, and what a 340px cap failed by 2.5%. The old flat art's 292px cap was the
+     same number for the same reason. */
+  /* --sign-h and --k are declared on .instruction, which needs them for its own `top`. */
+  /* No transform-origin: there is no pivot to name. The drop has no rotation in it — the
+     board falls and settles straight down — and the old origin was 140% above the plank
+     because that is where the ropes used to leave the frame. */
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  /* THE ART'S HEIGHT EXACTLY, not a floor under it. With min-height the box was as tall as
+     its line box wanted, and a line box holding inline-block words is taller than its font
+     size by an amount that depends on the FONT'S metrics — so before Baloo 2 had loaded the
+     panel measured 199px against the art's 180, and after it 366 against 361. Two different
+     shares of the stage for the same rule, which is what the interface-share test caught
+     between 1920 and 4K. Pinned to the art, the panel is the picture and nothing else. */
+  height: var(--sign-h);
+
+  /* THREE LAYERS, NOT A 9-SLICE. The plank was one image sliced with border-image, and
+     however flat the column the cut landed on, a hairline showed at each cap on some
+     screens: the browser resamples the cap and the stretched middle separately, and
+     at a fractional cap width the boundary pixel is covered by neither. Three files
+     fix it structurally — the middle is drawn 2px wider than the room between the caps
+     and UNDER them, so the boundary pixel is always covered by the middle and there is
+     no seam for a resampler to find. The caps keep their natural size (auto 100%) and
+     only the middle stretches, exactly as before. */
+  background:
+    url("../assets/ui/plank-l.webp?v=1b2cb44b") left center / auto 100% no-repeat,
+    url("../assets/ui/plank-r.webp?v=553400cc") right center / auto 100% no-repeat,
+    /* +24px, not +2: at a phone's fractional device pixels the middle's edge landed on a
+       half-covered column and what was behind the plank showed through as a thin line at the
+       seam ("the blue cut line"). Twelve pixels under each opaque cap leaves no column for a
+       resampler to expose. */
+    url("../assets/ui/plank-m.webp?v=3b1338a9") center center / calc(100% - 626 * var(--k) + 24px) 100% no-repeat;
+
+  /* CENTRED ON THE WOOD, both ways, and the padding is where that is done.
+
+     SIDEWAYS: EQUAL, and that is the point. Both caps are cut to the same 313 (see
+     make-sign.mjs), so the same 313 + 82 art-px of clear wood on each side centres the
+     sentence on the board and between the two rope ends at once. Unequal paddings put it
+     6.4px to one side, which is what "the words are not centred" was.
+
+     VERTICALLY: on the PALE PANEL, y 158..432, centre 295 — not on the plank band, whose
+     centre at 259 counts the snow-covered rows along the top and floated the sentence 36
+     art px above the timber it is printed on. Padding 158 above and 45 below puts the line
+     exactly there: 158 + (478 - 158 - 45)/2 = 295.5. */
+  padding: calc(158 * var(--k)) calc(395 * var(--k))
+           calc(45 * var(--k)) calc(395 * var(--k));
+
+  /* IT DROPS IN ON ITS ROPES (asked for). The HUD restarts this animation for every new
+     sentence and never for a re-assert, so the plank arrives once per question. */
+  /* linear, because each keyframe of signDrop carries its own curve — the fall its gravity,
+     the bobs their springs — and an outer curve on top would bend all of them again */
+  animation: signDrop 760ms linear both;
+}
+
+/* THE SENTENCE. It is the whole instruction, and it has to sit inside the plank's safe
+   box — so it is sized off the SAME --k the panel is built from rather than off the
+   viewport. At 118 art-pixels against a 210-pixel-tall box it cannot touch the snow
+   above or the wood's edge below, whatever the stage size, and `nowrap` keeps the
+   panel growing sideways instead of the text wrapping onto the rope. */
+.instruction-text {
+  /* 120 art-px, not 132. The content box is centred on the wood at art-y 280 and
+     the snow reaches down to about 213, so a 132px line left 0.3px of clearance —
+     within font-metric noise of touching the snow. 120 keeps the same centre and
+     gives 7px of air. */
+  /* 193 art-px of a 478-tall art — the same size on screen as the old 132 of 652. Centred
+     on the pale panel at y 295 it runs 199..392, which leaves 41 art px of clear timber
+     above the capitals and 40 below — clear of the snow along the top edge and of the dark
+     rim under the bottom. */
+  font-size: calc(193 * var(--k));
+  line-height: 1;
+  font-weight: 900;
+  /* dark warm brown, which is what reads on pale timber; the old deep blue was chosen
+     against a white ice card and goes muddy on wood */
+  color: #5A3617;
+  /* A CREAM STROKE around the letters (asked for: "strokes, to make it big and evident"): it
+     lifts the words off the wood grain without a black outline. paint-order puts the stroke
+     BEHIND the fill, so the letterforms keep their weight. */
+  -webkit-text-stroke: calc(13 * var(--k)) #FFF6E0;
+  paint-order: stroke fill;
+  letter-spacing: -0.005em;
+  text-align: center;
+  white-space: nowrap;
+  /* a touch of relief, so the words look burnt into the plank rather than laid on it */
+  text-shadow: 0 calc(4 * var(--k)) 0 rgba(255, 246, 224, 0.55);
+}
+
+/* NO JUMP BUTTON — the stage is the control (see index.html). About ninety lines of
+   rules went with it: the two-state art, the pressed swap, the hover light, the face and
+   its unused label, the expanding tap ring, the focus outline and the pulse. They are not
+   parked here commented out; the art pair is still in assets/ui and tools/make-buttons.mjs
+   still knows how to rebuild it, which is the only part worth keeping. */
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: rgba(8, 43, 82, 0.42);
+  backdrop-filter: blur(3px);
+  /* ABOVE THE TUTORIAL LAYER (40). A panel must never end up behind the tutorial
+     blur sheet: that put the whole game blurred behind the ending card. It only
+     worked before because these panels happen to be declared after the tutorial in
+     index.html, which is not something layout should depend on. */
+  z-index: 45;
+}
+.overlay[hidden] { display: none; }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(11px, calc(1.15 * var(--u)), 44px);
+  padding: clamp(24px, calc(2.4 * var(--u)), 92px) clamp(32px, calc(3.44 * var(--u)), 132px);
+  border-radius: clamp(18px, calc(1.77 * var(--u)), 68px);
+  background: linear-gradient(180deg, rgba(234, 249, 255, 0.97), rgba(169, 231, 250, 0.94));
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 30px 70px rgba(6, 26, 56, 0.5);
+  text-align: center;
+}
+.card h1 {
+  margin: 0;
+  font-size: clamp(26px, calc(2.7 * var(--u)), 104px);
+  font-weight: 800;
+  color: var(--deep-1);
+  letter-spacing: -0.01em;
+}
+.card p {
+  margin: 0;
+  /* 15px rather than 13px at the small end: this is the only body copy in the game and
+     at a phone-landscape stage it was the smallest text on screen. */
+  font-size: clamp(15px, calc(1.3 * var(--u)), 48px);
+  font-weight: 600;
+  /* --ice-edge (#2D82B5) against the card's pale ice gradient measures about 3.0:1,
+     which fails AA for body text. --deep-1 measures about 8:1 on the same ground and
+     is the colour the headings already use. */
+  color: var(--deep-1);
+}
+
+.card-icon {
+  width: clamp(38px, calc(3.6 * var(--u)), 136px);
+  height: clamp(38px, calc(3.6 * var(--u)), 136px);
+  filter: drop-shadow(0 4px 10px rgba(6, 26, 56, 0.28));
+  animation: oopsPop 420ms cubic-bezier(.34, 1.56, .64, 1) both;
+}
+
+@keyframes oopsPop {
+  from { opacity: 0; transform: scale(.55) rotate(-16deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.rotate {
+  flex-direction: column;
+  gap: 24px;
+  background: #0a2450;
+  backdrop-filter: none;
+}
+/* sized from the stage like everything else: a hard 96px was a third of a small phone's
+   letterboxed band and a speck on a 4K screen */
+.rotate svg { width: clamp(56px, calc(5 * var(--u)), 190px); height: auto; aspect-ratio: 1; }
+.rotate p {
+  margin: 0;
+  font-size: clamp(18px, calc(1.56 * var(--u)), 60px);
+  font-weight: 700;
+  color: var(--frost);
+}
+
+/* ---------- motion ----------
+   `pillIn` (a fade and an 11px slide) went with the flat plank: the sign hangs on ropes
+   now, so it arrives with signDrop and leaves with signPullUp, both up beside the panel. */
+
+@media (prefers-reduced-motion: reduce) {
+  /* The tap ring and the Ouch icon's pop were the two that escaped this block. The
+     ring is pure decoration, so it goes; the icon has to stay VISIBLE, so it is held
+     at the animation's end state rather than at the opacity 0 it starts from — an
+     element whose only visible state is inside a keyframe disappears the moment the
+     animation does, which is the fault already documented on .hand-hint. */
+  /* No drop and no swing — but it must still ARRIVE at its resting state rather than be
+     parked at the opacity 0 the keyframes start from. */
+  .instruction-pill { animation: none; }
+  .instruction.leaving { animation: none; opacity: 0; }
+  .instruction.banner .instruction-pill { animation: none; }
+  .instruction-text .iw { animation: none; }
+  .card-icon { animation: none; opacity: 1; transform: none; }
+}
+
+/* ---------- the idle hand ----------
+   Shown only after a long idle, on the middle rope: a position, never an answer. It
+   demonstrates the GESTURE — "ropes are cut like this" — and leaves the instant
+   anything is touched.
+
+   It is small by rule: the test that guards this asserts under 9% of the stage width,
+   because a teaching hand that covers the thing it is pointing at teaches nothing. The
+   engine places it in stage percentages so it lands on the rope at any viewport size.
+
+   This block was missing entirely for a while. The element existed, the engine
+   positioned it, the art existed — but with no rule anywhere it was 0x0, which from
+   the outside is indistinguishable from a hint that never fires. */
+.hand-hint {
+  position: absolute;
+  /* SMALLER (asked for). It was 5 stage units and read as a glove laid over the row;
+     3.4 is the tutorial tap hand's size, which is what a hand pointing at something
+     wants to be rather than the thing being looked at. Still well inside the 9% of the
+     stage width the interface test holds it to. */
+  width: clamp(40px, calc(3.4 * var(--u)), 104px);
+  /* the supplied hand is 300x360, so it is not square */
+  aspect-ratio: 300 / 360;
+  --tip-x: 20%; --tip-y: 4%;
+  /* THE FINGERTIP IS THE POINT, NOT THE MIDDLE OF THE HAND.
+     The art is 300x360 with the index finger's tip about 20% across and 4% down, so a
+     hand centred on the cut line (translate -50% -50%) put its tip half a hand-height
+     ABOVE the line and a fifth of a hand-width beside it — reported as the hand not
+     being on the dashes. Translating by the tip's own place in the box lands the tip on
+     the point the engine gives, at any size. One image change is one edit here. */
+  transform: translate(calc(-1 * var(--tip-x)), calc(-1 * var(--tip-y)));
+  background: url("../assets/ui/icons/touch.png?v=d05ff66d") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 clamp(2px, calc(0.21 * var(--u)), 8px) clamp(4px, calc(0.42 * var(--u)), 16px) rgba(6, 26, 56, 0.45));
+  animation: handSwipe 1.8s cubic-bezier(.4, 0, .3, 1) infinite;
+}
+.hand-hint[hidden] { display: none; }
+/* Across the rope, not along it: the swipe has to read as the cut it is teaching.
+   Translate is composed after the centring transform, so both survive. */
+/* The base translate is the FINGERTIP anchor, so the TIP travels along the dashed line
+   rather than the hand's centre travelling along it. */
+@keyframes handSwipe {
+  0%      { transform: translate(calc(-1 * var(--tip-x)), calc(-1 * var(--tip-y))) translate(-46%, 0) rotate(-9deg); opacity: 0; }
+  16%     { transform: translate(calc(-1 * var(--tip-x)), calc(-1 * var(--tip-y))) translate(-40%, 0) rotate(-9deg); opacity: 1; }
+  62%     { transform: translate(calc(-1 * var(--tip-x)), calc(-1 * var(--tip-y))) translate(40%, 0)  rotate(7deg);  opacity: 1; }
+  80%     { transform: translate(calc(-1 * var(--tip-x)), calc(-1 * var(--tip-y))) translate(46%, 0)  rotate(7deg);  opacity: 0; }
+  100%    { transform: translate(calc(-1 * var(--tip-x)), calc(-1 * var(--tip-y))) translate(-46%, 0) rotate(-9deg); opacity: 0; }
+}
+/* With motion off it still has to be VISIBLE and still has to say "swipe", so it
+   holds mid-gesture rather than being parked at the opacity 0 the animation starts
+   from — an element whose only visible state is inside a keyframe disappears the
+   moment the animation does. */
+@media (prefers-reduced-motion: reduce) {
+  .hand-hint {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ---------- circular icon button ----------
+   Built to the supplied reference set: a THICK CHARCOAL BEZEL around a glossy AMBER
+   face carrying a solid white glyph.
+
+     .btn (the button)  the bezel — a dark ring with a lit top edge and a shaded
+                        bottom, so it reads as moulded plastic rather than as an
+                        outline drawn around a circle
+     .icon-btn-face     the amber cap, with a broad radial gloss up and left
+     .icon-btn-glyph    a flat white silhouette, masked so one file serves any colour
+
+   Amber, not ice blue: these controls sit over a blue-white world and have to be
+   found instantly. The reference set makes the same call for the same reason. */
+.icon-btn {
+  --size: clamp(38px, calc(3.9 * var(--u)), 148px);
+  --cap: clamp(3px, calc(0.31 * var(--u)), 12px);
+  /* A brighter amber with a wider value range: the old set spanned too little from
+     lit to bottom and read as flat. --halo is the button's own light. */
+  --face-lit: #FFF3C4;
+  --face-top: #FFD24E;
+  --face-mid: #FFA808;
+  --face-bot: #DB7A00;
+  --halo: rgba(255, 168, 8, 0.5);
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  /* The bezel. Slate-blue rather than charcoal: over an ice world a neutral dark ring
+     reads as a hole punched in the screen, and it was draining the amber it holds. The
+     last shadow is the button's own light — the cue that the control is live. */
+  background: linear-gradient(180deg, #6E7C93 0%, #45526A 52%, #2E3949 100%);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    inset 0 clamp(1px, calc(0.1 * var(--u)), 4px) 0 rgba(255, 255, 255, 0.42),
+    inset 0 clamp(-3px, -0.31vw, -2px) 0 rgba(0, 0, 0, 0.45),
+    0 0 0 clamp(2px, calc(0.21 * var(--u)), 8px) #14496F,
+    0 clamp(4px, calc(0.42 * var(--u)), 16px) clamp(8px, calc(0.85 * var(--u)), 32px) rgba(4, 18, 40, 0.42),
+    0 0 clamp(10px, calc(1.05 * var(--u)), 40px) var(--halo, transparent);
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+.icon-btn-face {
+  position: absolute;
+  /* the bezel thickness: about 14% of the button, as in the reference */
+  inset: 14%;
+  border-radius: 50%;
+  background:
+    radial-gradient(62% 48% at 34% 22%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.16) 58%, rgba(255,255,255,0) 82%),
+    linear-gradient(180deg, var(--face-lit) 0%, var(--face-top) 34%, var(--face-mid) 72%, var(--face-bot) 100%);
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 0.7),
+    inset 0 clamp(-5px, -0.5vw, -3px) 0 rgba(150, 82, 0, 0.34);
+  /* hover invites slowly, the press answers fast */
+  transition: filter 110ms ease, box-shadow 110ms ease;
+}
+.icon-btn-glyph {
+  position: absolute;
+  inset: 27%;
+  background: #FFFFFF;
+  -webkit-mask-repeat: no-repeat;  -webkit-mask-position: center;  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;  mask-position: center;  mask-size: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 clamp(1px, 0.1vw, 2px) 0 rgba(160, 84, 0, 0.55));
+}
+
+/* ---- states ---- */
+.icon-btn:hover .icon-btn-face { filter: brightness(1.12) saturate(1.08); }
+.icon-btn:hover {
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 0.42),
+    inset 0 clamp(-3px, -0.31vw, -2px) 0 rgba(0, 0, 0, 0.45),
+    0 0 0 clamp(2px, 0.21vw, 4px) #14496F,
+    0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(4, 18, 40, 0.42),
+    0 0 clamp(18px, 1.9vw, 36px) var(--halo, transparent);
+}
+/* pressed is a light state: see the note in screens.css */
+.icon-btn:active .icon-btn-face,
+.icon-btn.pressed .icon-btn-face {
+  filter: brightness(.8) saturate(1.14);
+  box-shadow:
+    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 0.4),
+    inset 0 0 clamp(10px, 1.05vw, 20px) rgba(90, 48, 0, 0.5),
+    inset 0 clamp(-6px, -0.6vw, -3px) 0 rgba(150, 82, 0, 0.5);
+}
+.icon-btn:focus-visible {
+  outline: clamp(3px, 0.31vw, 5px) solid #FFD34A;
+  outline-offset: clamp(3px, 0.31vw, 6px);
+}
+.icon-btn[disabled] { filter: saturate(.24) brightness(.86); cursor: default; pointer-events: none; }
+/* OFF state, e.g. sound muted: the face goes cold so the state reads at a glance */
+.icon-btn[aria-pressed="false"] {
+  --face-lit: #E4EAEE;
+  --face-top: #BDC8D0;
+  --face-mid: #96A4AE;
+  --face-bot: #78888F;
+}
+/* asks for attention without moving off its spot: the hint, when the learner is stuck */
+.icon-btn.nudge .icon-btn-face { animation: iconNudge 1.6s ease-in-out infinite; }
+@keyframes iconNudge {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.07); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn.nudge .icon-btn-face { animation: none; }
+}
+/* ---------- glyph selection ----------
+   The mask URLs are declared HERE rather than in an inline `--glyph` custom
+   property. A url() inside a custom property is resolved relative to the stylesheet
+   that CONSUMES it, not the document, so `assets/ui/...` set inline resolved to
+   `/css/assets/ui/...` and every glyph 404'd. Declaring them in this file makes the
+   relative path correct, and a data attribute picks between them — which also means
+   the icon set is enumerable in one place. */
+.icon-btn[data-icon="hint"]      .icon-btn-glyph { -webkit-mask-image: url("../assets/ui/icons/hint.svg?v=2eb235fd");      mask-image: url("../assets/ui/icons/hint.svg?v=2eb235fd"); }
+.icon-btn[data-icon="sound-on"]  .icon-btn-glyph { -webkit-mask-image: url("../assets/ui/icons/sound-on.svg?v=53f86786");  mask-image: url("../assets/ui/icons/sound-on.svg?v=53f86786"); }
+.icon-btn[data-icon="sound-off"] .icon-btn-glyph { -webkit-mask-image: url("../assets/ui/icons/sound-off.svg?v=4c1711d1"); mask-image: url("../assets/ui/icons/sound-off.svg?v=4c1711d1"); }
+.icon-btn[data-icon="pause"]     .icon-btn-glyph { -webkit-mask-image: url("../assets/ui/icons/pause.svg?v=7d4d26a9");     mask-image: url("../assets/ui/icons/pause.svg?v=7d4d26a9"); }
+.icon-btn[data-icon="play"]      .icon-btn-glyph { -webkit-mask-image: url("../assets/ui/icons/play.svg?v=058a4e07");      mask-image: url("../assets/ui/icons/play.svg?v=058a4e07"); }
+.icon-btn[data-icon="restart"]   .icon-btn-glyph { -webkit-mask-image: url("../assets/ui/icons/restart.svg?v=34740a8f");   mask-image: url("../assets/ui/icons/restart.svg?v=34740a8f"); }
+
+/* The verdict mark (a tick or a cross over the crossing) is gone: a right answer
+   throws confetti from the engine and a wrong one gets no mark. See cutShape(). */
+
+/* At a phone-landscape stage the panel is proportionally much wider, and at 46% it
+   reached the first rope. Narrowing it there keeps the rule "the interface never
+   covers gameplay" true at every size rather than only at the reference one. */
+/* A phone-landscape stage is proportionally much wider, so the card is trimmed rather
+   than allowed to run toward the edges. */
+/* On a phone-landscape stage everything still derives from --sign-h, so the sign only
+   needs to be told to be a little taller relative to a much smaller stage. */
+@media (max-width: 1200px) {
+  /* No top here: the shared rule places the board by its wood, which is what a phone
+     needs too. A flat 1% was for a picture whose top was empty rope. */
+  .instruction { max-width: 44%; left: 1.2%; }
+  /* A phone stage is 1920 units wide too, but its plank is proportionally larger, so the
+     banner sentence needs another step down to stay inside the band. Measured: 915 -> 830
+     of 1920, against the leftmost rope at 883. */
+  .instruction.banner .instruction-text { font-size: calc(193 * var(--k) * 0.68); }
+  /* MUCH smaller on a phone, and the two numbers that set it are both measured:
+     the hanging chunks start 122px down a 390px stage, so a card parked at 2.5% must
+     be under ~112px tall to clear them; and the interface has to stay under 12% of
+     the screen, which for a plank whose width runs about 2.7x its height means under
+     about 98px. 88px satisfies both with room to spare. It matters more here than on
+     desktop because the card is now on screen for the whole phase rather than a few
+     seconds. */
+  /* SIZED FROM THE STAGE, NOT THE VIEWPORT, now that the sign has to fit the left band. The
+     stage is 16:9 and letterboxed, so on a phone its width is set by the HEIGHT (a 844x390
+     window gives a 693px-wide stage) — a vw-based height therefore grew relative to the stage
+     on a short, wide phone and the plank ran back under the ropes. 16% of the stage's own
+     height keeps the longest sentence ("Cut the QUADRILATERAL.") inside 840 of the 1920 stage
+     units, clear of the leftmost rope (883 once the row moved in), on every phone shape. */
+  /* 0.0929 of the stage's height, where the rope art wanted 0.185: that art was 652 tall
+     for 285 rows of wood and this one is 478 for 416, so half the picture height is the
+     same board. The floor moves by the same factor, 52 -> 26.
+
+     ON .instruction, NOT ON THE PILL. --sign-h and --k are declared together on the
+     container now, and overriding only one of them here gave the pill a 72px height with
+     44px padding and type — the board drawn half again as tall as everything measured for
+     it, on every phone. */
+  .instruction { --sign-h: max(26px, calc(min(100vh, 100vw * 0.5625) * 0.0929)); }
+}

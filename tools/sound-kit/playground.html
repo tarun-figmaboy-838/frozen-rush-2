@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>juice.js — game feel playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:    #17121f;
+    --panel: #201929;
+    --edge:  #322842;
+    --ink:   #ece6f4;
+    --dim:   #968aa8;
+    --sans:  "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 26px 22px 60px; }
+
+  .bar { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding-bottom: 16px; }
+  .mark { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.02em; }
+  .bar p { margin: 0; color: var(--dim); font-size: 0.86rem; max-width: 52ch; }
+
+  /* ---- the stage ---- */
+  #stage {
+    position: relative;
+    height: 300px;
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #3a2f52 0%, #241d33 60%, #1d1729 100%);
+  }
+  #ice {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 74px;
+    background: linear-gradient(#cfe9f7 0 14px, #a9d3ec 14px 30px, #7cb4d6 30px 100%);
+  }
+  #ice::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 10px;
+    background: #f2fbff; border-radius: 0 0 40% 30%;
+  }
+  #gap {
+    position: absolute; bottom: 0; left: 52%; width: 108px; height: 74px;
+    background: linear-gradient(#1b1526, #120e1b);
+  }
+  #hero {
+    position: absolute; left: 0; top: 0;
+    width: 74px; height: 74px;
+    will-change: transform;
+  }
+  .live {
+    position: absolute; right: 12px; top: 10px;
+    font-size: 0.72rem; color: var(--dim);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    background: rgba(23,18,31,.72); padding: 4px 8px; border-radius: 2px;
+  }
+
+  /* ---- controls ---- */
+  h2 {
+    margin: 22px 0 10px; font-size: 0.85rem; font-weight: 500; color: var(--dim);
+  }
+  .keys { display: flex; flex-wrap: wrap; gap: 7px; }
+  .key {
+    font: inherit; font-size: 0.9rem; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--edge);
+    border-left: 2px solid var(--fam, var(--dim));
+    border-radius: 2px; padding: 8px 14px; cursor: pointer;
+    transition: background 90ms linear;
+  }
+  .key:hover { background: #2a2136; }
+  .key:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
+  .combos { --fam: #ff9d4d; }
+  .single { --fam: #5ec8ff; }
+  .screen { --fam: #ff6f7d; }
+  .parts  { --fam: #63e0a4; }
+
+  .controls {
+    display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
+    padding: 14px 2px 0; margin-top: 20px; border-top: 1px solid var(--edge);
+    font-size: 0.84rem; color: var(--dim);
+  }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 120px; height: 3px;
+    background: var(--edge); border-radius: 2px; outline-offset: 6px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--ink); cursor: grab;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 15px; height: 15px; border: 0; border-radius: 50%; background: var(--ink);
+  }
+  label.knob { display: flex; align-items: center; gap: 9px; }
+  output { color: var(--ink); font-variant-numeric: tabular-nums; min-width: 2.6em; }
+
+  .strip {
+    display: flex; align-items: center; gap: 14px; margin-top: 24px;
+    padding: 12px 16px; background: var(--panel);
+    border: 1px solid var(--edge); border-radius: 3px;
+  }
+  .strip code {
+    flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.86rem; color: #ffbf47; overflow-x: auto; white-space: nowrap;
+  }
+  .note { margin-top: 22px; color: var(--dim); font-size: 0.85rem; max-width: 70ch; }
+  .note code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--ink); font-size: 0.92em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <span class="mark">juice.js</span>
+    <p>The elephant is being moved by a game loop writing <code>style.transform</code> every single frame. Every effect below runs on top of that without touching it.</p>
+  </header>
+
+  <div id="stage">
+    <div id="ice"></div>
+    <div id="gap"></div>
+    <svg id="hero" viewBox="0 0 74 74" aria-label="character">
+      <ellipse cx="37" cy="70" rx="22" ry="4" fill="rgba(0,0,0,.28)"/>
+      <path d="M14 44c0-13 10-23 23-23s23 10 23 23c0 9-5 15-11 18H25c-6-3-11-9-11-18z" fill="#b9a8d6"/>
+      <path d="M13 34c-6-3-9 4-6 9s9 6 11 3z" fill="#a493c6"/>
+      <path d="M61 34c6-3 9 4 6 9s-9 6-11 3z" fill="#a493c6"/>
+      <path d="M37 52c-3 0-5 3-5 8s2 12 5 12 5-7 5-12-2-8-5-8z" fill="#a493c6"/>
+      <circle cx="29" cy="40" r="4.4" fill="#241d33"/>
+      <circle cx="45" cy="40" r="4.4" fill="#241d33"/>
+      <circle cx="30.4" cy="38.6" r="1.6" fill="#fff"/>
+      <circle cx="46.4" cy="38.6" r="1.6" fill="#fff"/>
+    </svg>
+    <div class="live" id="live">loop running</div>
+  </div>
+
+  <h2>Combos — one call fires visual and sound together</h2>
+  <div class="keys combos" id="comboKeys"></div>
+
+  <h2>Single effects</h2>
+  <div class="keys single" id="singleKeys"></div>
+
+  <h2>Screen</h2>
+  <div class="keys screen" id="screenKeys"></div>
+
+  <h2>Particles</h2>
+  <div class="keys parts" id="partKeys"></div>
+
+  <div class="controls">
+    <label class="knob">Intensity
+      <input type="range" id="int" min="0" max="200" value="100">
+      <output id="intOut">1.00</output>
+    </label>
+    <label class="knob">Volume
+      <input type="range" id="vol" min="0" max="100" value="55">
+      <output id="volOut">55%</output>
+    </label>
+    <label class="knob">
+      <input type="checkbox" id="reduce"> Reduced motion
+    </label>
+    <label class="knob">
+      <input type="checkbox" id="loop" checked> Game loop running
+    </label>
+  </div>
+
+  <div class="strip"><code id="snippet">Juice.trample(hero)</code></div>
+
+  <p class="note">
+    Turn the game loop off and on while an effect plays. Nothing stutters, nothing snaps, and the
+    character never drifts — every effect uses <code>composite: 'add'</code>, so the browser layers it
+    over whatever transform the loop just wrote, and every keyframe starts and ends at identity so
+    repeated effects cannot accumulate. No wrapper elements, no changes to your game code.
+  </p>
+
+</div>
+
+<script src="sfx.js"></script>
+<script src="juice.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var stage = document.getElementById('stage');
+  var hero  = document.getElementById('hero');
+  var live  = document.getElementById('live');
+  var snip  = document.getElementById('snippet');
+
+  Juice.stage(stage);
+  if (window.SFX) { SFX.key('C pentatonic'); SFX.volume(0.55); }
+
+  /* ---- a real game loop, writing transform every frame ---------------- */
+  /* This is the point of the demo: juice has to survive this. */
+
+  var x = 60, dir = 1, t = 0, loopOn = true;
+
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (!loopOn) return;
+
+    // hitstop reaches gameplay only because we read Juice.timeScale here.
+    var dt = 0.016 * Juice.timeScale;
+    t += dt;
+
+    x += dir * 62 * dt;
+    var w = stage.clientWidth - 74;
+    if (x > w) { x = w; dir = -1; }
+    if (x < 0) { x = 0; dir = 1; }
+
+    var bob = Math.sin(t * 4.2) * 5;
+    var lean = Math.sin(t * 4.2) * 2 * dir;
+
+    hero.style.transform =
+      'translate(' + x.toFixed(1) + 'px, ' + (152 + bob).toFixed(1) + 'px) ' +
+      'rotate(' + lean.toFixed(2) + 'deg) scaleX(' + dir + ')';
+
+    live.textContent = 'loop ' + (Juice.timeScale ? 'running' : 'FROZEN') +
+                       '  x=' + x.toFixed(0);
+  }
+  requestAnimationFrame(frame);
+
+  /* ---- buttons -------------------------------------------------------- */
+
+  var GROUPS = {
+    comboKeys: [
+      ['trample',   function () { Juice.trample(hero); }],
+      ['impact',    function () { Juice.impact(hero, { power: 1.3 }); }],
+      ['bonk',      function () { Juice.bonk(hero); }],
+      ['collect',   function () { Juice.collect(hero, { label: '+10' }); }],
+      ['celebrate', function () { Juice.celebrate(hero); }],
+      ['fail',      function () { Juice.fail(hero); }],
+      ['appear',    function () { Juice.appear(hero); }],
+      ['refuse',    function () { Juice.refuse(hero); }]
+    ],
+    singleKeys: [
+      ['pop', 'squash', 'stretch', 'wobble', 'shake', 'nudge',
+       'hop', 'spin', 'dizzy', 'tada', 'droop', 'anticipate', 'flash']
+    ],
+    screenKeys: [
+      ['shakeScreen', function () { Juice.shakeScreen({ power: 1 }); }],
+      ['punchZoom',   function () { Juice.punchZoom(); }],
+      ['flashScreen', function () { Juice.flashScreen(); }],
+      ['hitstop',     function () { Juice.hitstop(220); }]
+    ],
+    partKeys: [
+      ['burst', 'dust', 'stars', 'confetti', 'sparkle'],
+      ['popText', function () { Juice.popText(hero, 'Nice!'); }]
+    ]
+  };
+
+  function addButton(host, label, fn, code) {
+    var b = document.createElement('button');
+    b.className = 'key'; b.type = 'button'; b.textContent = label;
+    b.addEventListener('click', function () { fn(); snip.textContent = code; });
+    host.appendChild(b);
+  }
+
+  Object.keys(GROUPS).forEach(function (id) {
+    var host = document.getElementById(id);
+    GROUPS[id].forEach(function (entry) {
+      if (Array.isArray(entry) && typeof entry[1] === 'function') {
+        addButton(host, entry[0], entry[1],
+                  'Juice.' + entry[0] + '(hero)');
+      } else {
+        // a plain list of names taking (el)
+        entry.forEach(function (name) {
+          addButton(host, name, function () { Juice[name](hero); },
+                    'Juice.' + name + '(hero)');
+        });
+      }
+    });
+  });
+
+  /* ---- controls ------------------------------------------------------- */
+
+  var intIn = document.getElementById('int'), intOut = document.getElementById('intOut');
+  intIn.addEventListener('input', function () {
+    var v = intIn.value / 100;
+    Juice.configure({ intensity: v });
+    intOut.textContent = v.toFixed(2);
+  });
+
+  var volIn = document.getElementById('vol'), volOut = document.getElementById('volOut');
+  volIn.addEventListener('input', function () {
+    if (window.SFX) SFX.volume(volIn.value / 100);
+    volOut.textContent = volIn.value + '%';
+  });
+
+  document.getElementById('reduce').addEventListener('change', function (e) {
+    Juice.configure({ reducedMotion: e.target.checked ? true : 'auto' });
+  });
+
+  document.getElementById('loop').addEventListener('change', function (e) {
+    loopOn = e.target.checked;
+    if (!loopOn) live.textContent = 'loop stopped — effects still work';
+  });
+
+  // Tapping the stage acts like a gameplay hit.
+  stage.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('button')) return;
+    Juice.impact(hero, { power: 0.9 });
+    snip.textContent = 'Juice.impact(hero, { power: 0.9 })';
+  });
+})();
+</script>
+</body>
+</html>
