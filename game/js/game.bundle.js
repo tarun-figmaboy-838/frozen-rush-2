@@ -76,6 +76,7 @@ const ASSET_V = {
   "assets/env/rock-tall.webp": "760283f8",
   "assets/env/rock-wide.webp": "6247692d",
   "assets/env/rope-tied.webp": "f9b3e721",
+  "assets/option-shape/1.png": "24fbe8e1",
   "assets/option-shape/concaveHeptagon.webp": "d943871c",
   "assets/option-shape/concaveHexagon.webp": "38aae90c",
   "assets/option-shape/concavePentagon.webp": "25cd2560",
