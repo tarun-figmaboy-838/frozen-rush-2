@@ -210,18 +210,28 @@ test.describe('Level 2 — a wrong cut loses the slab to the river', () => {
     expect(jsErrors(errors), 'the game threw').toEqual([]);
   });
 
-  /* A SHORT DIAGONAL IS STILL A DIAGONAL. Dropping the slab for it would punish a child
-     who has understood the idea and only picked one that cannot span. */
-  test('a short diagonal wobbles it but never drops it', async ({ page }) => {
+  /* A SHORT DIAGONAL NOW CUTS, AND THE CUT IS THE POINT. It used to wobble and hold —
+     the reasoning being that the child had understood what a diagonal is and should not
+     lose the slab for it. That protected them from the lesson: they were told 'not that'
+     and never shown why not. It comes apart along the line they drew instead, into the
+     sliver and lump that plainly cannot bridge, and those go in the river. The nudge
+     still never calls it a side, because it is not one. */
+  test('a short diagonal cuts into unfit pieces and loses them', async ({ page }) => {
     await boot(page, { speed: 900, fast: 2 });
     await enterLevelTwo(page);
     await page.evaluate(() => window.iceAgeGame._l2Cut(0, 2));
+    await page.waitForTimeout(150);
     const r = await page.evaluate(() => {
       const L = window.iceAgeGame.debug().l2;
-      return { fall: !!L.fall, sign: window.iceAgeGame.debug().signSay };
+      return { fall: !!L.fall, pieces: L.debris ? L.debris.length : 0,
+               sign: window.iceAgeGame.debug().signSay };
     });
-    expect(r.fall, 'it holds').toBe(false);
-    expect(r.sign.toLowerCase(), 'and is nudged, not scolded').not.toContain('side');
+    expect(r.pieces, 'it really came apart').toBe(2);
+    expect(r.fall, 'and the pieces are going in the water').toBe(true);
+    expect(r.sign.toLowerCase(), 'a diagonal is never called a side').not.toContain('side');
+    // and the crossing recovers, so it stays winnable
+    await waitState(page, ['LEVEL_2_ACTIVE'], 40_000);
+    expect(await page.evaluate(() => window.iceAgeGame._l2Cut(0, 3))).toBe(true);
   });
 
   test('no cut can be started while the slab is in the air', async ({ page }) => {

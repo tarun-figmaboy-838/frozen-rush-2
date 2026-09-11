@@ -314,7 +314,14 @@ test.describe('the end of the journey', () => {
         if (G.state === 'OBSTACLE_HIT') g.retryObstacle();
         if (G.state === 'PHASE_ACTIVE' && G.l1 && G.l1.wanted.length) g._cut(G.l1.wanted[0]);
         // Level 2 is on the way home now: cut the slab on a main diagonal
-        if (G.state === 'LEVEL_2_ACTIVE') g._l2Cut(0, 3);
+        /* Each drawing crossing by its own rule — one main diagonal, every diagonal,
+           or two from the same corner. They come before the rope crossings now. */
+        if (G.state === 'LEVEL_2_ACTIVE' && G.l2) {
+          const m = G.l2.mechanic;
+          if (m === 'cut-diagonal') g._l2Cut(0, 3);
+          else if (m === 'draw-all-diagonals') { g._l2Cut(0, 2); g._l2Cut(1, 3); }
+          else if (m === 'same-vertex-diagonals') { g._l2Cut(0, 2); g._l2Cut(0, 3); }
+        }
         if (G.state === 'FINAL_RUN' && doneAtFinalRun < 0) doneAtFinalRun = G.phasesDone;
         if (G.state === 'COMPLETE') return { complete: true, doneAtFinalRun, phasesDone: G.phasesDone };
         await new Promise(res => requestAnimationFrame(res));

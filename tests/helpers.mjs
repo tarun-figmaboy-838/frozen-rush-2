@@ -125,6 +125,16 @@ export async function playLevelOne(page, { wrongFirst = false, budgetMs = 300_00
       }
       if (s === 'OBSTACLE_HIT') g.retryObstacle();
 
+      /* THE THREE DRAWING CROSSINGS COME FIRST, so a loop that only answers rope
+         questions sits in front of one it cannot solve and times out. Each is answered
+         by its own rule: one main diagonal, every diagonal, or two from one corner. */
+      if (s === 'LEVEL_2_ACTIVE' && G.l2) {
+        const m = G.l2.mechanic;
+        if (m === 'cut-diagonal') g._l2Cut(0, 3);
+        else if (m === 'draw-all-diagonals') { g._l2Cut(0, 2); g._l2Cut(1, 3); }
+        else if (m === 'same-vertex-diagonals') { g._l2Cut(0, 2); g._l2Cut(0, 3); }
+      }
+
       if (s === 'PHASE_ACTIVE' && G.l1) {
         // what the phase still WANTS; any open crevasse will take it
         const target = G.l1.unfilled[0];
@@ -141,7 +151,11 @@ export async function playLevelOne(page, { wrongFirst = false, budgetMs = 300_00
          CFG.levelTwo.enabled: RUN_SEGMENT_2 with Level 2 on, FINAL_RUN with it off.
          This loop answers Level 1's questions and nothing else, so it stops at either
          — a caller wanting the rest calls playLevelTwo() next. */
-      if (s === 'RUN_SEGMENT_2' || s === 'FINAL_RUN' || s === 'COMPLETE') break;
+      /* IT PLAYS THE WHOLE JOURNEY. It used to stop at the first hand-over, which was
+         right when Part 2 was one crossing tacked on the end; the drawing crossings come
+         FIRST now, so stopping there would end the run before a single rope question had
+         been asked. */
+      if (s === 'FINAL_RUN' || s === 'COMPLETE') break;
       await new Promise(r => requestAnimationFrame(r));
     }
     const G = g.debug();

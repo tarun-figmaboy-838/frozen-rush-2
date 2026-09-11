@@ -226,7 +226,7 @@ test.describe('Level 1', () => {
     const errors = await boot(page, { speed: 900, fast: 5 });
     const r = await playLevelOne(page, { budgetMs: 330_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state + '@' + r.phase).toBe(false);
-    expect(r.phasesDone).toBeGreaterThanOrEqual(6);
+    expect(r.phasesDone, 'every crossing credited').toBeGreaterThanOrEqual(6);
     expect(['RUN_SEGMENT_2', 'FINAL_RUN', 'COMPLETE']).toContain(r.state);
     expect(r.trail.join(' ')).toContain('PHASE_SUCCESS');
     expect(jsErrors(errors), 'the game threw').toEqual([]);
@@ -237,7 +237,7 @@ test.describe('Level 1', () => {
     const errors = await boot(page, { speed: 900, fast: 5 });
     const r = await playLevelOne(page, { wrongFirst: true, budgetMs: 330_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state + '@' + r.phase).toBe(false);
-    expect(r.phasesDone).toBeGreaterThanOrEqual(6);
+    expect(r.phasesDone, 'every crossing credited').toBeGreaterThanOrEqual(6);
     expect(r.trail.join(' ')).toContain('PHASE_WRONG');
     expect(jsErrors(errors), 'the game threw').toEqual([]);
   });

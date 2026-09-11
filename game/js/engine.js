@@ -11072,6 +11072,23 @@ export function createGame(canvas, hooks = {}) {
     if (amp <= 0.01) return;
 
     const sec = t / 1000;
+    /* WHERE THE LEADING EDGE HAS GOT TO. It comes over the ridge off the left of the
+       frame and sweeps the width of the pass, easing out so it surges in and then runs
+       on past — a wave arriving rather than a curtain being drawn. Everything below is
+       measured against it. */
+    const q = clamp((t - roar) / (sweep + settle), 0, 1);
+    /* IT CHASES HIM, AND IT NEARLY CATCHES HIM. Momo runs at x 430, so a front that
+       is past him by the first second has stopped being a threat and become scenery
+       he is standing in. Eased IN rather than out — it gathers behind him, closes,
+       and only runs on at the very end — and it starts well back so the left of the
+       pass is full of it while he is still ahead. */
+    /* NEARLY LINEAR. Eased-in it barely moved for the first second and the wall was
+       still off the left of the frame when the beat was a third gone; eased-out it was
+       past Momo before he had taken a stride and stopped being a threat. A wave of snow
+       travels at the speed it travels — the slight front-load is only so it does not
+       start with a visible jerk. Timed so it reaches him at about 1.7s, which leaves him
+       plainly ahead of it and plainly not by much. */
+    const front = lerp(-500, CFG.W + 400, Math.pow(q, 0.85));
     ctx.save();
     /* NORMAL BLENDING, NOT ADDITIVE — and this is what turned it from a glow into snow.
        Additive white over a bright sky can only ever get brighter, so the cloud had no
@@ -11106,10 +11123,28 @@ export function createGame(canvas, hooks = {}) {
       const grow = Math.sin(clamp(phase, 0, 1) * Math.PI);
       const r = (58 + a2 * 74) * (0.45 + grow * 0.85);
 
-      /* DENSER AT THE FRONT OF THE WAVE. The leading puffs are the ones that have
-         fallen furthest, and they carry the brightness; the tail is thinner, which is
-         what stops it looking like an even curtain. */
-      const dens = amp * (0.30 + grow * 0.62) * (0.55 + a1 * 0.5);
+      /* THE FRONT IS WHAT MAKES IT AN AVALANCHE.
+       *
+       * Spread evenly across the sky this was snowFALL — a curtain of weather with no
+       * mass in it and nothing to run from, which is what it looked like. An avalanche
+       * ARRIVES: there is a leading edge, the bulk piles up just behind it, and what it
+       * has already passed thins out to haze.
+       *
+       * So the cloud is gated on a front that sweeps left to right across the pass.
+       * A puff the front has not reached yet is not drawn at all; one just behind it is
+       * at full weight; further back it fades. That is the whole difference between
+       * weather and a wall, and it costs one number. */
+      const d = front - x;
+      if (d < 0) continue;                               // the front has not got here yet
+      /* THE BULK RUNS A LONG WAY BACK from the leading edge — it is a mountainside of
+         snow, not a breaking wave. Full weight from just behind the front to about a
+         screen back, then thinning into the haze it leaves. Too narrow a band and the
+         wall reads as a thin bright line travelling across the sky, which is what the
+         first pass at this looked like. */
+      const body = clamp(d / 170, 0, 1) * clamp(1 - (d - 760) / 1000, 0, 1);
+      if (body <= 0.01) continue;
+
+      const dens = amp * body * (0.52 + grow * 0.72) * (0.6 + a1 * 0.5);
       if (dens <= 0.01) continue;
 
       // the body: a cool grey-blue, so the mass has weight and does not blow out
@@ -11141,7 +11176,11 @@ export function createGame(canvas, hooks = {}) {
       const sx = -200 + a1 * 1600 + ph * 700;
       const sy = -140 + ph * (CFG.H + 220);
       const len = 34 + a2 * 62;
-      const al = amp * 0.5 * Math.sin(clamp(ph, 0, 1) * Math.PI);
+      // gated on the front too, or the snow arrives before the wall carrying it
+      const dd = front - sx;
+      if (dd < 0) continue;
+      const al = amp * 0.62 * Math.sin(clamp(ph, 0, 1) * Math.PI)
+               * clamp(dd / 200, 0, 1) * clamp(1 - (dd - 260) / 800, 0, 1);
       if (al <= 0.02) continue;
       ctx.strokeStyle = `rgba(255,255,255,${al.toFixed(3)})`;
       ctx.lineWidth = 2 + a2 * 3;
@@ -11156,10 +11195,14 @@ export function createGame(canvas, hooks = {}) {
        thins to nothing, so the ice behind the wave dims out rather than being cut off
        at a line. Normal blending, over the top, because this one is meant to obscure. */
     ctx.save();
-    ctx.globalAlpha = amp * 0.34 * clamp((t - roar * 0.4) / roar, 0, 1);
-    const veil = ctx.createLinearGradient(0, 0, CFG.W * 0.72, CFG.H);
-    veil.addColorStop(0, 'rgba(238,248,255,0.92)');
-    veil.addColorStop(0.55, 'rgba(238,248,255,0.35)');
+    ctx.globalAlpha = amp * 0.62 * clamp((t - roar * 0.4) / roar, 0, 1);
+    /* THE HAZE SITS BEHIND THE FRONT, not over the whole stage. Washing everything
+       evenly was the other half of why this read as weather: the ground Momo is running
+       onto should be clear, and only what the wave has already taken is hidden. */
+    const hx = clamp(front, -400, CFG.W + 400);
+    const veil = ctx.createLinearGradient(hx - 1500, 0, hx + 60, 0);
+    veil.addColorStop(0, 'rgba(238,248,255,0.88)');
+    veil.addColorStop(0.62, 'rgba(238,248,255,0.42)');
     veil.addColorStop(1, 'rgba(238,248,255,0)');
     ctx.fillStyle = veil;
     ctx.fillRect(0, 0, CFG.W, CFG.H);
