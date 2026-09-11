@@ -626,6 +626,11 @@ export const CFG = {
        side left a 200px hole under a 243px plug; 3% leaves 228. The crossing deck and
        the snow laid over the joins are what hide a 7px seat, and they always did. */
     bearing: 0.03,
+    /* HOW FAR TWO PLUGS IN ONE CREVASSE TUCK BEHIND EACH OTHER. Laid edge to edge
+       they leave a seam, and with a dented plug that seam opens into a V. 14% of a
+       lane is enough for the body of one to fill the notch of the next without either
+       looking squashed — see the note where the slots are cut. */
+    plugLap: 0.14,
     /* THE PHASE ZOOM. The view eases in when a shape level opens so the instruction,
      * the blocks and the ditch are the whole picture, and eases back out when the run
      * resumes.
@@ -1623,25 +1628,58 @@ export const PolygonFactory = {
      which is how a wedge actually sits. Scaling is uniform: the piece stays the shape
      the learner picked, rather than being stretched to plug a hole. */
   seat(pts, span) {
-    let bi = 0, best = -1;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
-      if (len > best) { best = len; bi = i; }
-    }
-    const a = pts[bi], b = pts[(bi + 1) % pts.length];
-    // rotate that edge to horizontal
-    let rot = -Math.atan2(b.y - a.y, b.x - a.x);
+    const n = pts.length;
     const turn = (r) => pts.map(q => ({
       x: q.x * Math.cos(r) - q.y * Math.sin(r),
       y: q.x * Math.sin(r) + q.y * Math.cos(r)
     }));
-    // ...and make sure it ends up at the top, not the bottom
+    /* WHICH CORNERS TURN THE WRONG WAY — the notch. A convex shape has none and every
+       branch below collapses to "longest edge up", which is what this always did. */
+    const cross = i => {
+      const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
+      return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    };
+    const turns = pts.map((_, i) => cross(i));
+    const pos = turns.filter(t => t > 0).length, neg = turns.filter(t => t < 0).length;
+    const sign = pos >= neg ? -1 : 1;                   // the minority turn is the notch
+    const reflex = pts.map((_, i) => i).filter(i => Math.sign(turns[i]) === sign && turns[i] !== 0);
+
+    /* THE EDGE IT RESTS ON, and for a CONCAVE shape the longest one is often the wrong
+       choice. A notch is a bite out of the outline: land it on top and the walking
+       surface has a hole in it, land it on the side and it opens a V against the piece
+       next door. Both were happening — two dented plugs side by side in one crevasse
+       read as broken debris rather than as a mended path.
+       So every edge is scored: length is still what matters most, but an edge that puts
+       the notch DOWN, where the crevasse hides it, is worth a great deal more than a few
+       pixels of extra span. A convex shape has no reflex corner and scores purely on
+       length, exactly as before. */
+    let bi = 0, bestScore = -Infinity, bestLen = 0;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len <= 0) continue;
+      let rot = -Math.atan2(b.y - a.y, b.x - a.x);
+      let out = turn(rot);
+      const bb = polyBounds(out);
+      const mid = bb.y0 + bb.h / 2;
+      if ((out[i].y + out[(i + 1) % n].y) / 2 > mid) { rot += Math.PI; out = turn(rot); }
+      const b2 = polyBounds(out);
+      /* 0 = the notch is at the very top, 1 = at the very bottom. */
+      const low = reflex.length && b2.h > 0
+        ? reflex.reduce((s, k) => s + (out[k].y - b2.y0) / b2.h, 0) / reflex.length
+        : 1;
+      const score = len * (1 + low * 1.6);
+      if (score > bestScore) { bestScore = score; bi = i; bestLen = len; }
+    }
+
+    const a = pts[bi], b = pts[(bi + 1) % n];
+    let rot = -Math.atan2(b.y - a.y, b.x - a.x);
     let out = turn(rot);
+    // ...and make sure it ends up at the top, not the bottom
     const edgeY = (out[bi].y + out[(bi + 1) % out.length].y) / 2;
     const cy = polyBounds(out).y0 + polyBounds(out).h / 2;
     if (edgeY > cy) { rot += Math.PI; out = turn(rot); }
-    return { rot, scale: best > 0 ? span / best : 1, pts: this.center(out) };
+    return { rot, scale: bestLen > 0 ? span / bestLen : 1, pts: this.center(out) };
   },
 
   /** The edge a seated shape is resting its top on: the one whose midpoint is
@@ -6406,7 +6444,19 @@ export function createGame(canvas, hooks = {}) {
           /* Its crevasse by INDEX, not by reference. A slot holding its gap while the
              gap holds its slots is a cycle, and debug() is read straight out of the
              page by the tests — a cycle there cannot be serialised. */
-          gapIndex: i, x0: x + ins + j * throatW, x1: x + ins + (j + 1) * throatW,
+          /* NEIGHBOURS IN ONE CREVASSE OVERLAP, and they have to. Two plugs laid edge
+             to edge leave a seam, and with a DENTED plug the seam opens into a V — the
+             notch of one against the flank of the other, which read as two broken bits
+             dropped in a hole rather than as a mended path. Pulling the lanes together
+             tucks each piece behind its neighbour, so a notch is filled by the body
+             next to it and the pair meet like two pieces of a puzzle.
+
+             It costs nothing in span: the plugs are already wider than their lanes (a
+             piece lands at the size it was cut, never re-fitted), so the crossing is
+             covered either way. Only the seam moves. */
+          gapIndex: i,
+          x0: x + ins + j * throatW - (j > 0 ? throatW * L1.plugLap : 0),
+          x1: x + ins + (j + 1) * throatW - (j > 0 ? throatW * L1.plugLap : 0),
           // a lone slot IS its crevasse, which is the one-answer case unchanged
           full: k === 1, filled: false, reserved: false, kind: null
         });
@@ -6769,7 +6819,20 @@ export function createGame(canvas, hooks = {}) {
          second after the finger left the rope — so the answer to a wrong cut arrived late and
          read as unconnected to it (the owner's note: "it takes time to show"). The startle is
          the immediate answer; the splash below keeps the body jolt, not a second startle. */
+      /* HE TREMBLES, not just blinks. A pose change alone is easy to miss on a stage
+         scaled into a phone, and a wrong answer is the one moment the child most needs
+         told. This is the same fright the ground giving way produces — the whole
+         performance, not a frame — with a shove on the world and a spray of chips off
+         the rope so the miss is felt as well as seen. The splash when the block lands
+         is still the punchline; this is the flinch that answers the finger. */
       mammoth.setState('SURPRISED');
+      mammoth.scare = 0;
+      mammoth.startle(reduced ? 0.5 : 0.95);
+      shake(reduced ? 1.2 : 3, 260);
+      hitStop(CFG.juice.stopHit * 0.45);
+      punch(CFG.juice.punchHit * 0.5, 240, sh.x, sh.y);
+      particles.chips(sh.x, sh.y, reduced ? 4 : 9, -170);
+      audio.kit('doink', { volume: 0.55, vary: 0.2 });   // the comic "nope"
     }
     else {
       if (!reduced) particles.confetti(CFG.W, 64);        // a shower across the stage, as asked
@@ -11214,7 +11277,12 @@ export function createGame(canvas, hooks = {}) {
        the left edge and the room he just made would sit empty between them.
        It closes to his heels and stops: caught, not buried. */
     const him = CFG.mammothX + (G.avLead || 0);
-    const front = Math.min(lerp(-620, him + 420, Math.pow(q, 0.8)), him - 120);
+    /* CLEAR OF HIS BODY, not of his MARK. mammothX is where his collider sits, and
+       the drawn character reaches about 220px behind it — so a front clamped 120 short
+       of the mark was still a hundred pixels inside his hindquarters, which is exactly
+       the 'it covers Momo' that kept being reported. 340 puts the leading edge behind
+       his tail with daylight to spare. */
+    const front = Math.min(lerp(-620, him + 420, Math.pow(q, 0.8)), him - 340);
     ctx.save();
     /* NORMAL BLENDING, NOT ADDITIVE — and this is what turned it from a glow into snow.
        Additive white over a bright sky can only ever get brighter, so the cloud had no
