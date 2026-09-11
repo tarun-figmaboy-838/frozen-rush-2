@@ -1041,12 +1041,12 @@ export const CFG = {
            mouth is 923 and the slab lands past the right edge of the stage. At 80 the
            mouth is 778, the far lip 1684, and the slab sits comfortably on the path. */
         hexR: 80,
-        ditches: 1,
-        /* Four slots in the one crevasse: a piece each, so they meet edge to edge and
-           the four together are the floor. layoutLevelTwo cuts each to its own triangle
-           rather than to a shared width — they are 103 to 191px and a common size would
-           leave the widest overhanging by half. */
-        slots: 4,
+        /* TWO CREVASSES, and the slab stands on the pillar between them exactly as it
+           does on crossing 1 — the owner's ask, and the better picture: a block plainly
+           too big for what it is balanced on, with the holes it is about to fill either
+           side of it. The four pieces are shared two and two (shareOut), so each
+           crevasse is floored by a pair meeting edge to edge. */
+        ditches: 2,
         /* Bigger than crossing 1's, because the slab itself is smaller: at rest it is
            190px against the hexagon's 278, so the same on-screen working size needs a
            larger multiplier. 3.7 puts it at about 700 across. */
@@ -1070,9 +1070,10 @@ export const CFG = {
            triangles, so the crevasse is cut to hold three — decks totalling 469 at this
            size, a 700px mouth, far lip at 1615. Room to spare, unlike crossing 2. */
         // 80, for the same reason as crossing 2: the slab has to stand past the far lip
-        hexR: 80,
-        ditches: 1,
-        slots: 3,
+        // 90 with two crevasses: the three pieces share out 1 and 2, and at this size the
+        // pair of holes plus the pillar comes to 934 against the 960 the row allows
+        hexR: 90,
+        ditches: 2,
         /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
            width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
            in behind the question board. 2.15 keeps it clear. */
@@ -9860,6 +9861,30 @@ export function createGame(canvas, hooks = {}) {
    * different slab re-sizes the whole crossing by itself. */
   function quarterDecks() { return quarterPieces().map(q => q.deck); }
 
+  /* THE PIECES THIS CROSSING'S CUT WILL MAKE, left to right, as their deck widths.
+     One place that answers "what is about to come apart", so the crevasse, the slots
+     and the flight are all cut from the same list and cannot disagree. A crossing that
+     halves its slab makes two; both diagonals of a quadrilateral make four; two
+     diagonals from one corner fan a pentagon into three. */
+  function pieceDecks() {
+    const m = p2Cfg().mechanic;
+    if (m === 'draw-all-diagonals') return quarterDecks();
+    if (m === 'same-vertex-diagonals') return fanDecks();
+    // cut-diagonal: two halves, each spanning the main diagonal it was cut along
+    const d = minMainCut();
+    return [d, d];
+  }
+
+  /* HOW THE PIECES ARE SHARED OUT ACROSS THE CREVASSES.
+     Part 1's rule, and for the same reason: extra pieces go to the later holes, so
+     three across two gives a single-piece crossing and one bridged by two side by
+     side — the arrangement the brief drew. Four across two gives two and two. */
+  function shareOut(pieces, n) {
+    const share = new Array(n).fill(1);
+    for (let extra = pieces - n, i = n - 1; extra > 0; extra--, i = (i - 1 + n) % n) share[i]++;
+    return share;
+  }
+
   /* THE FAN two diagonals from one corner leave.
    *
    * From corner v of an n-gon, the diagonals to every non-neighbour cut it into n-2
@@ -9974,10 +9999,30 @@ export function createGame(canvas, hooks = {}) {
      to be unjumpable still fit between the character and the right edge. */
   function layoutLevelTwo(originX) {
     const C = p2Cfg();
-    const n = Math.max(1, Math.min(2, C.ditches || 2));      // one hole or two
-    const throatW = Math.round(minMainCut() * (1 - 2 * L2.bearing));
-    const gapW = Math.round(throatW * (L1.mouth || 1));      // the visible cut: the MOUTH
-    const groupW = gapW * n + L2.ditchGap * (n - 1);
+    const n = Math.max(1, Math.min(2, C.ditches || 2));
+
+    /* EVERY PIECE THE CUT WILL MAKE, left to right, and how wide each one rests.
+       The crossing is cut from these: each piece gets a slot its own width, the slots
+       are shared out across the crevasses, and each crevasse is as wide as the slots
+       in it. So the hole always fits what the learner is about to make, whichever
+       crossing this is and however many pieces its cut leaves. */
+    const decks = pieceDecks();
+    const share = shareOut(decks.length, n);
+
+    /* ONE CREVASSE PER SHARE. Its throat is the decks it holds, less the bearing they
+       take on the lips; its MOUTH is that flared by 1.6, which is what draws the
+       undercut. Unequal shares give unequal holes — which is the picture Part 1 already
+       draws when three answers cross two crevasses. */
+    let k = 0;
+    const plan = share.map(cnt => {
+      let sum = 0;
+      const mine = [];
+      for (let j = 0; j < cnt; j++) { mine.push(decks[k]); sum += decks[k]; k++; }
+      const throat = Math.round(sum * (1 - 2 * L2.bearing));
+      return { decks: mine, throat, mouth: Math.round(throat * (L1.mouth || 1)) };
+    });
+    const groupW = plan.reduce((a, q) => a + q.mouth, 0) + L2.ditchGap * (n - 1);
+
     const rowMid = (CFG.mammothX + L1.clearOfPlayer + (CFG.W - 60)) / 2;
     const lead = clamp(
       Math.max(Math.round(rowMid - groupW / 2), CFG.mammothX + L1.clearance),
@@ -9990,45 +10035,35 @@ export function createGame(canvas, hooks = {}) {
        which sits inside the platform; the opening the character stops at starts half an
        overhang further in. Without this shift he halts an overhang short of the edge he
        is supposed to be standing on — the same correction layoutPhase makes. */
-    const ins0 = (gapW - throatW) / 2;
-    let x = originX + lead - ins0;
-    for (let i = 0; i < n; i++) {
+    let x = originX + lead - (plan[0].mouth - plan[0].throat) / 2;
+    plan.forEach((q, i) => {
       /* The record is Level 1's, field for field, because everything downstream reads
          it: ground.drawDitch paints the undercut and the water, drawCracks runs the
          crack across it, updateBreak opens it, the pruner keeps it alive while it is
-         the current crossing, and drawRepairedPieces draws whatever is seated in it.
-         A second shape of gap record would mean a second copy of all of that. */
+         the current crossing, and drawRepairedPieces draws whatever is seated in it. */
       const g = ground.addGap({
-        x0: x, x1: x + gapW, throat: throatW, open: 0, repaired: false,
+        x0: x, x1: x + q.mouth, throat: q.throat, open: 0, repaired: false,
         crack: 0, crackPts: makeCrack(),
         bridge: 0, splashes: null, slots: [], pieces: []
       });
-      /* THE SLOTS SPAN THE THROAT — the neck a piece actually wedges at, inset inside
-         the wider mouth. Spanning the mouth instead would seat pieces against the void
-         rather than the opening, which is the same mistake in a second place.
-
-         One slot per PIECE, each cut to its own width. A crossing that halves its slab
-         puts one piece in each of two crevasses; one that quarters it lays four
-         side by side in a single wide crevasse, and those four are 103 to 191px, so a
-         shared width would leave the widest overhanging by half. Each gets its own. */
-      const ins = (gapW - throatW) / 2;
-      const decks = (C.slots > 1)
-        ? (C.mechanic === 'same-vertex-diagonals' ? fanDecks() : quarterDecks())
-        : null;
-      if (decks && decks.length) {
-        const total = decks.reduce((a, d) => a + d, 0) || 1;
-        let sx = x + ins;
-        decks.forEach((d, k) => {
-          const w = throatW * (d / total);           // its share of the opening
-          g.slots.push({ gapIndex: i, x0: sx, x1: sx + w, full: false, filled: false, reserved: false, kind: null });
-          sx += w;
+      /* A SLOT PER PIECE, each cut to its own deck and inset inside the wider mouth.
+         Spanning the mouth would seat pieces against the void rather than the opening,
+         and one shared width would leave the widest overhanging — the quadrilateral's
+         four decks differ by half. */
+      const ins = (q.mouth - q.throat) / 2;
+      const sum = q.decks.reduce((a, d) => a + d, 0) || 1;
+      let sx = x + ins;
+      q.decks.forEach(d => {
+        const w = q.throat * (d / sum);
+        g.slots.push({
+          gapIndex: i, x0: sx, x1: sx + w, full: q.decks.length === 1,
+          filled: false, reserved: false, kind: null
         });
-      } else {
-        g.slots.push({ gapIndex: i, x0: x + ins, x1: x + ins + throatW, full: true, filled: false, reserved: false, kind: null });
-      }
+        sx += w;
+      });
       gaps.push(g);
-      x += gapW + L2.ditchGap;
-    }
+      x += q.mouth + L2.ditchGap;
+    });
     // every slot across every crevasse, in left-to-right order — one per piece
     return { gaps, slots: gaps.reduce((a, g) => a.concat(g.slots), []) };
   }
@@ -10176,11 +10211,40 @@ export function createGame(canvas, hooks = {}) {
     const L = G.l2;
     if (i < 0 || j < 0 || i === j) return null;
     const n = L.pts.length;
-    if (Math.abs(i - j) === 1 || Math.abs(i - j) === n - 1) return null;   // a side: no real chord
-    const lo = Math.min(i, j), hi = Math.max(i, j);
-    const [pa, pb] = PolygonCutManager.split(L.pts, lo, hi);
+    let pa, pb;
+    if (Math.abs(i - j) === 1 || Math.abs(i - j) === n - 1) {
+      /* A SIDE STILL CUTS — it just cuts nothing worth having, and that IS the lesson.
+       *
+       * There is no chord between two neighbours, so a strict split returns the shape
+       * and an empty piece, and the slab used to drop whole with no visible cut at all:
+       * the child drew a line, the game took the slab away, and nothing on screen said
+       * a cut had happened. Reported as not being able to cut cleanly.
+       *
+       * So the blade takes a SLIVER off along that edge — which is what sawing down a
+       * side of anything actually does. The slab comes apart, plainly, into a thin
+       * wafer and the rest of itself, and the two fall together. What the learner sees
+       * is a clean cut that produced nothing useful, which is exactly why a side is the
+       * wrong answer and the thing the nudge is trying to say in words. */
+      const a = L.pts[i], b = L.pts[j];
+      const c = centroid(L.pts);
+      const bb = polyBounds(L.pts);
+      const depth = Math.max(10, Math.min(bb.w, bb.h) * 0.13);
+      const toward = (p) => {
+        const dx = c.x - p.x, dy = c.y - p.y;
+        const d = Math.hypot(dx, dy) || 1;
+        return { x: p.x + dx / d * depth, y: p.y + dy / d * depth };
+      };
+      const a2 = toward(a), b2 = toward(b);
+      pa = [a, b, b2, a2];                                  // the wafer
+      // the remainder: the ring with that edge pushed in
+      pb = L.pts.map((p, k) => (k === i ? a2 : k === j ? b2 : p));
+    } else {
+      [pa, pb] = PolygonCutManager.split(L.pts, Math.min(i, j), Math.max(i, j));
+    }
     if (pa.length < 3 || pb.length < 3) return null;
-    const vi = L.pts[lo], vj = L.pts[hi];
+    /* The two pieces part along the line that was drawn, whichever kind of cut it was
+       — its endpoints are the two corners either way. */
+    const vi = L.pts[i], vj = L.pts[j];
     let nx = -(vj.y - vi.y), ny = (vj.x - vi.x);
     const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;
     return [pa, pb].map(ring => {
