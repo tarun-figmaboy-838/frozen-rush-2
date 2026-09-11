@@ -96,10 +96,30 @@ export const CFG = {
    *
    * gravity is left alone: it sets the FEEL of the arc, and a floatier jump on the
    * same airtime reads as the character being lighter, which is not the fix. */
-  gravity: 3000,
-  jumpVel: -1470,          // apex 360px, airtime 0.98s (was 295px / 0.887s)
-  coyoteMs: 150,           // pressed a moment late off the ground still counts
-  bufferMs: 190,           // pressed a moment early still fires on landing
+  /* A WIDER ARC, AND IT IS THE AIRTIME THAT WIDENS — the height cannot.
+
+     Asked for: make the jump easier to land. The obvious lever is a higher jump and it
+     is not available: at the apex it already has, his feet are 360px up and his head is
+     at y 10, a hair from the top of the frame. Any more and he leaves the picture.
+
+     What actually decides whether a jump is easy is not how high it goes but how long
+     the press window is — the time he spends above the bar, less the time the rock
+     takes to cross him. So the apex is held at exactly 360 and the airtime stretched
+     from 0.98s to 1.30s, which takes the window from 0.45s to about 0.75s. Two thirds
+     more time to get the tap right, and he still fits on screen.
+
+     Holding the apex while stretching the airtime fixes both numbers: apex = v^2/2g and
+     airtime = 2v/g, so v = 4*apex/T and g = 8*apex/T^2. That is where these two come
+     from — they are solved, not tuned.
+
+     It reads floatier, and that is the trade. A lighter-feeling mammoth is the price of
+     a jump a child can actually land, and for this game that is the right way round.
+     The leap now covers 676px rather than 510; the rock spacing is derived from the
+     leap (see runRoomS) so the stretches re-space themselves and nothing else moves. */
+  gravity: 1704,
+  jumpVel: -1108,          // apex 360px (unchanged), airtime 1.30s (was 0.98s)
+  coyoteMs: 200,           // pressed a moment late off the ground still counts
+  bufferMs: 250,           // pressed a moment early still fires on landing
   /* THE LEAP GOES FORWARD, AND LANDS FORWARD.
    *
    * The character's world position is fixed at mammothX and the ground scrolls past
@@ -121,7 +141,8 @@ export const CFG = {
    * press window are untouched, and the jump is exactly as hard as it was tuned to be.
    * 120px is about a quarter of the ground a leap covers (520px/s x 0.98s = 510), which
    * reads as travel without putting him a body-length from his own hit box. */
-  jumpLead: 120, jumpLeadBackS: 0.75,
+  // a quarter of the ground a leap now covers (676), so the arc still reads as travel
+  jumpLead: 165, jumpLeadBackS: 0.9,
   totalDistance: 11200,
   // surfaceRatio anchors the path image to surfaceY. The art's faint top fringe starts
   // at src y~216 but its SOLID snow edge is at ~227, so the old 0.406 left the feet
