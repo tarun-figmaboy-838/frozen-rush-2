@@ -1971,7 +1971,7 @@ const CFG = {
            x 1.6) are both wide enough to be unjumpable and still fit the row. */
         hexR: 139,
         ditches: 2,
-        focusK: 3.20,
+        focusK: 3.71,
         instruction: 'Cut the shape along its diagonal.',
         voId: 'p2-1-diagonal'
       },
@@ -2002,7 +2002,7 @@ const CFG = {
         /* Bigger than crossing 1's, because the slab itself is smaller: at rest it is
            190px against the hexagon's 278, so the same on-screen working size needs a
            larger multiplier. 3.7 puts it at about 700 across. */
-        focusK: 5.50,
+        focusK: 6.16,
         instruction: 'Draw all the diagonals.',
         voId: 'p2-2-diagonals'
       },
@@ -2029,7 +2029,7 @@ const CFG = {
         /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
            width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
            in behind the question board. 2.15 keeps it clear. */
-        focusK: 4.70,
+        focusK: 5.16,
         instruction: 'Draw 2 diagonals from the same vertex.',
         voId: 'p2-3-samevertex'
       }
@@ -11577,6 +11577,15 @@ function createGame(canvas, hooks = {}) {
         L.pos.y = lerp(f.from.y, L.home.y, e);
         L.scale = lerp(f.from.scale, 1, e);
         L.spin = 0;
+        /* The pieces ride the slab back, already apart. They are what is drawn from the
+           first frame of the fall, so they have to be placed from the first frame too. */
+        if (L.debris) for (const pc of L.debris) {
+          pc.x = L.pos.x + pc.cx * L.scale;
+          pc.y = L.pos.y + pc.cy * L.scale;
+          pc.scale = L.scale;
+          pc.rot = 0;
+          pc.offset = 10 * e;          // they part a little as it shears
+        }
         // a shiver on the way back, so it plainly is not going to survive this
         L.shake = Math.max(L.shake || 0, 0.7);
         if (f.t >= 0.26) {
@@ -11843,7 +11852,17 @@ function createGame(canvas, hooks = {}) {
     /* THE PIECES A BAD CUT MADE, falling. Drawn instead of the slab, because the slab
        no longer exists — it came apart along the line the learner drew, and what is on
        screen is the two things they actually made going into the water. */
-    if (L.debris && L.fall && L.fall.phase === 'drop') {
+    /* THE PIECES ARE DRAWN FOR THE WHOLE FALL, not only once they are dropping.
+       They were shown on the drop alone, so the beat before it — the slab travelling
+       back to the pillar — still drew the slab WHOLE with a crack line over it. That
+       crack was stored in stage coordinates taken while the slab was at centre stage
+       and 6x its resting size, then re-projected through a position and scale that
+       were both changing: it slid across the face as the slab shrank and moved, and
+       what it ended up looking like was a cut in a different place from the one the
+       learner drew. Drawing the real pieces from the first frame removes the whole
+       class of problem — the cut you see IS the cut that was made, because it is the
+       geometry rather than a line drawn on top of it. */
+    if (L.debris && L.fall) {
       for (const pc of L.debris) drawL2Piece(ctx, pc);
       return;
     }
