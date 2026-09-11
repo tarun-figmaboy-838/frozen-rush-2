@@ -116,8 +116,25 @@ export const CFG = {
      a jump a child can actually land, and for this game that is the right way round.
      The leap now covers 676px rather than 510; the rock spacing is derived from the
      leap (see runRoomS) so the stretches re-space themselves and nothing else moves. */
-  gravity: 1704,
-  jumpVel: -1108,          // apex 360px (unchanged), airtime 1.30s (was 0.98s)
+  /* AND THAT TRADE WAS TAKEN TOO FAR. 1.30s was called slow, which it is: it is a third
+     of a second longer than the 0.98 it came from and the extra is all spent hanging at
+     the top, where the arc is flattest and the character moves least.
+
+     So the stretch is halved rather than undone. T = 1.08 by the same two formulas —
+     v = 4*apex/T, g = 8*apex/T^2 — with the apex still pinned at 360 because his head
+     is still at y 10 there.
+
+     What that costs and keeps, measured the same way as above: he is above the bar for
+     T*sqrt(1 - 63/360) = 0.98s, the rock crosses him in 0.44s, so the press window is
+     0.54s. It was 0.45s before any of this and 0.75s at 1.30 — so two thirds of the
+     easing is kept, and the flight is a fifth shorter than the one that read as slow.
+     coyoteMs and bufferMs are untouched and add another 0.45s of their own on top.
+
+     The other half of "slow" was not the physics at all — see the JUMP_AIR poses, which
+     were keyed to absolute vertical speeds and so held one static frame for longer and
+     longer as the airtime grew. They are keyed to the fraction of the flight now. */
+  gravity: 2469,
+  jumpVel: -1333,          // apex 360px (unchanged), airtime 1.08s (was 1.30s, 0.98s before that)
   coyoteMs: 200,           // pressed a moment late off the ground still counts
   bufferMs: 250,           // pressed a moment early still fires on landing
   /* THE LEAP GOES FORWARD, AND LANDS FORWARD.
@@ -846,6 +863,7 @@ export const CFG = {
         distractors: ['regularPentagon', 'regularHeptagon'],
         rotate: 0, swing: 0,
         instruction: 'Cut the concave polygon.',
+        voId: 'p2-4-concave',
         sub: 'Choose the polygon that is concave.' },
 
       /* The mirror, and it matters that it comes second: having found the dented one,
@@ -856,6 +874,7 @@ export const CFG = {
         distractors: ['concavePentagon', 'concaveHeptagon'],
         rotate: 0, swing: 0,
         instruction: 'Cut the convex polygon.',
+        voId: 'p2-5-convex',
         sub: 'Choose the polygon that is convex.' },
 
       /* TWO ANSWERS, and two properties at once. Both concave pentagons are wanted; the
@@ -869,6 +888,7 @@ export const CFG = {
         distractors: ['regularPentagon', 'concaveHeptagon'],
         rotate: 0, swing: 0,
         instruction: 'Cut the concave pentagon.',
+        voId: 'p2-6-concave-pentagon',
         /* THE SUB-LINE CARRIES THE COUNT. The instruction is the owner's wording and
            is singular; this level wants BOTH concave pentagons, and a child told to cut
            'the' one would cut one and wait. The second line is where that is said, so
@@ -882,6 +902,7 @@ export const CFG = {
         distractors: ['regularPentagon', 'concaveHexagon'],
         rotate: 0, swing: 0,
         instruction: 'Cut the convex hexagon.',
+        voId: 'p2-7-convex-hexagon',
         // two answers here as well; see the note on level 6
         sub: 'Choose both polygons that are convex hexagons.' },
 
@@ -895,6 +916,7 @@ export const CFG = {
         distractors: ['regularPentagon', 'irregularConvexHexagon', 'regularOctagon'],
         rotate: 0, swing: 0,
         instruction: 'Cut all the concave polygons.',
+        voId: 'p2-8-all-concave',
         sub: 'Choose all the polygons that are concave.' },
 
       /* The last, and the widest: three convex answers spread across a triangle, a
@@ -905,6 +927,7 @@ export const CFG = {
         distractors: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
         rotate: 0, swing: 0,
         instruction: 'Cut all the convex polygons.',
+        voId: 'p2-9-all-convex',
         sub: 'Choose all the polygons that are convex.' }
     ],
     // which phases are preceded by a rock to jump, so it never becomes every phase
@@ -1045,7 +1068,13 @@ export const CFG = {
            x 1.6) are both wide enough to be unjumpable and still fit the row. */
         hexR: 139,
         ditches: 2,
-        focusK: 3.71,
+        /* 30% DOWN FROM 3.71, on the owner's call. At 3.71 the hexagon was 1030px
+           across a 1920 stage and its corners sat within a handle's width of the
+           edges — the handles are what the level is played with, and a handle you
+           cannot reach past is a handle you cannot drag from. 2.60 brings it to about
+           720, which is still the largest thing on the screen by a distance. The same
+           0.7 is applied to all three so the crossings stay a set. */
+        focusK: 2.60,
         instruction: 'Cut the shape along its diagonal.',
         voId: 'p2-1-diagonal'
       },
@@ -1075,8 +1104,9 @@ export const CFG = {
         ditches: 2,
         /* Bigger than crossing 1's, because the slab itself is smaller: at rest it is
            190px against the hexagon's 278, so the same on-screen working size needs a
-           larger multiplier. 3.7 puts it at about 700 across. */
-        focusK: 6.16,
+           larger multiplier. 6.16 put it at about 1170 across, which overran the stage
+           on the right; 0.7 of that — the same cut taken on all three — is 4.31. */
+        focusK: 4.31,
         instruction: 'Draw all the diagonals.',
         voId: 'p2-2-diagonals'
       },
@@ -1102,8 +1132,10 @@ export const CFG = {
         ditches: 2,
         /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
            width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
-           in behind the question board. 2.15 keeps it clear. */
-        focusK: 5.16,
+           in behind the question board — which it was doing again at 5.16, the crown
+           touching the board's underside. 0.7 of that, the same cut as the other two,
+           is 3.61 and leaves real air above the apex. */
+        focusK: 3.61,
         instruction: 'Draw 2 diagonals from the same vertex.',
         voId: 'p2-3-samevertex'
       }
@@ -1145,6 +1177,14 @@ export const CFG = {
        At 1350 the question arrived while that was still being taken in and the beat
        read as a stutter before the real thing. A tap still skips it. */
     overviewMs: 2200,
+    /* AND IT GROWS INTO BEING AT THE START OF THAT BEAT — it is not standing there when
+       the beat opens. The ground breaking apart and a block simply BEING on the pillar
+       on the next frame was reported as "in this stage shape appear suddenly", and it is
+       the same note as the one about the plug landing in the ditch: ice does not arrive,
+       it accretes. 900ms, which fits inside the overview twice over, so the formation is
+       finished and the picture is settled long before the glow singles it out at 1440.
+       See drawSlabForming for what actually happens on screen. */
+    formMs: 900,
     /* Then the slab announces itself: it glows and swells in place before it travels.
        The glow is what says "this one" — without it the move reads as the game taking
        the object away rather than as the object being picked up.
@@ -1656,14 +1696,43 @@ export const PolygonFactory = {
     }));
     /* WHICH CORNERS TURN THE WRONG WAY — the notch. A convex shape has none and every
        branch below collapses to "longest edge up", which is what this always did. */
+    /* AND IT HAS TO SURVIVE A TRACED OUTLINE, which is what broke it.
+     *
+     * This took the raw cross product and called any corner whose sign was in the
+     * minority a notch. On a hand-built polygon that is exactly right. On a ring traced
+     * off a PNG it is nonsense: a traced outline carries dozens of nearly-straight
+     * corners whose cross products are tiny and whose signs are pure rounding noise, so
+     * `reflex` came back holding half the perimeter scattered evenly round the shape.
+     * Every candidate edge then scored the same average lowness, the notch term
+     * cancelled out, and the scoring collapsed to plain "longest edge up" — which is
+     * how a concave plug ended up seated with its notch ON THE WALKING SURFACE, a V of
+     * open water cut into the path the mammoth is about to run across. Reported twice:
+     * "this shape fit odd" and "not fit correctlly".
+     *
+     * Two changes make it hold. The turn is measured as the SINE of the angle between
+     * the two edges — the cross product over both their lengths — which is scale-free
+     * and comparable between a 6px traced segment and a 200px one, and anything under
+     * about seven degrees is discarded as noise rather than counted as a corner. And
+     * the direction is taken from the ring's SIGNED AREA rather than from a show of
+     * hands: for any simple polygon a convex corner turns with the winding and a reflex
+     * corner against it, so the winding is the definition and counting was only ever an
+     * approximation of it that a noisy outline could outvote. */
     const cross = i => {
       const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
-      return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+      const ux = b.x - a.x, uy = b.y - a.y, vx = c.x - b.x, vy = c.y - b.y;
+      const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+      if (lu < 1e-6 || lv < 1e-6) return 0;
+      return (ux * vy - uy * vx) / (lu * lv);           // sin of the turn, -1..1
     };
     const turns = pts.map((_, i) => cross(i));
-    const pos = turns.filter(t => t > 0).length, neg = turns.filter(t => t < 0).length;
-    const sign = pos >= neg ? -1 : 1;                   // the minority turn is the notch
-    const reflex = pts.map((_, i) => i).filter(i => Math.sign(turns[i]) === sign && turns[i] !== 0);
+    let area2 = 0;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      area2 += a.x * b.y - b.x * a.y;
+    }
+    const wind = area2 >= 0 ? 1 : -1;
+    const TURN = 0.12;                                  // ~7 degrees
+    const reflex = pts.map((_, i) => i).filter(i => turns[i] * wind < -TURN);
 
     /* THE EDGE IT RESTS ON, and for a CONCAVE shape the longest one is often the wrong
        choice. A notch is a bite out of the outline: land it on top and the walking
@@ -4086,9 +4155,51 @@ class PlayerController {
         /* The pose follows the vertical speed; each hands over to the next by a dissolve across
            the 180 units of speed before its threshold, so the four flight poses read as one arc
            instead of four cuts. */
-        const TH = [[-420, J.rise, J.apex], [160, J.apex, J.fall], [760, J.fall, J.preLand]];
-        f = this.vy < -420 ? J.rise : this.vy < 160 ? J.apex : this.vy < 760 ? J.fall : J.preLand;
-        for (const [thr, from, to] of TH) if (f === from && this.vy > thr - 180 && this.vy < thr) { blendF = to; blendU = (this.vy - (thr - 180)) / 180; }
+        /* KEYED TO THE FRACTION OF THE FLIGHT, NOT TO ABSOLUTE SPEEDS.
+         *
+         * The thresholds used to be -420, 160 and 760 px/s with a 180-wide dissolve, and
+         * those numbers were chosen against a particular jumpVel. Retuning the jump
+         * moves the range they sit in but not the numbers, so the poses drift: when the
+         * airtime went to 1.30s the apex pose alone covered a third of a second of held,
+         * unchanging frame. That is half of what "the jump looks slow and laggy" was —
+         * not the arc, the animation standing still in the middle of it.
+         *
+         * `u` is 0 at take-off and 1 at touchdown and is linear in time (vy is), so the
+         * same fractions divide the flight identically at any tuning: rise for the first
+         * 36%, apex to 55%, fall to 76%, preLand home. They are the fractions the old
+         * absolute numbers worked out to at the jumpVel they were written for, so the
+         * arc looks as it was drawn to look — it just cannot come adrift again. */
+        const u = clamp((this.vy - CFG.jumpVel) / Math.max(1, -2 * CFG.jumpVel), 0, 1);
+        /* AND IT CROSSFADES THE WHOLE WAY, rather than holding each pose and dissolving
+         * at the last moment.
+         *
+         * This is the other half of "the jump looks slow and lag", and the bigger half.
+         * There are four poses for a flight that now lasts 1.08s. The dissolve used to
+         * span 6% of that, so each pose was HELD, unchanging, for between 0.2 and 0.4
+         * seconds and then swapped over five frames. Twelve to twenty-four identical
+         * frames in a row is not slow motion, it is a stall, and no amount of retuning
+         * the physics fixes it — at the old 1.30s airtime the apex pose alone held for
+         * a third of a second.
+         *
+         * So the poses are keyframes at fixed points in the flight and the draw is
+         * always a dissolve between the two that bracket where he is. Every frame is a
+         * different picture. Smoothstepped rather than linear, so he still settles into
+         * each pose and moves quickly between them — a linear fade between four frames
+         * reads as a dip to half-opacity, which is mush; eased, it reads as a body
+         * turning over.
+         *
+         * The keys sit at the middles of the old bands rather than at their edges,
+         * because a keyframe is the moment a pose is TRUE, not the moment it starts. */
+        const KEY = [[0.10, J.rise], [0.42, J.apex], [0.64, J.fall], [0.88, J.preLand]];
+        if (u <= KEY[0][0]) f = KEY[0][1];
+        else if (u >= KEY[KEY.length - 1][0]) f = KEY[KEY.length - 1][1];
+        else {
+          let i = 0;
+          while (i < KEY.length - 2 && u > KEY[i + 1][0]) i++;
+          const [ua, fa] = KEY[i], [ub, fb] = KEY[i + 1];
+          const t = clamp((u - ua) / (ub - ua), 0, 1);
+          f = fa; blendF = fb; blendU = t * t * (3 - 2 * t);
+        }
         break;
       }
       case 'LAND':
@@ -5747,8 +5858,15 @@ export function createGame(canvas, hooks = {}) {
     return m ? 'sign-' + m[1].toLowerCase() + (m[2] ? 's' : '') : '';
   }
   /* THE QUESTION IS SPOKEN as the plank arrives (stage beat 1), once per phase. */
+  /* THE LINE IS NAMED ON THE CROSSING, not guessed from its sentence.
+     voIdFor() pulls "the <word>" off the end of a question — which worked for Part 1
+     ("Cut the TRIANGLE.") and matches nothing in Part 2, where every sentence has an
+     adjective in the way ("Cut the concave POLYGON."). So every one of them was
+     silent, and would have stayed silent after the recordings arrived. Each crossing
+     names its own id now; voIdFor stays as the fallback. */
   function sayPhaseQuestion() {
-    const id = voIdFor(phaseCfg() && phaseCfg().instruction);
+    const p = phaseCfg();
+    const id = (p && p.voId) || voIdFor(p && p.instruction);
     if (id && G.saidQuestion !== id) { G.saidQuestion = id; G.voDur = audio.say(id) || 0; }
   }
   function updateInstruction(dt) {
@@ -5855,6 +5973,25 @@ export function createGame(canvas, hooks = {}) {
       signCentre: !!G.l2 && L2_PUZZLE_STATES.includes(G.state),
       // how long the spoken question runs, so the HUD can reveal the words in step with it
       voDur: G.voDur || 0,
+      /* THE TRAIL. Two integers: how many of the nine crossings are behind the learner,
+         and how many there are. Everything the trail does — which stone glows, where
+         Momo stands, when the cave lights — is derived from these in hud.js, so the
+         engine owns the count and the DOM owns the picture.
+
+         Both change once per crossing, which is the point: the HUD payload is diffed
+         as a whole string (see the note above this function) and a key that moves every
+         frame defeats the diff for everything else. `progress` used to be exactly that
+         mistake and was removed for it; this is the same word and deliberately not the
+         same thing.
+
+         Part 2's three drawing crossings run first and are counted by p2i; the six rope
+         crossings follow and are counted by phase. Clamped, because phase is left at
+         phases.length for a frame after the last one is repaired. */
+      step: G.complete ? p2Count() + L1.phases.length
+        : (G.p2i < p2Count()
+            ? G.p2i
+            : p2Count() + Math.min(G.phase, L1.phases.length)),
+      steps: p2Count() + L1.phases.length,
       jumpEnabled: G.jumpEnabled, complete: G.complete,
       // TEMPORARY: whether the review control that jumps to the ending may show
       skippable: G.state !== 'BOOT' && G.state !== 'TITLE' && !G.complete,
@@ -7288,6 +7425,12 @@ export function createGame(canvas, hooks = {}) {
      recovering. Per second of game time. (These sat beside the old deck code and were
      nearly lost with it — they belong here, with the one function that reads them.) */
   const PIECE_GROW = 3.3, PIECE_IMPACT = 2.7;
+  /* AND HOW LONG THE ICE TAKES TO CLOSE OVER IT. Its own clock, slower than the settle
+     on purpose: `grow` is done in 300ms, which is under twenty frames, and the freeze is
+     the beat where the learner's answer visibly becomes the ground. 1.15 is ~870ms —
+     long enough to watch, and still inside bridgeMs (620) plus the flight before it, so
+     nothing that waits on the crossing waits on this. */
+  const PIECE_FREEZE = 1.15;
   function updatePieces(dt) {
     for (const g of ground.gaps) {
       if (!(g.pieces && g.pieces.length)) continue;
@@ -7295,6 +7438,21 @@ export function createGame(canvas, hooks = {}) {
         if (p.grow === undefined) p.grow = 0;
         if (p.grow < 1) p.grow = clamp(p.grow + dt * PIECE_GROW, 0, 1);
         if (p.impact) p.impact = Math.max(0, p.impact - dt * PIECE_IMPACT);
+        if (p.frz === undefined) p.frz = 0;
+        if (p.frz < 1) {
+          p.frz = clamp(p.frz + dt * PIECE_FREEZE, 0, 1);
+          /* ONE BURST ON THE FRAME IT TAKES. Glints off the join at the moment the
+             frost closes, placed on the CROSSING and not over the character — the same
+             rule the seal already follows, because the crossing is the thing that was
+             just fixed. */
+          if (p.frz >= 0.66 && !p.frzPop) {
+            p.frzPop = true;
+            if (!reduced) {
+              particles.sparkle(p.cx - G.worldX, CFG.surfaceY - 8, 7, 120);
+              particles.frost(p.cx - G.worldX, CFG.surfaceY - 4, 5);
+            }
+          }
+        }
       }
     }
   }
@@ -8393,8 +8551,19 @@ export function createGame(canvas, hooks = {}) {
           G.l1 = null; G.gapsThisPhase = null;
           G.phase++;
           G.hitCount = 0; G.phaseJumped = false;    // a fresh phase, a fresh slate
-          // every crossing repaired: on to Level 2, or straight home if it is switched off
-          if (G.phase >= L1.phases.length) setState(L2_ON ? 'RUN_SEGMENT_2' : 'FINAL_RUN');
+          /* EVERY CROSSING REPAIRED: HOME. And this is the end of the WHOLE journey now,
+             which it did not used to be.
+             This read `L2_ON ? 'RUN_SEGMENT_2' : 'FINAL_RUN'` — correct when Part 1's six
+             crossings came first and Part 2's one was tacked on the end. Part 2's three
+             drawing crossings come FIRST now (see BRIDGE_2_COMPLETE, which hands over to
+             PHASE_RUN once p2i reaches p2Count), so the rope crossings are the last six
+             of the nine and there is nothing after them. Sending the player back into
+             RUN_SEGMENT_2 sent them round the Part 2 loop again with p2i already spent —
+             a tenth crossing that should not exist, and no ending. It is why a full
+             playthrough finished at RUN_SEGMENT_2 on phase 6 instead of COMPLETE, and it
+             is the "why i see extra levels" report.
+             Nine crossings, then the run home, then the celebration. */
+          if (G.phase >= L1.phases.length) setState('FINAL_RUN');
           else setState('PHASE_RUN');
         }
         break;
@@ -9560,18 +9729,178 @@ export function createGame(canvas, hooks = {}) {
      path is bitmap art. The mend is cut from the path's own tiles instead, so there
      is nothing left for a deck to do. */
 
+  /** The seated piece's outline in SCREEN space, as points. The clip and the freeze-in
+      are both built from this one list, because they have to agree to the pixel — frost
+      crawling along an edge the ice is not actually on is worse than no frost at all. */
+  function pieceOutline(p, cx, cy, k, roll) {
+    const c = Math.cos(roll), sn = Math.sin(roll);
+    return p.pts.map(q => ({
+      x: cx + (q.x * c - q.y * sn) * k,
+      y: cy + (q.x * sn + q.y * c) * k
+    }));
+  }
+
   /** The seated piece's outline in SCREEN space, so it can be used as a clip for the
       path pixels that fill it. */
   function pieceSilhouette(p, cx, cy, k, roll) {
-    const c = Math.cos(roll), sn = Math.sin(roll);
     const path = new Path2D();
-    p.pts.forEach((q, i) => {
-      const x = cx + (q.x * c - q.y * sn) * k;
-      const y = cy + (q.x * sn + q.y * c) * k;
-      if (i === 0) path.moveTo(x, y); else path.lineTo(x, y);
+    pieceOutline(p, cx, cy, k, roll).forEach((q, i) => {
+      if (i === 0) path.moveTo(q.x, q.y); else path.lineTo(q.x, q.y);
     });
     path.closePath();
     return path;
+  }
+
+  /* THE ANSWER FREEZES INTO THE CROSSING. It does not simply appear in it.
+   *
+   * This is the single most important moment in a level — the shape the learner chose
+   * stops being an answer and becomes the ground they are about to run across — and it
+   * was being spent on one frame and a white outline. A block at full size popping into
+   * a hole reads as a sprite being placed. Ice forming reads as the world accepting it.
+   *
+   * So: the frost takes at the two lips the plug is resting on, races round its edge
+   * from both contacts at once, ferns inward across the face, flashes white as it
+   * closes, and clears.
+   *
+   * THREE RULES THIS KEEPS.
+   *
+   * It is an OVERLAY and nothing else. The plug underneath is drawn exactly as it was,
+   * at its final size on frame one — the standing rule, that an answer is never seen to
+   * change size. Delete this function and the crossing is still correct; it would just
+   * be dull again.
+   *
+   * It ENDS AT NOTHING. `f >= 1` returns on the first line, so once the beat is over
+   * there is no residue on the finished bridge and no per-frame cost for the rest of
+   * the run — the mended crossing looks exactly as it looked before this existed.
+   *
+   * It is DETERMINISTIC. Every angle and length comes from the piece's own seed, so a
+   * plug frosts the same way on every frame it is drawn. Math.random() here would make
+   * the crystals seethe.
+   *
+   * `f` is p.frz, its own clock — see PIECE_FREEZE. p.grow is over in 300ms, which is
+   * under twenty frames, and the whole point of this beat is that it can be watched.
+   */
+  function drawFreezeIn(ctx, p, sil, pts, f) {
+    if (f >= 1 || pts.length < 3) return;
+
+    const seed = ((p.seed || 7) % 997) * 0.618;
+    const rnd = n => { const s = Math.sin(seed + n * 78.233) * 43758.5453; return s - Math.floor(s); };
+
+    let mx = 0, my = 0;
+    for (const q of pts) { mx += q.x; my += q.y; }
+    mx /= pts.length; my /= pts.length;
+
+    const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+
+    /* WHERE IT STARTS: the two ends of the highest edge, which are the corners actually
+       touching the lips of the crevasse. Ice grows from contact, so starting the frost
+       anywhere else — the centre, the bottom, everywhere at once — would read as the
+       shape glowing rather than as it freezing to something. */
+    const hi = pts.slice().sort((a, b) => a.y - b.y);
+    const roots = [hi[0], hi[1]];
+    const bell = Math.sin(clamp(f, 0, 1) * Math.PI);
+
+    /* THE RIME TAKES AND CLEARS — a white-blue wash over the face that peaks halfway
+       and goes. It has to end at zero: a wash that stayed would be a recolour of the
+       learner's answer, and the answer has to stay the thing they cut. */
+    ctx.save();
+    ctx.clip(sil);
+    ctx.fillStyle = `rgba(228,247,255,${(0.36 * bell).toFixed(3)})`;
+    ctx.fill(sil);
+
+    /* AND THE FREEZE FRONT CROSSES IT, top to bottom, a little ahead of the crystals —
+       the bright line where liquid is becoming solid. Soft on both sides so it is a
+       front and not a wipe. */
+    const span = (y1 - y0) + 140;
+    const front = y0 - 70 + span * clamp(f * 1.22, 0, 1);
+    const sweep = ctx.createLinearGradient(0, front - 78, 0, front + 30);
+    sweep.addColorStop(0, 'rgba(255,255,255,0)');
+    sweep.addColorStop(0.74, `rgba(244,253,255,${(0.52 * (1 - f)).toFixed(3)})`);
+    sweep.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sweep;
+    ctx.fillRect(x0 - 12, y0 - 12, (x1 - x0) + 24, (y1 - y0) + 24);
+
+    /* THE CRYSTALS. Sampled round the outline; each one's start time comes from how far
+       round it is from the NEARER lip, so the frost travels the perimeter instead of
+       arriving everywhere on the same frame. They grow inward, lean off the normal so
+       they are a crystal field and not a comb, and melt back as the beat ends. */
+    if (!reduced) {
+      let per = 0;
+      const rim = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        const L = Math.hypot(b.x - a.x, b.y - a.y);
+        per += L;
+        const n = Math.max(1, Math.round(L / 24));
+        for (let j = 0; j < n; j++) {
+          const t = (j + 0.5) / n;
+          const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+          const ix = mx - x, iy = my - y, il = Math.hypot(ix, iy) || 1;
+          rim.push({ x, y, nx: ix / il, ny: iy / il });
+        }
+      }
+      const half = Math.max(1, per * 0.5);
+      const gone = clamp((f - 0.70) / 0.30, 0, 1);
+      rim.forEach((s, i) => {
+        const d = Math.min(Math.hypot(s.x - roots[0].x, s.y - roots[0].y),
+                           Math.hypot(s.x - roots[1].x, s.y - roots[1].y));
+        const cg = easeOut(clamp((f - clamp(d / half, 0, 1) * 0.60) / 0.34, 0, 1));
+        if (cg <= 0) return;
+        const a = 0.92 * cg * (1 - gone);
+        if (a < 0.025) return;
+        const len = (12 + rnd(i) * 30) * cg;
+        const w = 2.4 + rnd(i + 31) * 3.2;
+        const lean = rnd(i + 57) * 0.7 - 0.35;
+        const dx = s.nx * Math.cos(lean) - s.ny * Math.sin(lean);
+        const dy = s.nx * Math.sin(lean) + s.ny * Math.cos(lean);
+        const px = -dy, py = dx;
+        ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(s.x + px * w, s.y + py * w);
+        ctx.lineTo(s.x + dx * len, s.y + dy * len);
+        ctx.lineTo(s.x - px * w, s.y - py * w);
+        ctx.closePath();
+        ctx.fill();
+        // one barb on the long ones, which is the difference between a crystal and a shard
+        if (len > 25) {
+          const side = rnd(i + 91) > 0.5 ? 1 : -1;
+          const bx = s.x + dx * len * 0.55, by = s.y + dy * len * 0.55;
+          ctx.strokeStyle = `rgba(255,255,255,${(a * 0.75).toFixed(3)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(bx + (dx * 0.5 + px * side) * len * 0.34,
+                     by + (dy * 0.5 + py * side) * len * 0.34);
+          ctx.stroke();
+        }
+      });
+    }
+    ctx.restore();
+
+    /* THE WELD AT EACH LIP — brightest where it is actually joined. Inside no clip, so
+       it spills a few pixels onto the ice on either side: that spill IS the join. */
+    const weld = 0.62 * bell;
+    if (weld > 0.02) {
+      for (const r of roots) {
+        const gr = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, 34);
+        gr.addColorStop(0, `rgba(255,255,255,${weld.toFixed(3)})`);
+        gr.addColorStop(0.55, `rgba(232,249,255,${(weld * 0.45).toFixed(3)})`);
+        gr.addColorStop(1, 'rgba(226,246,255,0)');
+        ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.arc(r.x, r.y, 34, 0, 6.2832); ctx.fill();
+      }
+    }
+
+    /* AND THE EDGE LIGHTS as the freeze passes. This is the rim that was here before,
+       kept: it is what makes the plug's outline read against the dark of the crevasse
+       in the frames where it matters most. */
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,255,255,${(0.92 * (1 - f)).toFixed(3)})`;
+    ctx.lineWidth = 3 + 9 * (1 - f);
+    ctx.stroke(sil);
+    ctx.restore();
   }
 
   /* The mend itself. */
@@ -9617,6 +9946,7 @@ export function createGame(canvas, hooks = {}) {
 
     const gx0 = g.x0 - G.worldX, gx1 = g.x1 - G.worldX;
     const waterY = CFG.surfaceY + CFG.levelOne.waterDepth;
+    const outline = pieceOutline(p, cx, cy, kk, roll);
     const sil = pieceSilhouette(p, cx, cy, kk, roll);
 
     ctx.save();
@@ -9663,14 +9993,10 @@ export function createGame(canvas, hooks = {}) {
     }
     ctx.restore();
 
-    // while it is still growing, frost blooms along the leading edges
-    if (e < 1) {
-      ctx.save();
-      ctx.strokeStyle = `rgba(255,255,255,${(0.9 * (1 - e)).toFixed(3)})`;
-      ctx.lineWidth = 10;
-      ctx.stroke(sil);
-      ctx.restore();
-    }
+    /* AND IT FREEZES IN. This replaced a single fading white outline: see drawFreezeIn
+       for why the moment an answer becomes the path deserves more than that. Its own
+       clock, p.frz, because p.grow is over in 300ms. */
+    drawFreezeIn(ctx, p, sil, outline, p.frz === undefined ? 1 : p.frz);
 
 
   }
@@ -9682,6 +10008,122 @@ export function createGame(canvas, hooks = {}) {
     return c;
   }
 
+
+  /* THE DECK — the ice that closes the last of the crossing over the answer.
+   *
+   * MEASURED, not guessed. Phase 5's second crevasse has a 260px throat bridged by a
+   * quadrilateral and an octagon. The quadrilateral's walking surface is its whole
+   * width, 132px. The OCTAGON's is 58px of its 133 — a regular octagon's flat top is
+   * 0.41 of its width — so of 260px of crossing, 70px had nothing over it at all: a
+   * hole at the seam between the two plugs, and a bigger one against the right lip.
+   * That single fact is every one of "this shape fit odd", "not fit correctlly" and
+   * "not connect and fit", and it is why a hexagon pair showed a bowtie between them.
+   *
+   * WHY NOT SIMPLY CUT A NARROWER DITCH. Because it would then have to be cut to the
+   * narrowest TOP EDGE among the phase's options rather than the narrowest width — 58px
+   * for an octagon against 133 for a triangle. The size of the hole would tell the
+   * learner which shape fits before they had answered it. Every ditch in a phase is
+   * deliberately identical for exactly that reason (see layoutPhase) and that has to
+   * stay true, so the geometry stands and the ice closes over it instead. Which is what
+   * ice does.
+   *
+   * WHAT IT IS NOT is a bar across the hole. Three earlier attempts here — a deck, a
+   * snow band, an ice collar — each spanned the whole crevasse and each read as
+   * something added to the answer. This is sampled against the TOP OF WHATEVER IS
+   * UNDERNEATH: it has exactly zero height where a plug already reaches the snow line,
+   * a thin wedge over a slanted shoulder, a notch-shaped patch over a notch. The
+   * silhouette the learner cut is never covered, because where the shape is there is
+   * nothing to fill. And it is capped at DECK_MAX below the line, so it cannot reach
+   * across an empty slot — a half-answered crevasse still reads as plainly open.
+   */
+  const DECK_MAX = 28;
+
+  /** The top surface of everything seated in this crevasse, sampled across its throat.
+      Cached: nothing moves once a plug is down, and this walks every edge of every plug
+      once per sample. Keyed on the piece count so a crevasse still filling up
+      recomputes as each answer lands. Stored in WORLD x, because the world scrolls. */
+  function deckProfile(g) {
+    const n = (g.pieces || []).length;
+    if (g._deck && g._deckN === n) return g._deck;
+    const x0 = g.x0 + ((g.x1 - g.x0) - g.throat) / 2;      // the throat, inside the mouth
+    const x1 = x0 + g.throat;
+    const floor = CFG.surfaceY + DECK_MAX;
+    const out = [];
+    for (let x = x0; x <= x1 + 0.01; x += 5) {
+      let top = floor;
+      for (const p of (g.pieces || [])) {
+        const kk = Math.max(p.fit || 1, 0.001);
+        const pcy = CFG.surfaceY + PLUG_SINK - (p.topLocal || 0) * kk;
+        const lx = (x - p.cx) / kk;
+        const pts = p.pts;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          const dx = b.x - a.x;
+          if (Math.abs(dx) < 1e-6) continue;
+          if ((a.x - lx) * (b.x - lx) > 0) continue;        // this edge does not span lx
+          const y = pcy + (a.y + (b.y - a.y) * ((lx - a.x) / dx)) * kk;
+          if (y < top) top = y;
+        }
+      }
+      out.push({ x, y: Math.min(top, floor) });
+    }
+    /* SMOOTHED, or it is a row of boxes. The raw profile steps vertically wherever a
+       plug's edge is — 34px straight down against the lip, straight back up at the next
+       plug — and filled, those steps read as white blocks jammed in the hole rather
+       than as snow that has drifted into it. A five-tap mean turns every cliff into a
+       slope, which is both what drifted snow looks like and what a foot could cross. */
+    const sm = out.map((q, i) => {
+      let s = 0, c = 0;
+      for (let k = -2; k <= 2; k++) {
+        const o = out[i + k];
+        if (o) { s += o.y; c++; }
+      }
+      return { x: q.x, y: s / c };
+    });
+    g._deck = sm; g._deckN = n;
+    return sm;
+  }
+
+  /** The fill itself, grown on `g.bridge` — the clock that already means "the ice is
+      creeping out from the lips to meet what is wedged in the middle", so the deck
+      closing IS that, rather than a second animation saying the same thing. */
+  function drawDeck(ctx, g) {
+    if (!g.repaired || !(g.pieces && g.pieces.length)) return;
+    const grow = clamp(g.bridge === undefined ? 1 : g.bridge, 0, 1);
+    if (grow <= 0.002) return;
+    const prof = deckProfile(g);
+    if (prof.length < 2) return;
+    const y0 = CFG.surfaceY - 5;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(prof[0].x - G.worldX, y0);
+    for (const q of prof) ctx.lineTo(q.x - G.worldX, y0 + (q.y - y0) * grow);
+    ctx.lineTo(prof[prof.length - 1].x - G.worldX, y0);
+    ctx.closePath();
+    /* The path's own two colours, snow over ice, so the fill belongs to the ground it
+       is mending rather than to the block it is mending around. */
+    const gr = ctx.createLinearGradient(0, y0, 0, y0 + DECK_MAX);
+    gr.addColorStop(0, '#FFFFFF');
+    gr.addColorStop(0.40, '#EFF9FF');
+    gr.addColorStop(1, '#B9E1F6');
+    ctx.fillStyle = gr;
+    ctx.fill();
+    /* A frost lip along the underside. Without it the fill and the plug beneath it are
+       the same pale blue and the join disappears into a smear; with it you can see the
+       ice has closed around a shape. */
+    ctx.beginPath();
+    prof.forEach((q, i) => {
+      const x = q.x - G.worldX, y = y0 + (q.y - y0) * grow;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+  }
 
   function drawRepairedPieces(ctx) {
     for (const g of ground.gaps) {
@@ -9695,6 +10137,10 @@ export function createGame(canvas, hooks = {}) {
          and rests on the lips; the slab is the walkway. A deck, a snow band and an ice
          collar were each tried here and each read as something added to the answer. */
       for (const p of g.pieces) drawKeystone(ctx, g, p);
+      /* AND THE ICE CLOSES OVER THE JOINS. After the plugs, because it fills the holes
+         BETWEEN them and against the lips — see drawDeck for why the crossing needs it
+         and why it is not the ice collar that was tried here before. */
+      drawDeck(ctx, g);
     }
   }
   function drawCracks(ctx) {
@@ -10287,7 +10733,12 @@ export function createGame(canvas, hooks = {}) {
       fall: null, respawn: 0, debris: null,
       /* 0 until the learner reaches for it, then eases to 1 and the corner handles
          fade in. See the note where they are drawn. */
-      reveal: 0, wantReveal: false
+      reveal: 0, wantReveal: false,
+      /* THE ICE GROWING UP OUT OF THE PILLAR, 0 -> 1. Only on a FIRST slab: the
+         replacement after a wrong cut is lowered in from above the frame instead (see
+         respawn), and it plainly arriving is already the thing formation exists to
+         achieve — doing both would say it twice. */
+      form: keepScore ? 1 : 0
     };
   }
 
@@ -10519,7 +10970,17 @@ export function createGame(canvas, hooks = {}) {
     if (L.mechanic === 'same-vertex-diagonals') {
       const key = Math.min(i, j) + '-' + Math.max(i, j);
       if (L.drawn.includes(key)) return rejectCut('already', pts[i], pts[j]);
-      if (L.origin === undefined || L.origin === null) {
+      /* THE TEST IS "HAVE WE A LINE YET", AND IT IS ASKED OF `cands`, NOT `origin`.
+         This read `L.origin === undefined || L.origin === null` — and origin is
+         DELIBERATELY still null after the first line, because which of its two ends is
+         the origin cannot be known until the second line arrives. So the first branch
+         ran again on the second cut, overwrote the candidates with that line's own two
+         ends, and the sameVertex test below was never reached by any input at all: two
+         diagonals from opposite corners of the pentagon were accepted and the slab
+         fanned as though the answer were right. That is the reported fault — a wrong
+         cut shown as the correct cut. `cands` is null until the first line and a pair
+         forever after, so it is the thing that actually distinguishes the two states. */
+      if (!L.cands) {
         /* WHICH END IS THE ORIGIN IS NOT DECIDED YET. A single diagonal has two, and
            choosing now would refuse a perfectly good second line that shares the other
            one. Both are held as candidates and the second cut settles it. */
@@ -10665,6 +11126,21 @@ export function createGame(canvas, hooks = {}) {
     const L = G.l2; if (!L) return;
     L.cornerPulse = Math.max(0, L.cornerPulse - dt * 1.4);
     L.shake = Math.max(0, (L.shake || 0) - dt * 3.4);
+    /* THE ICE STILL COMING UP. Advanced here, above the state branches, because the
+       block is on screen from the frame the ground opens and every one of those beats
+       should show it growing. Stopped while it is falling: a slab on its way into the
+       river is not accreting, and a freezing front crawling up a block that is upside
+       down over the water would be the single strangest thing in the game. */
+    if (!L.fall && L.form < 1) {
+      const was = L.form;
+      L.form = clamp(L.form + dt * 1000 / (L2.formMs || 900), 0, 1);
+      // frost kicked up off the pillar as it starts, and the ice sealing as it closes
+      if (was <= 0 && !reduced) particles.frost(L.pos.x, CFG.surfaceY - 6, 8);
+      if (L.form >= 1) {
+        audio.seal();
+        if (!reduced) particles.sparkle(L.pos.x, L.pos.y, 6, 110);
+      }
+    }
     /* THE HANDLES FADE IN once they are wanted — on the first touch, or on their own
        after a few seconds, so a child who is still looking is not left with nothing to
        aim at. Eased rather than switched, or six beads appear between two frames. */
@@ -10971,6 +11447,130 @@ export function createGame(canvas, hooks = {}) {
     ctx.restore();
   }
 
+  /* THE SLAB GROWS OUT OF THE PILLAR — it is not placed on it.
+   *
+   * Reported as "in this stage shape appear suddenly": the ground splits open and on
+   * the next frame there is a block standing on the pedestal. That is the same note as
+   * the one about the plug landing in the ditch, at the other end of the level — ice
+   * does not arrive, it accretes — and the answer is the same idea pointed the other
+   * way. A plug freezes to the two lips it is resting on and grows INWARD from its
+   * whole rim (drawFreezeIn); a slab grows UP out of the one face it stands on.
+   *
+   * Deliberately two functions and not one parameterised one: they share a material and
+   * nothing else. The directions differ, the fronts differ, and the plug's has to cost
+   * nothing once it is over because it is called for every mended crossing for the rest
+   * of the run, while this one is called for one object during one 900ms beat.
+   *
+   * WHY THE FRONT HAS TEETH. A straight edge rising up the block is a wipe, and a wipe
+   * reads as a mask sliding over a picture that was already there — which is precisely
+   * the thing being complained about, just slower. Ice freezing has a ragged crystal
+   * front, so the reveal is clipped to one: deterministic teeth of alternating depth,
+   * with spikes standing up off them and a rime that clears off the face behind.
+   *
+   * Everything is in the slab's LOCAL frame, inside the caller's transform, so it
+   * travels, turns and scales with the block for nothing. `inv` undoes that scale for
+   * the things that should be a fixed width on screen.
+   */
+  function drawSlabForming(ctx, L) {
+    const b = polyBounds(L.pts);
+    const e = easeOut(clamp(L.form, 0, 1));
+    const inv = 1 / (L.scale || 1);
+    const rnd = n => { const s = Math.sin(31.7 + n * 78.233) * 43758.5453; return s - Math.floor(s); };
+
+    /* The freezing front, from a little under the base to a little over the crown, so
+       the block is wholly hidden at 0 and wholly shown at 1 with no sliver left at
+       either end. Teeth are sized off the block, not fixed, or a small slab gets three
+       of them and a large one gets forty. */
+    const y = b.y1 + 16 - (b.h + 32) * e;
+    const teeth = clamp(Math.round(b.w / 26), 5, 26);
+    const step = (b.w + 40) / teeth;
+    const front = new Path2D();
+    front.moveTo(b.x0 - 20, b.y1 + 40);
+    front.lineTo(b.x0 - 20, y);
+    for (let i = 0; i < teeth; i++) {
+      const x = b.x0 - 20 + i * step;
+      front.lineTo(x + step * 0.5, y - (7 + rnd(i) * 24));
+      front.lineTo(x + step, y);
+    }
+    front.lineTo(b.x1 + 20, b.y1 + 40);
+    front.closePath();
+
+    // the block's own outline, so nothing the front draws escapes the shape
+    const body = new Path2D();
+    L.pts.forEach((q, i) => { if (i === 0) body.moveTo(q.x, q.y); else body.lineTo(q.x, q.y); });
+    body.closePath();
+
+    // THE BLOCK, up to the front and no further
+    ctx.save();
+    ctx.clip(front);
+    paintGlacierChunk(ctx, { pts: L.pts, art: L.art, seed: 11 }, false, inv);
+    ctx.restore();
+
+    ctx.save();
+    ctx.clip(body);
+
+    /* NEW ICE IS PALE. A rime wash over what has just formed, heaviest at the front and
+       gone by the time the front has left it, so the block is visibly settling into its
+       own colour behind the growth rather than being painted in at full strength. */
+    const rime = ctx.createLinearGradient(0, y - 40, 0, y + 150);
+    rime.addColorStop(0, `rgba(236,251,255,${(0.62 * (1 - e * 0.55)).toFixed(3)})`);
+    rime.addColorStop(1, 'rgba(236,251,255,0)');
+    ctx.save();
+    ctx.clip(front);
+    ctx.fillStyle = rime;
+    ctx.fillRect(b.x0 - 24, y - 44, b.w + 48, 200);
+    ctx.restore();
+
+    /* THE CRYSTALS STANDING ON THE FRONT — this is the part that reads as growing. They
+       point UP, into the ice that has not formed yet, and each one is rooted on a tooth
+       so the front and its crystals are the same event. */
+    if (!reduced) {
+      for (let i = 0; i < teeth; i++) {
+        const x = b.x0 - 20 + i * step + step * 0.5;
+        const root = y - (7 + rnd(i) * 24);
+        const len = (16 + rnd(i + 11) * 34);
+        const lean = (rnd(i + 23) - 0.5) * 0.8;
+        const tx = x + Math.sin(lean) * len, ty = root - Math.cos(lean) * len;
+        const w = (2.6 + rnd(i + 37) * 3.4);
+        ctx.fillStyle = 'rgba(255,255,255,0.88)';
+        ctx.beginPath();
+        ctx.moveTo(x - w, root + 4);
+        ctx.lineTo(tx, ty);
+        ctx.lineTo(x + w, root + 4);
+        ctx.closePath();
+        ctx.fill();
+        // a barb, so it is a crystal and not a spike
+        if (len > 30) {
+          const side = rnd(i + 53) > 0.5 ? 1 : -1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+          ctx.lineWidth = 2 * inv;
+          ctx.beginPath();
+          ctx.moveTo(x + (tx - x) * 0.5, root + (ty - root) * 0.5);
+          ctx.lineTo(x + (tx - x) * 0.5 + side * len * 0.3, root + (ty - root) * 0.5 - len * 0.16);
+          ctx.stroke();
+        }
+      }
+    }
+
+    /* AND THE FRONT ITSELF LIGHTS, which is what holds the two halves of the block —
+       the formed and the not-yet — apart from each other while it crosses. */
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 4 * inv;
+    ctx.stroke(front);
+    ctx.restore();
+
+    /* THE LAST BEAT: the whole outline flashes as the front closes over the crown, so
+       the formation ENDS on something rather than simply running out. */
+    const seal = clamp((L.form - 0.76) / 0.24, 0, 1);
+    if (seal > 0) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,255,255,${(0.85 * Math.sin(seal * Math.PI)).toFixed(3)})`;
+      ctx.lineWidth = 7 * inv;
+      ctx.stroke(body);
+      ctx.restore();
+    }
+  }
+
   function drawL2(ctx) {
     const L = G.l2; if (!L) return;
     if (L.pieces) { L.pieces.forEach(pc => drawL2Piece(ctx, pc)); return; }
@@ -11011,7 +11611,11 @@ export function createGame(canvas, hooks = {}) {
       ctx.shadowColor = `rgba(150,225,255,${(0.9 * L.glow).toFixed(3)})`;
       ctx.shadowBlur = 42 * L.glow;
     }
-    paintGlacierChunk(ctx, { pts: L.pts, art: L.art, seed: 11 }, false, 1 / (L.scale || 1));
+    /* THE BLOCK — grown out of the pillar if it is still forming, painted whole if it
+       is not. drawSlabForming does the whole beat, clip included, and returns having
+       drawn the block itself, so there is exactly one paint call either way. */
+    if (L.form !== undefined && L.form < 1) drawSlabForming(ctx, L);
+    else paintGlacierChunk(ctx, { pts: L.pts, art: L.art, seed: 11 }, false, 1 / (L.scale || 1));
     /* THE SHEAR, drawn ON the falling slab. A wrong cut cracks it along the line that
        was actually drawn, so the block does not merely fall — it fails where the
        learner cut it. Inside the same transform as the block, in the block's own
@@ -11758,7 +12362,15 @@ export function createGame(canvas, hooks = {}) {
         cut: L.cut || null, wrong: L.wrong || 0, attempts: G.attempts || 0,
         pieces: L.pieces ? L.pieces.length : 0, seated: !!L.seated,
         badLine: L.badLine ? L.badLine.kind : null,
-        dragFrom: L.dragFrom
+        dragFrom: L.dragFrom,
+        /* THE RULE'S OWN STATE. A crossing is only teaching its rule if it refuses the
+           thing the rule is about, and that cannot be asserted from the outside without
+           these: which rule is running, whether it has been satisfied, the lines drawn
+           so far, and — for same-vertex — the corner they were required to share.
+           Read-only copies; `drawn` is sliced so a test cannot write into the level. */
+        mechanic: L.mechanic, solved: !!L.solved,
+        drawn: (L.drawn || []).slice(), need: L.need,
+        origin: L.origin === undefined ? null : L.origin
       };
     },
     /** The two crevasses Level 2 opens, and what is bridging them. */

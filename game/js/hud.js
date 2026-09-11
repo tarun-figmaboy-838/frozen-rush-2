@@ -32,18 +32,155 @@ export class Hud {
       instruction: root.getElementById('instruction'),
       pill: root.getElementById('instruction-pill'),
       text: root.getElementById('instruction-text'),
-      sub: root.getElementById('instruction-sub'),
+      /* No `sub` lookup: the second line on the board was removed (see index.html).
+         A lookup with no user is how a dead element gets wired back up by the next
+         person reading this file — the same rule the pause and hint lookups above
+         are kept under, and they at least still have callers. */
       complete: root.getElementById('complete'),
       replay: root.getElementById('btn-replay'),
       /* oops and retry are gone from the markup: a crash recovers by itself now and
          there is no failure panel. The lookups are not kept "just in case" — every
          use of them went with them, and a lookup with no user is how a dead element
          gets resurrected by the next person reading this file. */
-      rotate: root.getElementById('rotate')
+      rotate: root.getElementById('rotate'),
+      trail: root.getElementById('trail'),
+      trailSteps: root.getElementById('trail-steps'),
+      trailMomo: root.getElementById('trail-momo')
     };
     this.paused = false;
     this.lastMessage = null;
+    /* THE TRAIL'S OWN STATE. `_steps` is how many stones have been built (0 until the
+       engine says how many crossings there are), `_at` the last stone Momo was put on.
+       -1 rather than 0, so the FIRST crossing is a real change and gets the arrival
+       animation instead of being silently already-correct. */
+    this._steps = 0;
+    this._at = -1;
     this._onResize = () => this.checkOrientation();
+  }
+
+  /* ---------- the progress trail ----------
+
+     Nine stones and a cave, with Momo on the one in play. The count comes from the
+     engine rather than from the markup, so adding or removing a crossing needs no
+     change here and none in index.html. */
+
+  /** Build the row, once, for `n` crossings. Cheap to call again — it returns unless
+      the count has actually changed, which is how the first HUD push builds it and
+      every later one does nothing. */
+  buildTrail(n) {
+    const box = this.el.trailSteps;
+    if (!box || n <= 0 || n === this._steps) return;
+    this._steps = n;
+    this._at = -1;
+    box.textContent = '';
+    for (let i = 0; i < n; i++) {
+      const img = document.createElement('img');
+      img.className = 'trail-step locked';
+      img.alt = '';
+      img.src = 'assets/progress/step-locked.webp';
+      box.appendChild(img);
+    }
+    const goal = document.createElement('img');
+    goal.className = 'trail-step goal';
+    goal.alt = '';
+    goal.src = 'assets/progress/step-goal.webp';
+    box.appendChild(goal);
+  }
+
+  /** Put Momo on stone `i`. `hop` arcs him across; without it he is simply placed,
+      which is what a resize or a restart wants. */
+  _momoTo(i, hop) {
+    const momo = this.el.trailMomo, box = this.el.trailSteps;
+    if (!momo || !box) return;
+    const stone = box.children[Math.min(i, box.children.length - 1)];
+    if (!stone) return;
+    /* Measured off the stone itself rather than computed from --step and --gap. The
+       two would agree today and drift the first time either is touched, and a marker
+       standing between two stones is worse than no marker. */
+    const mid = stone.offsetLeft + stone.offsetWidth / 2;
+    momo.style.setProperty('--at', mid + 'px');
+    /* THE GOLD RUNS TO THE SAME POINT. Same measurement, so the bar's end and the
+       mammoth standing on it can never drift apart — and both carry the same 560ms
+       travel, so the fill flows along underneath him as he hops rather than snapping
+       ahead of him. The track is inset past the stones at each end (see the CSS), so
+       the fill is offset by that inset to start at the track's real left edge. */
+    const wrap = this.el.trail;
+    if (wrap) {
+      const inset = parseFloat(getComputedStyle(wrap).getPropertyValue('--step')) * 0.16 || 0;
+      wrap.style.setProperty('--fill', (mid + inset) + 'px');
+    }
+    momo.classList.toggle('idle', !hop);
+    if (hop) {
+      // restarted by hand: re-adding a class the element already has replays nothing
+      momo.classList.remove('hop');
+      void momo.offsetWidth;
+      momo.classList.add('hop');
+      const off = () => { momo.classList.remove('hop'); momo.classList.add('idle'); };
+      momo.addEventListener('animationend', off, { once: true });
+    }
+  }
+
+  /** A burst of light over stone `i`, for the frame it is won. */
+  _trailPop(i) {
+    const box = this.el.trailSteps, wrap = this.el.trail;
+    if (!box || !wrap) return;
+    const stone = box.children[i];
+    if (!stone) return;
+    const pop = document.createElement('div');
+    pop.className = 'trail-pop';
+    pop.style.left = (stone.offsetLeft + stone.offsetWidth / 2) + 'px';
+    pop.style.top = (stone.offsetTop + stone.offsetHeight / 2) + 'px';
+    wrap.appendChild(pop);
+    pop.addEventListener('animationend', () => pop.remove(), { once: true });
+  }
+
+  /** `done` crossings are behind the learner, out of `total`. Everything else — which
+      stone glows, where Momo stands, whether the cave lights — follows from that one
+      number, so the engine publishes a count and nothing more. */
+  setTrail(done, total, visible) {
+    const wrap = this.el.trail;
+    if (!wrap) return;
+    this.buildTrail(total);
+    const box = this.el.trailSteps;
+    if (!box || !this._steps) return;
+
+    if (!visible) { wrap.hidden = true; return; }
+    if (wrap.hidden) {
+      wrap.hidden = false;
+      wrap.classList.remove('enter');
+      void wrap.offsetWidth;
+      wrap.classList.add('enter');
+    }
+
+    const at = Math.min(done, this._steps);     // the stone in play; === steps when finished
+    if (at === this._at) return;
+    const first = this._at < 0;
+    const won = !first && at > this._at;        // a crossing was just completed
+
+    for (let i = 0; i < this._steps; i++) {
+      const s = box.children[i];
+      if (!s) continue;
+      const want = i < at ? 'done' : i === at ? 'now' : 'locked';
+      if (s.classList.contains(want)) continue;
+      s.classList.remove('locked', 'now', 'done');
+      s.classList.add(want);
+      s.src = 'assets/progress/step-' + want + '.webp';
+      /* THE ONE THAT WAS JUST WON gets the overshoot and the spark. Only on a real
+         advance — restoring the trail after a resize must not fire nine of them. */
+      if (want === 'done' && won && i === at - 1) {
+        s.classList.remove('just');
+        void s.offsetWidth;
+        s.classList.add('just');
+        s.addEventListener('animationend', () => s.classList.remove('just'), { once: true });
+        this._trailPop(i);
+      }
+    }
+
+    const goal = box.children[this._steps];
+    if (goal) goal.classList.toggle('lit', at >= this._steps);
+
+    this._at = at;
+    this._momoTo(at, won);
   }
 
   /* Pick an icon by NAME. The mask URLs live in the stylesheet: a url() inside a
@@ -144,10 +281,61 @@ export class Hud {
       s.textContent = text;
       el.appendChild(s);
     };
-    if (!m) { for (const w of (message || '').trim().split(/\s+/)) word(w, 'iw', true); return; }
+    if (!m) {
+      for (const w of (message || '').trim().split(/\s+/)) word(w, 'iw', true);
+      this.fitInstruction();
+      return;
+    }
     for (const w of m[1].trim().split(/\s+/)) word(w, 'iw', true);
     word((m[2] + m[3]).toUpperCase(), 'iw key', true);
     word(m[4], 'iw', false);                                  // the sentence keeps its full stop
+    this.fitInstruction();
+  }
+
+  /* THE SENTENCE IS FITTED TO THE BOARD — the board is never fitted to the sentence.
+   *
+   * It used to be the other way round: the plank was shrink-to-fit, so its width was
+   * whatever the words needed. The middle of the plank is ONE PIECE OF ART stretched
+   * across that width (plank-m, 1498x478, see the background rules), so the wood grain
+   * and the snow along the top were scaled horizontally by however long the question
+   * happened to be. Measured across the nine: between 1.40x and 2.50x, a different
+   * amount every time. That is the "squeezed, not natural" report — the grain smears,
+   * the snowdrifts stretch into streaks, and because it changes per question the sign
+   * never reads as the same physical object twice.
+   *
+   * A real sign is one plank. So the plank is now a fixed width (see the CSS) and the
+   * TYPE gives way instead, which is what signwriting has always done: the stretch is
+   * one constant value for every question, and a long sentence is simply set smaller on
+   * the same board.
+   *
+   * Measured rather than guessed, because the font is loaded late and its metrics are
+   * not knowable from the string: the words are laid out at full size, the overflow is
+   * read off the layout, and --fit scales the type down only if there is one. Most
+   * questions need no scaling at all and get --fit 1.
+   *
+   * scrollWidth, not getBoundingClientRect: the words animate in on a transform and a
+   * measured rect would be whatever the scale was on that frame. scrollWidth is layout,
+   * which transforms do not touch.
+   */
+  fitInstruction() {
+    const el = this.el.text, pill = this.el.pill;
+    if (!el || !pill) return;
+    el.style.setProperty('--fit', '1');
+    /* Deferred one frame: called straight after the words are appended, the pill has
+       not been laid out at the new content yet and clientWidth is the previous
+       question's. */
+    const run = () => {
+      const cs = getComputedStyle(pill);
+      const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const need = el.scrollWidth;
+      if (!(avail > 0) || !(need > 0)) return;
+      /* A floor at 0.62. Below that the type is too small to be the thing you look at,
+         and a sentence that cannot fit even then should be shortened rather than
+         shrunk — none of the nine comes close (the longest needs 0.88). */
+      const fit = Math.max(0.62, Math.min(1, avail / need));
+      el.style.setProperty('--fit', fit.toFixed(3));
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();
   }
 
   /** @param {{onPause:Function,onReplay:Function,onStamp?:Function}} handlers */
@@ -248,6 +436,11 @@ export class Hud {
      * stuck: if there is a message and the element is not showing it, it shows it.
      * The entrance animation is still only restarted for a genuinely NEW line, so a
      * re-assert does not make the pill flash. */
+    /* THE TRAIL, from the two numbers the engine publishes. Shown for the whole of the
+       journey and hidden on the cover, the tutorial and the ending — the ending has a
+       celebration of its own and does not need a scoreboard over it. */
+    this.setTrail(h.step || 0, h.steps || 0, !!h.steps && !h.complete && !!h.skippable);
+
     const el = this.el.instruction;
     this._voDur = h.voDur || 0;          // paces the word reveal, see setInstruction
     /* A BANNER IS A SENTENCE, NOT A QUESTION. The key-word treatment takes the noun after "the"
@@ -261,11 +454,6 @@ export class Hud {
        stage, so the left band is not where the eye is and a sign parked there reads as
        abandoned. A class on the same element — same board, same type, moved. */
     if (el) el.classList.toggle('centered', !!h.signCentre);
-    /* NO SECOND LINE ON THE BOARD. One was added for the crossings that want two
-       shapes; it read as a second instruction competing with the first, which is
-       exactly why Part 1 has none. Kept hidden rather than removed from the markup, so
-       nothing has to be re-added if a caption is ever wanted there. */
-    if (this.el.sub) { this.el.sub.textContent = ''; this.el.sub.hidden = true; }
     const outOfSync = message && (el.hidden || el.classList.contains('leaving'));
     if (message !== this.lastMessage || outOfSync) {
       const isNewLine = message !== this.lastMessage;

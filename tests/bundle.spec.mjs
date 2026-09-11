@@ -54,6 +54,18 @@ test.describe('the file:// build', () => {
           if (sx > 380 && sx < 700 && !o.passed) g.jump();
         }
         if (G.state === 'OBSTACLE_HIT') g.retryObstacle();
+        /* THE DRAWING CROSSINGS COME FIRST, so a loop that only answers rope questions
+           sits in front of one it cannot solve and never gets anywhere. This loop did
+           exactly that and timed out at LEVEL_2_ACTIVE — the same fault helpers.mjs
+           already had fixed for playLevelOne when Part 2 moved to the front. Each
+           crossing is answered by its own rule: one main diagonal, every diagonal, or
+           two from one corner. */
+        if (G.state === 'LEVEL_2_ACTIVE' && G.l2) {
+          const m = G.l2.mechanic;
+          if (m === 'cut-diagonal') g._l2Cut(0, 3);
+          else if (m === 'draw-all-diagonals') { g._l2Cut(0, 2); g._l2Cut(1, 3); }
+          else if (m === 'same-vertex-diagonals') { g._l2Cut(0, 2); g._l2Cut(0, 3); }
+        }
         if (G.state === 'PHASE_ACTIVE' && G.l1) g._cut(G.l1.unfilled[0]);
         if (G.phasesDone >= 2) break;
         await new Promise(res => requestAnimationFrame(res));

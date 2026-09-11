@@ -69,7 +69,32 @@
              still be set from the URL (?sound=0, ?reduced=1) and the pause panel below
              is still wired, but nothing opens it any more. -->
 
-        <!-- how far through the six repairs: diamonds only, no captions -->
+        <!-- HOW FAR THROUGH THE NINE CROSSINGS — the trail Momo is walking.
+
+             This replaces the row of diamonds that used to sit here and was removed as
+             too plain to be worth the space. A child cannot read "3 / 9", but they can
+             see that the mammoth is three stones along a path of ice with a bear's cave
+             at the end of it, and that one more stone lights up every time they answer
+             something. The stones ARE the nine levels.
+
+             Built in script rather than written out nine times, because the count comes
+             from the engine (three drawing crossings plus six rope ones) and a hard
+             coded nine here would be a second place to change. See Hud.buildTrail.
+
+             It is top-left, in the sky, above everything the game draws — the ice line
+             is at stage y 840 and the trail's bottom is at about 150, so it can never
+             cover a crevasse, a block or the character. Pointer events off: it is a
+             read-out, and a tap anywhere on the stage is the jump control. -->
+        <div class="trail" id="trail" aria-hidden="true" hidden>
+          <!-- THE TRACK THE STONES STAND ON. Without it the row read as nine tiles
+               floating in the sky with nothing holding them together — reported as
+               exactly that. The track is the ledge of ice they are set into, and the
+               fill running along it is how far the journey has got: a progress bar
+               whose handle is a mammoth. -->
+          <div class="trail-track" aria-hidden="true"><i class="trail-fill"></i></div>
+          <div class="trail-steps" id="trail-steps"></div>
+          <img class="trail-momo" id="trail-momo" alt="" src="assets/progress/step-momo.webp" />
+        </div>
 
         <div class="instruction" id="instruction" hidden>
           <div class="instruction-pill" id="instruction-pill">
@@ -78,13 +103,17 @@
                  whole instruction and are set large enough to be the thing you look
                  at. Still the only learner-facing text in a phase. -->
             <span class="instruction-text" id="instruction-text" aria-live="polite"></span>
-            <!-- THE SECOND LINE, for the crossings that need one. Part 1 deliberately had
-                 no second line — its questions were three words and anything more was
-                 noise. Part 2's later crossings ask about two properties at once ("a
-                 concave pentagon"), and two of them want BOTH matching shapes while the
-                 headline stays singular, so the count has to be said somewhere. It is
-                 hidden whenever the level does not set one, which is most of them. -->
-            <span class="instruction-sub" id="instruction-sub" aria-live="polite" hidden></span>
+            <!-- NO SECOND LINE. One was added here for the crossings that want two
+                 shapes, and removed on request: it read as a second instruction
+                 competing with the first, which is the very thing Part 1 has none for.
+                 It was then left in the markup, permanently emptied and hidden on every
+                 HUD push — an element that could never show anything. Gone with its
+                 stylesheet rules and its lookup.
+
+                 The `sub:` sentences are still in CFG.levelOne.phases and still tested
+                 (curriculum.spec: "every phase has a sub-line"); they are simply not
+                 published to the HUD. If a caption is ever wanted, the words exist and
+                 this is where the element went. -->
           </div>
         </div>
 

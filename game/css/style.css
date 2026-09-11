@@ -123,6 +123,230 @@ a:hover { color: var(--ice-pale); }
 
 /* Pause and Replay are styled with the rest of the button family in screens.css */
 
+/* ---------- the progress trail ----------
+
+   Nine stones of ice and a bear's cave at the end of them, with Momo standing on the
+   one being played. It replaces a row of diamonds that said the same thing and said it
+   to nobody: a five-year-old cannot read "4 / 9", but they can see the mammoth three
+   stones along a path, and they can see one more stone light up every time they get
+   something right. That is the whole design — the reward is a picture of how far you
+   have come, and it is legible without a single word.
+
+   WHERE IT GOES: the top LEFT, on the line under the question board (asked for on the
+   left; it was on the right first). The left band is the one column of the stage that
+   no part of the game ever draws in — the option ropes all come down right of x 780
+   and the character's head reaches y 500 at the highest — which is why the board lives
+   there too, and why the two have to share it: board on the top line, trail beneath.
+   Everything here is in stage units, so it holds its share of the picture at 1280 and
+   at 4K alike, and it takes no pointer events: the whole stage is the jump control and
+   a read-out must never eat a tap.
+
+   The art: three states of one stone (locked, now, done) plus the goal and the marker,
+   trimmed and sized by tools/make-progress.mjs. */
+.trail {
+  position: absolute;
+  /* LEFT, AND UNDER THE BOARD — asked for on the left, and this is the only way it
+     fits there.
+     The question board cannot move out of the left band: tests/stage.spec.mjs pins it
+     ("the sign starts at the left edge, not the middle") because the hanging option
+     ropes come down through the middle and right, and a board that reached them would
+     cover the thing the learner has to cut. So the board keeps the top of the band and
+     the trail takes the line underneath it.
+     7.1 units: the board runs y 27..117 of the 1080 stage at every size, so this clears
+     its bottom edge by about 20px. Below is open sky — the character's head reaches
+     y 500 at the highest and the ropes all start right of x 780. */
+  top: calc(7.1 * var(--u));
+  left: 1.6%;
+  pointer-events: none;
+  /* ONE NUMBER SIZES THE WHOLE TRAIL. Clamped at both ends: below about 14px a stone
+     is a smudge, and above 80 the row would reach across a third of a 4K stage. */
+  --step: clamp(14px, calc(2.25 * var(--u)), 80px);
+  --gap: calc(var(--step) * 0.22);
+  /* ABOVE PART 2's BLUR SHEET, with the question board.
+     At 3 it sat under .p2-veil (6) and went out of focus for the whole of every
+     drawing crossing — a progress read-out that blurs looks broken, not depth-of-field.
+     The veil exists to push back the WORLD so the slab is the only sharp thing in it;
+     the board is already excepted from that at 8 for exactly the same reason, and the
+     trail is the same kind of thing. */
+  z-index: 8;
+}
+.trail[hidden] { display: none; }
+
+/* THE LEDGE THE STONES ARE SET INTO, and the fill that runs along it.
+
+   Nine tiles in a row with nothing under them read as nine tiles floating in the sky —
+   reported as "the platform not look connected, all look floating". A path needs
+   something to be a path ON. So there is a bar of ice beneath them, the stones sit
+   into it rather than on top of it, and the part of it already travelled is filled
+   with the same gold the current stone glows with. That fill is the progress bar the
+   whole thing was asked to be; the stones are its notches and Momo is its handle.
+
+   Inset behind the stones by a negative z-index, which works because .trail already
+   makes a stacking context (z-index 8) — so this cannot escape the trail and land
+   behind the game. */
+.trail-track {
+  position: absolute;
+  left: calc(var(--step) * -0.16);
+  right: calc(var(--step) * -0.16);
+  /* MOSTLY BELOW THE STONES, not behind them. Put across their lower third it was
+     invisible — a stone is 0.72 of --step tall and bottom-aligned, so a bar inside
+     that range is covered by the very things it is supposed to be carrying, and all
+     that showed were slivers between them. Hung below their base it reads as the
+     ledge they are standing on, which is what "the platform not look connected" was
+     asking for, and the gold fill running along it is finally visible. The stones'
+     feet still overlap its top edge, so they are ON it rather than above it. */
+  bottom: calc(var(--step) * -0.2);
+  height: calc(var(--step) * 0.36);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, #F2FBFF 0%, #CDEAF9 42%, #8FC9E6 100%);
+  box-shadow:
+    inset 0 calc(var(--step) * 0.05) 0 rgba(255, 255, 255, 0.9),
+    inset 0 calc(var(--step) * -0.05) 0 rgba(27, 94, 140, 0.35),
+    0 calc(var(--step) * 0.05) calc(var(--step) * 0.08) rgba(10, 40, 80, 0.3);
+  overflow: hidden;
+  z-index: -1;
+}
+/* HOW FAR ALONG. --fill is set in script to the current stone's centre, measured off
+   the stone itself (see Hud._momoTo) so the bar and the marker cannot disagree. The
+   transition matches Momo's travel, so the gold runs along under him as he hops. */
+.trail-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #FFE9A8 0%, #FFC24A 48%, #E9922A 100%);
+  box-shadow:
+    inset 0 calc(var(--step) * 0.05) 0 rgba(255, 255, 255, 0.75),
+    0 0 calc(var(--step) * 0.24) rgba(255, 186, 60, 0.85);
+  transition: width 560ms cubic-bezier(.5, 0, .2, 1);
+}
+
+/* The stones sit on one baseline — the art is three different heights, so they are
+   bottom-aligned rather than centred, which is what puts them on a path rather than
+   on a washing line. */
+.trail-steps {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap);
+  position: relative;
+}
+.trail-step {
+  display: block;
+  width: var(--step);
+  height: auto;
+  /* Each stone can be swapped and popped independently; the transform origin is its
+     base so a pop grows UP off the path instead of sinking through it. */
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 calc(var(--step) * 0.05) calc(var(--step) * 0.07) rgba(10, 40, 80, 0.28));
+}
+/* The cave is the destination, and is allowed to be bigger than a stepping stone. */
+.trail-step.goal { width: calc(var(--step) * 1.34); }
+
+/* THE ONE BEING PLAYED is BIGGER, and breathes.
+
+   Ten things in a row on a 1920 stage cannot each be large — the board takes the
+   middle and the row has about 540px to live in. So rather than make everything
+   bigger and collide with the board, the row stays compact and the one stone that
+   matters is grown out of it. The eye lands on the biggest thing; the biggest thing is
+   where you are; the other nine are context. Momo stands on it and is scaled to match,
+   so the focal point is a mammoth on a glowing stone rather than ten small squares.
+
+   Slow breath, in the gold the art already glows with — a highlight, not an alarm. */
+.trail-step.now {
+  width: calc(var(--step) * 1.24);
+  animation: trailNow 1.75s ease-in-out infinite;
+}
+@keyframes trailNow {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 calc(var(--step) * 0.05) calc(var(--step) * 0.07) rgba(10, 40, 80, 0.28)); }
+  50%      { transform: translateY(calc(var(--step) * -0.07)) scale(1.06);
+             filter: drop-shadow(0 calc(var(--step) * 0.09) calc(var(--step) * 0.12) rgba(10, 40, 80, 0.3))
+                     drop-shadow(0 0 calc(var(--step) * 0.3) rgba(255, 186, 60, 0.85)); }
+}
+
+/* A STONE THAT HAS JUST BEEN WON. The overshoot is the point: it is the only moment
+   in the trail that is allowed to be loud, because it is the moment something was
+   achieved. Runs once, then the stone is simply `done` and quiet again. */
+.trail-step.just {
+  animation: trailWin 620ms cubic-bezier(.34, 1.56, .64, 1) both;
+}
+@keyframes trailWin {
+  0%   { transform: translateY(calc(var(--step) * -0.34)) scale(1.42); }
+  55%  { transform: translateY(calc(var(--step) * 0.04)) scale(0.94); }
+  100% { transform: none; }
+}
+
+/* THE SPARK that goes up off it as it lands — drawn, not art, because it is four
+   frames of light and loading a sprite for that would be absurd. */
+.trail-pop {
+  position: absolute;
+  width: calc(var(--step) * 1.5);
+  height: calc(var(--step) * 1.5);
+  margin-left: calc(var(--step) * -0.75);
+  margin-top: calc(var(--step) * -0.75);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 236, 170, 0.95) 0%, rgba(255, 196, 74, 0.55) 38%, rgba(255, 196, 74, 0) 70%);
+  animation: trailPop 620ms ease-out both;
+  pointer-events: none;
+}
+@keyframes trailPop {
+  from { opacity: 0.95; transform: scale(0.25); }
+  to   { opacity: 0; transform: scale(1.5); }
+}
+
+/* MOMO, standing on the stone that is in play and hopping to the next one when it is
+   won. Positioned by the stone's own centre, measured in script (--at), so the hop
+   lands exactly on it at any stage size and however many crossings there turn out to
+   be. The arc is a separate animation from the travel: `left` carries him across,
+   `trailHop` lifts him over the gap, and the two together are a jump rather than a
+   slide. */
+.trail-momo {
+  position: absolute;
+  left: var(--at, 0px);
+  bottom: calc(var(--step) * 0.52);
+  width: calc(var(--step) * 1.3);
+  height: auto;
+  transform: translateX(-50%);
+  transition: left 560ms cubic-bezier(.5, 0, .2, 1);
+  filter: drop-shadow(0 calc(var(--step) * 0.06) calc(var(--step) * 0.08) rgba(10, 40, 80, 0.35));
+  will-change: left, transform;
+}
+.trail-momo.hop { animation: trailHop 560ms cubic-bezier(.4, 0, .5, 1) both; }
+@keyframes trailHop {
+  0%   { transform: translateX(-50%) translateY(0) scaleY(0.9) scaleX(1.06); }
+  22%  { transform: translateX(-50%) translateY(calc(var(--step) * -0.62)) scaleY(1.08) scaleX(0.95); }
+  60%  { transform: translateX(-50%) translateY(calc(var(--step) * -0.72)) scaleY(1.04) scaleX(0.98); }
+  100% { transform: translateX(-50%) translateY(0) scaleY(1) scaleX(1); }
+}
+/* Standing still, he breathes — a trail with a frozen mammoth on it reads as a
+   diagram; one that bobs reads as a character waiting for you. */
+.trail-momo.idle { animation: trailBob 2.4s ease-in-out infinite; }
+@keyframes trailBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(calc(var(--step) * -0.06)); }
+}
+
+/* THE WHOLE TRAIL ARRIVES, once, when the first crossing opens — it should not simply
+   be there on the first frame, for the same reason nothing else in this game is. */
+.trail.enter { animation: trailIn 620ms cubic-bezier(.34, 1.4, .64, 1) both; }
+@keyframes trailIn {
+  from { opacity: 0; transform: translateY(calc(var(--step) * -0.9)); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* EVERY CROSSING DONE. The cave lights up and holds — the end of the journey, marked
+   on the thing that has been counting towards it all game. */
+.trail-step.goal.lit { animation: trailGoal 900ms cubic-bezier(.34, 1.5, .64, 1) both, trailGoalGlow 2s ease-in-out 900ms infinite; }
+@keyframes trailGoal {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.3) translateY(calc(var(--step) * -0.14)); }
+  100% { transform: scale(1.1); }
+}
+@keyframes trailGoalGlow {
+  0%, 100% { filter: drop-shadow(0 0 calc(var(--step) * 0.18) rgba(255, 196, 74, 0.7)); }
+  50%      { filter: drop-shadow(0 0 calc(var(--step) * 0.42) rgba(255, 214, 120, 0.95)); }
+}
+
 /* ---------- instruction panel ----------
    Moved to the top LEFT. Centred, it sat directly on top of the hanging rig: the
    ropes and their anchors run down the middle and right of the screen, while the
@@ -190,7 +414,10 @@ a:hover { color: var(--ice-pale); }
      art, its place and its clearance of the ropes, and the sentence stays on one line. */
   max-width: 46%;
 }
-.instruction.banner .instruction-text { font-size: calc(193 * var(--k) * 0.78); }
+/* A teaching line is a whole sentence, so its board is longer — but still a FIXED
+   length, for the same reason the question board is (see .instruction-pill). */
+.instruction.banner .instruction-pill { width: calc(44 * var(--u)); }
+.instruction.banner .instruction-text { font-size: calc(193 * var(--k) * 0.78 * var(--fit, 1)); }
 /* AND IT IS LIT while it speaks (asked for): a soft icy glow around the plank, breathing, so the
    eye goes to the words being read out. It is the panel that glows, not the words. */
 .instruction.banner .instruction-pill {
@@ -224,6 +451,26 @@ a:hover { color: var(--ice-pale); }
    the 300ms the HUD waits before hiding the panel (hud.js: _leaveT). */
 .instruction.leaving {
   animation: signPullUp 280ms cubic-bezier(.5, -0.3, .8, .6) both;
+}
+/* AND THE CENTRED BOARD LEAVES FROM WHERE IT IS STANDING.
+ *
+ * .instruction.centered is placed with left:50% and transform: translateX(-50%) — the
+ * transform IS half its centring. signPullUp animates `transform`, and an animation
+ * replaces the property outright rather than composing with it, so the moment the exit
+ * began the -50% was dropped and the board jumped half its own width (365px) to the
+ * right before sliding up. Twice per Part 2 crossing.
+ *
+ * Same curve, same timings, the X shift carried through every keyframe. Any future
+ * edit to signPullUp has to be made here too — which is the cost of CSS animations not
+ * composing, and cheaper than the alternatives (a wrapper element, or centring with
+ * margins so the transform is free). */
+.instruction.centered.leaving {
+  animation: signPullUpCentred 280ms cubic-bezier(.5, -0.3, .8, .6) both;
+}
+@keyframes signPullUpCentred {
+  0%   { transform: translateX(-50%) translateY(0); opacity: 1; }
+  20%  { transform: translateX(-50%) translateY(0); opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  100% { transform: translateX(-50%) translateY(-230%); opacity: 0; }
 }
 /* And the exit is straight up as well — no dip below the mark first, for the same reason the
    drop no longer overshoots downward: 3.5% down is the ropes' cut ends in the picture. The
@@ -325,6 +572,25 @@ a:hover { color: var(--ice-pale); }
      board falls and settles straight down — and the old origin was 140% above the plank
      because that is where the ropes used to leave the frame. */
 
+  /* ONE PLANK, ALWAYS THE SAME PLANK.
+   *
+   * This was shrink-to-fit, and the middle of the board is a single 1498x478 artwork
+   * stretched to whatever width that produced — so the grain and the snowdrifts were
+   * scaled sideways by between 1.40x and 2.50x depending on which question was up,
+   * measured across all nine. A sign that is a different shape every time is not a
+   * sign, and the smeared timber is what was reported as squeezed and unnatural.
+   *
+   * Fixed, the horizontal stretch is one constant for the whole game and the board is
+   * recognisably the same object being lowered in again. The WORDS give way instead —
+   * Hud.fitInstruction scales the type, which is what a signwriter does.
+   *
+   * 38 stage units, and it has to clear two things at once. CENTRED (Part 2's three
+   * crossings) it runs x 595..1325 and the progress trail starts at 1360. In the LEFT
+   * band (the six rope crossings, left: 1.6%) it runs 31..761 and the option row's safe
+   * area starts at 770. Both by about 20px, at every viewport, because this is in stage
+   * units and so is everything it has to miss. */
+  width: calc(38 * var(--u));
+
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -390,7 +656,10 @@ a:hover { color: var(--ice-pale); }
      on the pale panel at y 295 it runs 199..392, which leaves 41 art px of clear timber
      above the capitals and 40 below — clear of the snow along the top edge and of the dark
      rim under the bottom. */
-  font-size: calc(193 * var(--k));
+  /* --fit is set by Hud.fitInstruction: 1 for a sentence that fits the fixed board, and
+     the ratio it needs for one that does not. The board no longer grows to the words —
+     see the note on that method for why, and for what it looked like when it did. */
+  font-size: calc(193 * var(--k) * var(--fit, 1));
   line-height: 1;
   font-weight: 900;
   /* dark warm brown, which is what reads on pale timber; the old deep blue was chosen
@@ -496,6 +765,25 @@ a:hover { color: var(--ice-pale); }
    now, so it arrives with signDrop and leaves with signPullUp, both up beside the panel. */
 
 @media (prefers-reduced-motion: reduce) {
+  /* THE TRAIL, STILL. Every one of these is decoration over a read-out that works
+     perfectly as three static pictures — which stone you are on is carried by the ART,
+     not by the motion. Held at their end states, never at the opacity 0 or the scale
+     1.42 a keyframe starts from: an element whose only visible state is inside a
+     keyframe vanishes the moment the animation is switched off, which is the fault
+     already on the record for .hand-hint. Momo still MOVES between stones — `left` is
+     a transition, and stopping that would leave him on the wrong stone — he simply
+     travels flat instead of arcing. */
+  .trail.enter, .trail-step.now, .trail-step.just, .trail-momo.hop, .trail-momo.idle {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .trail-momo.hop, .trail-momo.idle { transform: translateX(-50%); }
+  .trail-step.goal.lit { animation: none; transform: scale(1.1); }
+  .trail-pop { display: none; }
+  /* The fill still MOVES — it is the read-out, not decoration — it simply jumps. */
+  .trail-fill, .trail-momo { transition: none; }
+
   /* The tap ring and the Ouch icon's pop were the two that escaped this block. The
      ring is pure decoration, so it goes; the icon has to stay VISIBLE, so it is held
      at the animation's end state rather than at the opacity 0 it starts from — an
@@ -807,28 +1095,9 @@ a:hover { color: var(--ice-pale); }
   /* Above the focus layer: the words are the question and must never be softened. */
   z-index: 8;
 }
+/* THE SECOND LINE IS GONE — see index.html, where the element was.
 
-/* THE SECOND LINE ON THE BOARD.
-
-   Part 1 had none — its questions were three words and anything more was noise. Part 2's
-   later crossings ask about two properties at once ("a concave pentagon"), and two of
-   them want BOTH matching shapes while the headline stays singular, so the count has to
-   be said somewhere.
-
-   Deliberately quieter than the question: smaller, and in the board's own brown rather
-   than the key-word blue. It is a clarification, not a second instruction, and if it
-   competed with the line above it there would be two things to read instead of one. */
-.instruction-sub {
-  display: block;
-  font-size: clamp(9px, calc(1.02 * var(--u)), 26px);
-  font-weight: 600;
-  line-height: 1.15;
-  margin-top: calc(0.28 * var(--u));
-  color: #7A5230;
-  opacity: 0.92;
-  white-space: normal;
-}
-.instruction-sub[hidden] { display: none; }
-/* On the centred Part 2 board the words have the width of the stage, so the second line
-   should not be allowed to run the full span and turn into a paragraph. */
-.instruction.centered .instruction-sub { max-width: 72ch; margin-left: auto; margin-right: auto; }
+   It was emptied and hidden on every HUD push, so these rules could never style
+   anything. The sentences still live in CFG.levelOne.phases and are still tested
+   (curriculum.spec: "every phase has a sub-line"); they are simply not published to
+   the HUD. */
