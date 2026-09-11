@@ -5935,13 +5935,27 @@ export function createGame(canvas, hooks = {}) {
       case 'AVALANCHE':
         G.moving = true; G.jumpEnabled = false; G.speedFactor = 1;
         G.avT = 0; G.avX = -760;            // it starts off the left edge
+        G.avRoared = false; G.avPuff = 0; G.avCracked = false; G.avSquealed = false;
         mammoth.setState('RUN');
+        /* THE SOUND OF IT, and it is three things rather than one.
+           `anticipate` is the rising tick before anything is visible — the cue that
+           something is coming, which is what makes the first second tense instead of
+           empty. The rumble is the body of it, and the music ducks hard underneath so
+           the roar owns the beat. The comic beats (a startled squeak from Momo, the
+           whoosh as the wave arrives) come later, on the frames they belong to. */
+        audio.kit('anticipate', { volume: 0.8, vary: 0 });
         audio.rumble();
-        audio.setDuck(0.55);                // the roar owns this beat
+        audio.setDuck(0.4);
         quake(reduced ? 5 : 13, T.avalancheRoar + T.avalancheSweep, T.avalancheRoar);
+        G.avGap = -9999;                    // the first crevasse opens on the next tick
         break;
       case 'RUN_SEGMENT_1':
         G.avT = 0;                          // the wall is gone; nothing left to draw
+        /* AND THE TRAIL GOES WITH IT. The collapsing ice behind him is scenery for the
+           opening and nothing else: left in ground.gaps it would still be there when the
+           first crossing is laid out, and the pruner only drops gaps that are behind the
+           character — these are, but they would linger in the list for the whole run. */
+        ground.gaps = ground.gaps.filter(g => !g.avalanche);
         audio.setDuck(1);
         G.moving = true; G.jumpEnabled = true; mammoth.setState('RUN'); break;
       case 'JUMP_CHALLENGE_1':
@@ -8044,7 +8058,49 @@ export function createGame(canvas, hooks = {}) {
           particles.poof(fx, CFG.surfaceY - rand(0, 90), 2, 1.7);
           particles.chips(fx, CFG.surfaceY - rand(10, 60), 1, -rand(140, 320));
         }
-        if (G.st > roar && !G.avRoared) { G.avRoared = true; audio.crack(); shake(reduced ? 2 : 6, 400); }
+        /* THE PATH COMES APART BEHIND HIM, the whole way. One crevasse scrolls off the
+           left inside a second at running speed, so it is a TRAIL: a new one opens just
+           behind his heels every so often, cracks, yawns and slides away with the rest
+           of the world. What the shot says is that the ground he was on a moment ago is
+           not there any more — he is running from the snow AND from the floor. */
+        if (G.st < roar + sweep && G.st - (G.avGap || 0) > 620) {
+          G.avGap = G.st;
+          const back = G.worldX + CFG.mammothX - 300;
+          const w = 190 + rand(0, 120);
+          ground.addGap({
+            x0: back, x1: back + w, throat: Math.round(w / (L1.mouth || 1.6)),
+            open: 0, repaired: false, crack: 0, crackPts: makeCrack(),
+            bridge: 0, splashes: null, slots: [], pieces: [], avalanche: true, born: G.st
+          });
+          audio.crack();
+        }
+        for (const g of ground.gaps) {
+          if (!g.avalanche) continue;
+          const age = G.st - (g.born || 0);
+          g.crack = clamp(age / 260, 0, 1);
+          g.open = clamp((age - 180) / 320, 0, 1);
+        }
+        /* THE COMEDY BEATS, each on the frame it belongs to rather than all at the
+           start. The crack is the ground going; the squeak is Momo noticing; the
+           whoosh is the wave itself passing. Spread out, they read as one event
+           happening TO someone instead of a stack of sounds at the door. */
+        if (G.st > roar && !G.avRoared) {
+          G.avRoared = true;
+          audio.crack();
+          audio.kit('swoosh', { volume: 0.9, vary: 0.1 });
+          shake(reduced ? 2 : 6, 400);
+        }
+        if (G.st > roar * 0.55 && !G.avSquealed) {
+          G.avSquealed = true;
+          // he has just worked out what that noise was
+          audio.kit('squeak', { volume: 0.85, vary: 0.15 });
+          mammoth.jolt(reduced ? 0.3 : 0.65);
+        }
+        if (G.st > roar + sweep * 0.45 && !G.avCracked) {
+          G.avCracked = true;
+          audio.crack();
+          audio.kit('boing', { volume: 0.5, vary: 0.2 });   // the cartoon punctuation
+        }
         if (G.st > total) setState('RUN_SEGMENT_1');
         break;
       }
@@ -11088,7 +11144,21 @@ export function createGame(canvas, hooks = {}) {
        travels at the speed it travels — the slight front-load is only so it does not
        start with a visible jerk. Timed so it reaches him at about 1.7s, which leaves him
        plainly ahead of it and plainly not by much. */
-    const front = lerp(-500, CFG.W + 400, Math.pow(q, 0.85));
+    /* IT NEVER CATCHES HIM, AND IT NEVER COVERS HIM. The wave closing past Momo put
+       him inside the cloud — which hides the one thing the shot is about, and reads as
+       him being buried rather than escaping. It closes on his heels and stops there:
+       the chase is the picture, so he stays sharp, ahead of it, with clear ice in front
+       of him to run onto. */
+    /* IT CATCHES HIS HEELS AND NO MORE. Momo runs at x 430 of a 1920 stage, so there
+       is only a quarter of the screen behind him — clamp the wave fully off him and
+       almost none of it is visible, which is what happened first. It closes to just
+       past his tail instead: his hindquarters are in the snow, his head and the ice
+       ahead of him are clear, and a good half of the frame is wall. Caught but not
+       buried, which is the shot. */
+    const front = Math.min(
+      lerp(-620, CFG.mammothX + 420, Math.pow(q, 0.8)),
+      CFG.mammothX + 240
+    );
     ctx.save();
     /* NORMAL BLENDING, NOT ADDITIVE — and this is what turned it from a glow into snow.
        Additive white over a bright sky can only ever get brighter, so the cloud had no
@@ -11113,8 +11183,23 @@ export function createGame(canvas, hooks = {}) {
       const speed = 0.55 + a2 * 0.75;
       const phase = (sec * speed * 0.62 + a3) % 1;       // 0 at the ridge, 1 at the foot
 
-      const x = -260 + lane * 1500
-              + phase * 760                              // the down-slope lean
+      /* PLACED RELATIVE TO THE FRONT, not in absolute stage space. Laid out across a
+         fixed band and then gated on the front, most of the cloud fell outside the
+         frame the moment the front was clamped to stay behind Momo — the wall thinned
+         to nothing and the shot lost its subject. Hung off the front instead, the mass
+         is always where the wall is, however the timing is tuned.  is how far
+         behind the leading edge this puff sits. */
+      /* THE FRONT LEANS FORWARD AT THE TOP, which is both what an avalanche does and
+         the only way this shot works. Momo runs at x 430 of a 1920 stage, so the ground
+         behind him is a quarter of the frame: a vertical wall kept off him is a wall
+         almost entirely off-screen, which is why it kept thinning to nothing. A real
+         slide billows out ahead of its own foot — the cloud overruns the snow beneath
+         it — so the leading edge here runs far to the right up in the sky and tucks
+         back behind his heels at ground level. He stays clear, the frame stays full. */
+      const yFrac = clamp((-220 + phase * (CFG.H + 300)) / CFG.H, 0, 1);
+      const lean = (1 - yFrac) * 620;
+      const back = lane;
+      const x = front + lean - back * 920
               + Math.sin(sec * 1.6 + i) * 26;            // turbulence
       const y = -220 + phase * (CFG.H + 300)
               + Math.cos(sec * 1.9 + i * 0.7) * 18;
@@ -11134,14 +11219,10 @@ export function createGame(canvas, hooks = {}) {
        * A puff the front has not reached yet is not drawn at all; one just behind it is
        * at full weight; further back it fades. That is the whole difference between
        * weather and a wall, and it costs one number. */
-      const d = front - x;
-      if (d < 0) continue;                               // the front has not got here yet
-      /* THE BULK RUNS A LONG WAY BACK from the leading edge — it is a mountainside of
-         snow, not a breaking wave. Full weight from just behind the front to about a
-         screen back, then thinning into the haze it leaves. Too narrow a band and the
-         wall reads as a thin bright line travelling across the sky, which is what the
-         first pass at this looked like. */
-      const body = clamp(d / 170, 0, 1) * clamp(1 - (d - 760) / 1000, 0, 1);
+      /* DENSEST JUST BEHIND THE EDGE and thinning away back — a mountainside of snow
+         rather than a breaking wave. The very front is slightly softer so the leading
+         edge frays instead of ending on a line. */
+      const body = clamp(back / 0.08, 0, 1) * clamp(1 - (back - 0.55) / 0.55, 0, 1);
       if (body <= 0.01) continue;
 
       const dens = amp * body * (0.52 + grow * 0.72) * (0.6 + a1 * 0.5);
@@ -11149,8 +11230,8 @@ export function createGame(canvas, hooks = {}) {
 
       // the body: a cool grey-blue, so the mass has weight and does not blow out
       const sh = ctx.createRadialGradient(x, y, 0, x, y, r);
-      sh.addColorStop(0, `rgba(196,219,238,${(0.40 * dens).toFixed(3)})`);
-      sh.addColorStop(0.55, `rgba(206,228,244,${(0.22 * dens).toFixed(3)})`);
+      sh.addColorStop(0, `rgba(196,219,238,${(0.78 * dens).toFixed(3)})`);
+      sh.addColorStop(0.55, `rgba(206,228,244,${(0.46 * dens).toFixed(3)})`);
       sh.addColorStop(1, 'rgba(206,228,244,0)');
       ctx.fillStyle = sh;
       ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
@@ -11158,8 +11239,8 @@ export function createGame(canvas, hooks = {}) {
       // the lit crown, up and to the left, where the sun is
       const lx = x - r * 0.26, ly = y - r * 0.3, lr = r * 0.78;
       const li = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
-      li.addColorStop(0, `rgba(255,255,255,${(0.52 * dens).toFixed(3)})`);
-      li.addColorStop(0.6, `rgba(250,253,255,${(0.20 * dens).toFixed(3)})`);
+      li.addColorStop(0, `rgba(255,255,255,${(0.92 * dens).toFixed(3)})`);
+      li.addColorStop(0.6, `rgba(250,253,255,${(0.38 * dens).toFixed(3)})`);
       li.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = li;
       ctx.beginPath(); ctx.arc(lx, ly, lr, 0, 6.2832); ctx.fill();
@@ -11173,14 +11254,12 @@ export function createGame(canvas, hooks = {}) {
       const a1 = Math.abs((Math.sin(i * 7.13) * 43758.5453) % 1);
       const a2 = Math.abs((Math.sin(i * 3.71 + 2.2) * 24634.6345) % 1);
       const ph = (sec * (1.5 + a2 * 1.4) + a1) % 1;
-      const sx = -200 + a1 * 1600 + ph * 700;
       const sy = -140 + ph * (CFG.H + 220);
+      // the same forward lean the billows have, so the snow stays inside the wall
+      const sx = front + (1 - clamp(sy / CFG.H, 0, 1)) * 620 - a1 * 900;
       const len = 34 + a2 * 62;
-      // gated on the front too, or the snow arrives before the wall carrying it
-      const dd = front - sx;
-      if (dd < 0) continue;
-      const al = amp * 0.62 * Math.sin(clamp(ph, 0, 1) * Math.PI)
-               * clamp(dd / 200, 0, 1) * clamp(1 - (dd - 260) / 800, 0, 1);
+      // hung off the front like the billows, so the snow is always inside the wall
+      const al = amp * 0.62 * Math.sin(clamp(ph, 0, 1) * Math.PI) * clamp(1 - a1 / 0.85, 0, 1);
       if (al <= 0.02) continue;
       ctx.strokeStyle = `rgba(255,255,255,${al.toFixed(3)})`;
       ctx.lineWidth = 2 + a2 * 3;
@@ -11195,7 +11274,7 @@ export function createGame(canvas, hooks = {}) {
        thins to nothing, so the ice behind the wave dims out rather than being cut off
        at a line. Normal blending, over the top, because this one is meant to obscure. */
     ctx.save();
-    ctx.globalAlpha = amp * 0.62 * clamp((t - roar * 0.4) / roar, 0, 1);
+    ctx.globalAlpha = amp * 0.8 * clamp((t - roar * 0.4) / roar, 0, 1);
     /* THE HAZE SITS BEHIND THE FRONT, not over the whole stage. Washing everything
        evenly was the other half of why this read as weather: the ground Momo is running
        onto should be clear, and only what the wave has already taken is hidden. */

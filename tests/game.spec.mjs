@@ -222,9 +222,13 @@ test.describe('Level 1', () => {
        a fixed duration in milliseconds, so ?speed alone shortens nothing, and a
        runner without a GPU spends most of each frame compositing. Physics is
        unchanged — see the note in engine.js. */
-    test.setTimeout(420_000);
+    /* THE JOURNEY IS NINE CROSSINGS NOW, not seven, and game time runs slower than
+       wall clock on a renderer that cannot hold 30fps (see helpers.mjs). Two more
+       crossings plus the avalanche put this past the old budget on this machine, and
+       it timed out mid-loop and reported a progression bug that was not happening. */
+    test.setTimeout(720_000);
     const errors = await boot(page, { speed: 900, fast: 5 });
-    const r = await playLevelOne(page, { budgetMs: 330_000 });
+    const r = await playLevelOne(page, { budgetMs: 620_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state + '@' + r.phase).toBe(false);
     expect(r.phasesDone, 'every crossing credited').toBeGreaterThanOrEqual(6);
     expect(['RUN_SEGMENT_2', 'FINAL_RUN', 'COMPLETE']).toContain(r.state);
@@ -233,9 +237,13 @@ test.describe('Level 1', () => {
   });
 
   test('a wrong answer in every phase still completes the level', async ({ page }) => {
-    test.setTimeout(420_000);
+    /* THE JOURNEY IS NINE CROSSINGS NOW, not seven, and game time runs slower than
+       wall clock on a renderer that cannot hold 30fps (see helpers.mjs). Two more
+       crossings plus the avalanche put this past the old budget on this machine, and
+       it timed out mid-loop and reported a progression bug that was not happening. */
+    test.setTimeout(720_000);
     const errors = await boot(page, { speed: 900, fast: 5 });
-    const r = await playLevelOne(page, { wrongFirst: true, budgetMs: 330_000 });
+    const r = await playLevelOne(page, { wrongFirst: true, budgetMs: 620_000 });
     expect(r.timedOut, 'ran out of wall clock at ' + r.state + '@' + r.phase).toBe(false);
     expect(r.phasesDone, 'every crossing credited').toBeGreaterThanOrEqual(6);
     expect(r.trail.join(' ')).toContain('PHASE_WRONG');

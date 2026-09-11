@@ -290,12 +290,13 @@ test.describe('the controls', () => {
 });
 
 test.describe('the end of the journey', () => {
-  test.setTimeout(420_000);
+  // nine crossings now, on a renderer that runs game time slower than wall clock
+  test.setTimeout(720_000);
 
   /* The run home must start after the LAST phase and not a phase earlier — with the
      count changing from six to seven, an off-by-one here would cut a crossing out of
      the curriculum without failing anything else. */
-  test('the run home starts only once every phase is repaired, and reaches COMPLETE', async ({ page }) => {
+  test('the run home starts only once every crossing is repaired, and reaches COMPLETE', async ({ page }) => {
     const errors = await boot(page, { speed: 900, fast: 6 });
     const total = await page.evaluate(async () => {
       const m = await import('/js/engine.js');
@@ -305,7 +306,7 @@ test.describe('the end of the journey', () => {
       const g = window.iceAgeGame;
       const t0 = Date.now();
       let doneAtFinalRun = -1;
-      while (Date.now() - t0 < 300_000) {
+      while (Date.now() - t0 < 620_000) {
         const G = g.debug();
         for (const o of g._obstacles().list) {
           const sx = o.x - G.worldX;
