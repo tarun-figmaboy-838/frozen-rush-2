@@ -1,14 +1,16 @@
 /* THE CURRICULUM, held to its own spec.
 
-   Seven phases, and the thing being taught is that a polygon's identity is its
-   NUMBER OF SIDES — not how regular it looks, and not whether it is convex. So
-   these tests check two separate things and keep them separate:
+   SIX ROPE CROSSINGS (levels 4-9), and what they teach is CONCAVITY — whether a shape
+   is dented — not how many sides it has. Part 2 replaced the seven side-counting
+   crossings this file used to describe; levels 1-3 come before these and are drawn on
+   a single slab, so they live in tests/level-two.spec.mjs and part2-crossing2.spec.mjs.
+   These tests check two separate things and keep them separate:
 
      the GEOMETRY   every shape the curriculum names really has the side count,
                     convexity and regularity it claims, straight from the verified
                     registry rather than from a filename or a picture;
-     the PHASE      a phase accepts exactly its targets, rejects everything else,
-                    and — for "cut ALL the pentagons" — is not finished until every
+     the PHASE      a crossing accepts exactly its targets, rejects everything else,
+                    and — where it wants more than one — is not finished until every
                     one of them has been cut, in whatever order the learner chose.
 
    Everything here drives the real engine through its debug hooks. Nothing asserts a
@@ -101,7 +103,11 @@ test.describe('polygon geometry', () => {
         irregularHexagon: [6, false, true], irregularConvexHexagon: [6, false, true],
         irregularConvexOctagon: [8, false, true],
         concavePentagon: [5, false, false], concaveHexagon: [6, false, false],
-        concaveHeptagon: [7, false, false]
+        concaveHeptagon: [7, false, false],
+        // Part 2's second concave pentagon. iceQuadrilateral is deliberately NOT here:
+        // its geometry is traced from the delivered art (option-shapes.js), because the
+        // level draws corner handles ON the picture and they must land on painted corners.
+        concavePentagon2: [5, false, false]
       };
       const turn = (p, i) => {
         const n = p.length, a = p[(i - 1 + n) % n], b = p[i], c = p[(i + 1) % n];
@@ -182,25 +188,46 @@ test.describe('polygon geometry', () => {
 /* =========================== the curriculum data =========================== */
 
 test.describe('curriculum data', () => {
-  test('seven phases, with the exact instruction sentences', async ({ page }) => {
+  /* THE ROPE CROSSINGS ARE 4 TO 9 NOW. Part 2 replaced the seven side-counting
+     crossings this used to assert: the first three levels are drawn on one slab and
+     live in CFG.levelTwo.levels, and what is left here asks about concavity instead.
+     The ids are the level numbers the design names, which is why they start at 4. */
+  test('six rope crossings, with the exact instruction sentences', async ({ page }) => {
     await boot(page);
     const phases = await curriculum(page);
     expect(phases.map(p => p.instruction)).toEqual([
-      'Cut the triangle.',
-      'Cut the quadrilateral.',
-      'Cut the pentagon.',
-      'Cut the hexagon.',
-      'Cut the heptagon.',
-      'Cut all the pentagons.',
-      'Cut all the hexagons.'
+      'Cut the concave polygon.',
+      'Cut the convex polygon.',
+      'Cut the concave pentagon.',
+      'Cut the convex hexagon.',
+      'Cut all the concave polygons.',
+      'Cut all the convex polygons.'
     ]);
-    expect(phases.map(p => p.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(phases.map(p => p.id)).toEqual([4, 5, 6, 7, 8, 9]);
   });
 
-  test('the option counts are 3, 3, 3, 3, 3, 5, 6', async ({ page }) => {
+  /* AND THE THREE BEFORE THEM. Nine levels in all: a child is asked to draw on a slab
+     three times and then to choose from the ropes six times. Asserted here because the
+     count is split across two config blocks and nothing else would notice one of them
+     losing an entry. */
+  test('nine levels in all, numbered 1 to 9 with no gaps', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/engine.js');
+      return {
+        drawn: m.CFG.levelTwo.levels.map(c => c.id),
+        rope: m.CFG.levelOne.phases.map(p => p.id)
+      };
+    });
+    expect(r.drawn).toEqual([1, 2, 3]);
+    expect(r.rope).toEqual([4, 5, 6, 7, 8, 9]);
+    expect(r.drawn.concat(r.rope)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  test('the option counts are 3, 3, 4, 4, 6, 6', async ({ page }) => {
     await boot(page);
     const phases = await curriculum(page);
-    expect(phases.map(p => p.options)).toEqual([3, 3, 3, 3, 3, 5, 6]);
+    expect(phases.map(p => p.options)).toEqual([3, 3, 4, 4, 6, 6]);
     // and every phase really has that many distinct shapes to hang
     for (const p of phases) {
       const all = p.targets.concat(p.distractors);
@@ -213,15 +240,16 @@ test.describe('curriculum data', () => {
     await boot(page);
     const phases = await curriculum(page);
     const want = [
-      { targets: ['regularTriangle'], distractors: ['regularPentagon', 'regularHexagon'] },
-      { targets: ['regularQuadrilateral'], distractors: ['regularTriangle', 'regularPentagon'] },
-      { targets: ['regularPentagon'], distractors: ['regularTriangle', 'regularOctagon'] },
-      { targets: ['irregularConvexHexagon'], distractors: ['irregularPentagon', 'regularHeptagon'] },
-      { targets: ['concaveHeptagon'], distractors: ['concaveHexagon', 'irregularConvexOctagon'] },
-      { targets: ['regularPentagon', 'irregularConvexPentagon', 'concavePentagon'],
-        distractors: ['concaveHexagon', 'regularQuadrilateral'] },
-      { targets: ['irregularConvexHexagon', 'concaveHexagon', 'regularHexagon'],
-        distractors: ['concaveHeptagon', 'irregularPentagon', 'regularOctagon'] }
+      { targets: ['concaveHexagon'], distractors: ['regularPentagon', 'regularHeptagon'] },
+      { targets: ['regularHexagon'], distractors: ['concavePentagon', 'concaveHeptagon'] },
+      { targets: ['concavePentagon', 'concavePentagon2'],
+        distractors: ['regularPentagon', 'concaveHeptagon'] },
+      { targets: ['regularHexagon', 'irregularConvexHexagon'],
+        distractors: ['regularPentagon', 'concaveHexagon'] },
+      { targets: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
+        distractors: ['regularPentagon', 'irregularConvexHexagon', 'regularOctagon'] },
+      { targets: ['regularTriangle', 'regularQuadrilateral', 'regularOctagon'],
+        distractors: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'] }
     ];
     phases.forEach((p, i) => {
       expect(p.targets.slice().sort(), `phase ${p.id} targets`).toEqual(want[i].targets.slice().sort());
@@ -232,24 +260,53 @@ test.describe('curriculum data', () => {
   /* The instruction names the CLASS, and only the class. Phase 4's answer is an
      irregular hexagon and phase 5's is a concave heptagon — if the sentence said so,
      there would be nothing left for the learner to work out. */
-  test('the instruction names the class, and never the answer', async ({ page }) => {
+  /* THE BAN INVERTED WITH THE CURRICULUM, and that is worth spelling out because the
+     old rule reads like a law and was only ever a consequence.
+
+     Part 1 taught SIDE COUNT, so a sentence saying "concave" handed the answer over and
+     the words were banned outright. Part 2 teaches CONCAVITY — the property IS the
+     question — so naming it is not a leak, it is the instruction. What must not appear
+     now is anything that points at a particular option: where it hangs, what order it
+     is in, or how it is drawn beyond the property being asked for.
+
+     So the test still exists and still guards a leak; it guards the right one. */
+  test('the instruction names the property, and never which option', async ({ page }) => {
     await boot(page);
     const phases = await curriculum(page);
     for (const p of phases) {
       const s = p.instruction.toLowerCase();
-      // it says the class...
-      const cls = ['triangle', 'quadrilateral', 'pentagon', 'hexagon', 'heptagon']
-        .filter(c => s.includes(c));
-      expect(cls.length, `phase ${p.id} names exactly one class: "${p.instruction}"`).toBe(1);
-      // ...and never gives away regularity or convexity, which is what it is testing
-      for (const tell of ['regular', 'irregular', 'convex', 'concave', 'sided', 'sides']) {
+      // it names the property being taught
+      expect(/concave|convex/.test(s), `phase ${p.id} names the property: "${p.instruction}"`).toBe(true);
+      /* ...and never points at an option. "Regular"/"irregular" stay banned: they are
+         not what these levels ask about, so they could only ever narrow the field. */
+      for (const tell of ['regular', 'irregular', 'sided', 'sides',
+                          'left', 'right', 'middle', 'first', 'last', 'biggest', 'smallest']) {
         expect(s, `phase ${p.id} must not say "${tell}"`).not.toContain(tell);
       }
-      // plural exactly when several answers are wanted
-      const plural = s.includes(cls[0] + 's');
-      expect(plural, `phase ${p.id} plural`).toBe(p.targets.length > 1);
-      // and "all" only where it means all
-      expect(s.includes('all the'), `phase ${p.id} "all"`).toBe(p.targets.length > 1);
+      /* "all the" exactly where every match is wanted. Levels 6 and 7 want two and are
+         deliberately singular — the owner's wording — so the COUNT is carried by the
+         second line instead, which is asserted below. */
+      expect(s.includes('all the'), `phase ${p.id} "all"`).toBe(p.targets.length > 2);
+    }
+  });
+
+  /* THE SECOND LINE CARRIES THE COUNT where the headline cannot. Levels 6 and 7 ask for
+     two shapes with a singular sentence, and a child told to cut "the" concave pentagon
+     would cut one and wait — so the sub-line has to say otherwise. */
+  test('every phase has a sub-line, and it says how many where the question does not', async ({ page }) => {
+    await boot(page);
+    const rows = await page.evaluate(async () => {
+      const m = await import('/js/engine.js');
+      return m.CFG.levelOne.phases.map(p => ({ id: p.id, sub: p.sub || '', n: p.targets.length }));
+    });
+    for (const r of rows) {
+      expect(r.sub.length, `phase ${r.id} has a second line`).toBeGreaterThan(0);
+      if (r.n === 2) {
+        expect(r.sub.toLowerCase(), `phase ${r.id} says both`).toContain('both');
+      }
+      if (r.n > 2) {
+        expect(r.sub.toLowerCase(), `phase ${r.id} says all`).toContain('all');
+      }
     }
   });
 
@@ -261,8 +318,8 @@ test.describe('curriculum data', () => {
       return { phases: L.phases.length, runMs: L.runMs.length, jumpBefore: L.jumpBefore,
                ids: L.phases.map(p => p.id) };
     });
-    expect(r.phases).toBe(7);
-    expect(r.runMs, 'one run length per phase').toBe(7);
+    expect(r.phases).toBe(6);
+    expect(r.runMs, 'one run length per phase').toBe(6);
     // every jump-before id is a phase that exists
     for (const id of r.jumpBefore) expect(r.ids).toContain(id);
   });
@@ -287,16 +344,17 @@ test.describe('single-answer phases', () => {
      One distractor swapped in each: an irregular pentagon in 4, a concave hexagon in 5.
      Now neither regularity nor convexity separates the answer from the rest in any
      phase, and only the side count can. */
+  /* Only two rope crossings have a single answer now — 4 and 5, the pair that
+     introduce concave and convex. Their rows are built so the side count cannot
+     answer them: 4 spreads five, six and seven sides across its three options so only
+     the dent separates them, and 5 is its mirror with two dented distractors. */
   const cases = [
-    { i: 0, target: 'regularTriangle', wrong: ['regularPentagon', 'regularHexagon'] },
-    { i: 1, target: 'regularQuadrilateral', wrong: ['regularTriangle', 'regularPentagon'] },
-    { i: 2, target: 'regularPentagon', wrong: ['regularTriangle', 'regularOctagon'] },
-    { i: 3, target: 'irregularConvexHexagon', wrong: ['irregularPentagon', 'regularHeptagon'] },
-    { i: 4, target: 'concaveHeptagon', wrong: ['concaveHexagon', 'irregularConvexOctagon'] }
+    { i: 0, id: 4, target: 'concaveHexagon', wrong: ['regularPentagon', 'regularHeptagon'] },
+    { i: 1, id: 5, target: 'regularHexagon', wrong: ['concavePentagon', 'concaveHeptagon'] }
   ];
 
   for (const c of cases) {
-    test(`phase ${c.i + 1} accepts ${c.target} and refuses its distractors`, async ({ page }) => {
+    test(`level ${c.id} accepts ${c.target} and refuses its distractors`, async ({ page }) => {
       const errors = await boot(page, { speed: 900, fast: 4 });
 
       // every distractor first, so a wrong answer is proved recoverable
@@ -334,44 +392,51 @@ test.describe('multi-answer phases', () => {
      than the game — see the note at the top of helpers.mjs. */
   test.setTimeout(600_000);
 
+  /* FOUR crossings want more than one shape now, not two. 6 and 7 want a PAIR and ask
+     about two properties at once — each has a distractor with the right property and the
+     wrong side count, and one with the right count and the wrong property, so neither
+     half of the question can be skipped. 8 and 9 want all three of a kind. */
   const MULTI = [
-    /* phase 6's irregularHexagon -> concaveHexagon: both distractors were convex while
-       one of the three targets is a concave pentagon, so concavity identified one of
-       the three answers for free. */
-    { i: 5, name: 'phase 6', targets: ['regularPentagon', 'irregularConvexPentagon', 'concavePentagon'],
-      wrong: ['concaveHexagon', 'regularQuadrilateral'] },
-    { i: 6, name: 'phase 7', targets: ['irregularConvexHexagon', 'concaveHexagon', 'regularHexagon'],
-      wrong: ['concaveHeptagon', 'irregularPentagon', 'regularOctagon'] }
+    { i: 2, name: 'level 6', targets: ['concavePentagon', 'concavePentagon2'],
+      wrong: ['regularPentagon', 'concaveHeptagon'] },
+    { i: 3, name: 'level 7', targets: ['regularHexagon', 'irregularConvexHexagon'],
+      wrong: ['regularPentagon', 'concaveHexagon'] },
+    { i: 4, name: 'level 8', targets: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
+      wrong: ['regularPentagon', 'irregularConvexHexagon', 'regularOctagon'] },
+    { i: 5, name: 'level 9', targets: ['regularTriangle', 'regularQuadrilateral', 'regularOctagon'],
+      wrong: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'] }
   ];
 
   for (const m of MULTI) {
-    test(`${m.name} does not complete until all three targets are cut`, async ({ page }) => {
+    test(`${m.name} does not complete until every target is cut`, async ({ page }) => {
       const errors = await boot(page, { speed: 900, fast: 4 });
       const start = await enterPhase(page, m.i);
-      expect(start.wanted.sort(), 'all three are wanted up front').toEqual(m.targets.slice().sort());
-      expect(start.slots, 'one repair slot per answer').toBe(3);
+      const N = m.targets.length;
+      expect(start.wanted.sort(), 'every answer is wanted up front').toEqual(m.targets.slice().sort());
+      /* ONE SLOT PER ANSWER, whatever that number is. Levels 6 and 7 want a pair and 8
+         and 9 want three, so a hard-coded count here would only ever be right for half
+         of them — and the property being tested is the relationship, not the number. */
+      expect(start.slots, 'one repair slot per answer').toBe(N);
 
-      const r1 = await cutAndSettle(page, m.targets[0]);
-      expect(r1.state, 'one answer is not all of them').toBe('PHASE_ACTIVE');
-      expect(r1.solved).toBe(1);
-      expect(r1.phasesDone, 'the phase has not been credited').toBe(0);
-
-      const r2 = await cutAndSettle(page, m.targets[1]);
-      expect(r2.state, 'two answers are not all of them').toBe('PHASE_ACTIVE');
-      expect(r2.solved).toBe(2);
-      expect(r2.phasesDone).toBe(0);
-
-      const r3 = await cutAndSettle(page, m.targets[2]);
-      expect(r3.wanted, 'and now nothing is wanted').toEqual([]);
-      expect(['PHASE_DONE', 'PHASE_RUN', 'RUN_SEGMENT_2', 'FINAL_RUN', 'COMPLETE']).toContain(r3.state);
+      // every answer but the last leaves the crossing open
+      for (let k = 0; k < N - 1; k++) {
+        const r = await cutAndSettle(page, m.targets[k]);
+        expect(r.state, (k + 1) + ' of ' + N + ' is not all of them').toBe('PHASE_ACTIVE');
+        expect(r.solved).toBe(k + 1);
+        expect(r.phasesDone, 'the crossing has not been credited').toBe(0);
+      }
+      const last = await cutAndSettle(page, m.targets[N - 1]);
+      expect(last.wanted, 'and now nothing is wanted').toEqual([]);
+      expect(['PHASE_DONE', 'PHASE_RUN', 'RUN_SEGMENT_2', 'FINAL_RUN', 'COMPLETE']).toContain(last.state);
       expect(jsErrors(errors), 'the game threw').toEqual([]);
     });
 
     test(`${m.name} accepts its targets in any order`, async ({ page }) => {
       const errors = await boot(page, { speed: 900, fast: 4 });
-      const [a, b, c] = m.targets;
-      // three genuinely different orders through the same phase
-      const orders = [[a, b, c], [c, a, b], [b, c, a]];
+      /* Every rotation of the answers — two orders for a pair, three for a trio — so
+         the test covers each shape going first without assuming how many there are. */
+      const t = m.targets;
+      const orders = t.map((_, k) => t.slice(k).concat(t.slice(0, k)));
       for (const order of orders) {
         await enterPhase(page, m.i);
         let last = null;
@@ -432,7 +497,7 @@ test.describe('multi-answer phases', () => {
         return { solved: L.targets.filter(t => t.filled).length, wanted: L.wanted.length };
       });
       expect(after.solved, 'still one answer in').toBe(1);
-      expect(after.wanted, 'still two wanted').toBe(2);
+      expect(after.wanted, 'and the rest are still wanted').toBe(m.targets.length - 1);
       expect(jsErrors(errors), 'the game threw').toEqual([]);
     });
   }
@@ -541,7 +606,9 @@ test.describe('the hanging row', () => {
   test('no row clips, overlaps, or reaches the character — at every option count', async ({ page }) => {
     await boot(page, { speed: 900, fast: 4 });
     const total = await phaseCount(page);
-    expect(total).toBe(7);
+    // read, not asserted: Part 2 changed how many rope crossings there are and this
+    // test is about the ROW at each option count, not about how many crossings exist
+    expect(total).toBeGreaterThan(0);
 
     for (let i = 0; i < total; i++) {
       await enterPhase(page, i);

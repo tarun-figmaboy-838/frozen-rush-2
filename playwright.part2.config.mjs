@@ -21,7 +21,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: ['level-two.spec.mjs', 'part2*.spec.mjs'],
+  /* ANY spec, not just Part 2's. This started as a Part-2-only runner and that was the
+     wrong shape: what makes it useful is the single server, not the file list, and the
+     specs most worth running after a gameplay change are the ones that were already
+     here. The deploy checks (zzdeploy, zzcase, zzlive) need the other two servers and
+     are skipped below rather than failed. */
+  testIgnore: ['zzdeploy.spec.mjs', 'zzcase.spec.mjs', 'zzlive.spec.mjs'],
   timeout: 120_000,
   workers: 1,
   fullyParallel: false,

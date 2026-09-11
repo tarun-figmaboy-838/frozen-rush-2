@@ -37,12 +37,25 @@ const server = createServer(async (req, res) => {
     const info = await stat(file);
     if (info.isDirectory()) { res.writeHead(403).end('forbidden'); return; }
     const body = await readFile(file);
+    /* CODE IS NEVER CACHED HERE; ART STILL IS.
+     *
+     * A flat max-age=60 on everything is right for the 25MB of art — re-fetching that
+     * per page load made boot the slowest thing in the suite — and quietly wrong for
+     * the code. Edit engine.js, rebuild, reload, and for the next minute the browser
+     * serves the JS it already had: the markup and the stylesheet come back fresh while
+     * the game logic is a minute old. What that looks like from the outside is a game
+     * that has half your change in it, or levels that should be gone still showing up,
+     * and it costs a long time to work out that nothing is wrong with the code.
+     *
+     * The deployment already makes exactly this distinction (vercel.json: assets
+     * immutable for a year, js and html must-revalidate). The dev server should not be
+     * the one place that disagrees with it. */
+    const ext = extname(file).toLowerCase();
+    const isCode = ext === '.js' || ext === '.mjs' || ext === '.html' || ext === '.css';
     res.writeHead(200, {
-      'Content-Type': MIME[extname(file).toLowerCase()] || 'application/octet-stream',
+      'Content-Type': MIME[ext] || 'application/octet-stream',
       'Content-Length': body.length,
-      // let the browser cache: the game preloads about 25MB of art, and re-fetching
-      // all of it for every test made boot the slowest thing in the suite
-      'Cache-Control': 'public, max-age=60'
+      'Cache-Control': isCode ? 'no-cache, must-revalidate' : 'public, max-age=60'
     });
     res.end(body);
   } catch {
