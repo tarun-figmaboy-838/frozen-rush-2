@@ -261,14 +261,11 @@ export class Hud {
        stage, so the left band is not where the eye is and a sign parked there reads as
        abandoned. A class on the same element — same board, same type, moved. */
     if (el) el.classList.toggle('centered', !!h.signCentre);
-    /* THE SECOND LINE. Only the later Part 2 crossings set one — it names the property
-       being asked about and, where two shapes match, says so. Hidden the rest of the
-       time rather than left empty, so it takes no space on the board when unused. */
-    if (this.el.sub) {
-      const sub = h.sub || '';
-      this.el.sub.textContent = sub;
-      this.el.sub.hidden = !sub;
-    }
+    /* NO SECOND LINE ON THE BOARD. One was added for the crossings that want two
+       shapes; it read as a second instruction competing with the first, which is
+       exactly why Part 1 has none. Kept hidden rather than removed from the markup, so
+       nothing has to be re-added if a caption is ever wanted there. */
+    if (this.el.sub) { this.el.sub.textContent = ''; this.el.sub.hidden = true; }
     const outOfSync = message && (el.hidden || el.classList.contains('leaving'));
     if (message !== this.lastMessage || outOfSync) {
       const isNewLine = message !== this.lastMessage;

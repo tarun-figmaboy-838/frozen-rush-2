@@ -1019,7 +1019,7 @@ export const CFG = {
            x 1.6) are both wide enough to be unjumpable and still fit the row. */
         hexR: 139,
         ditches: 2,
-        focusK: 2.79,
+        focusK: 3.20,
         instruction: 'Cut the shape along its diagonal.',
         voId: 'p2-1-diagonal'
       },
@@ -1050,7 +1050,7 @@ export const CFG = {
         /* Bigger than crossing 1's, because the slab itself is smaller: at rest it is
            190px against the hexagon's 278, so the same on-screen working size needs a
            larger multiplier. 3.7 puts it at about 700 across. */
-        focusK: 4.5,
+        focusK: 5.50,
         instruction: 'Draw all the diagonals.',
         voId: 'p2-2-diagonals'
       },
@@ -1077,7 +1077,7 @@ export const CFG = {
         /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
            width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
            in behind the question board. 2.15 keeps it clear. */
-        focusK: 4.3,
+        focusK: 4.70,
         instruction: 'Draw 2 diagonals from the same vertex.',
         voId: 'p2-3-samevertex'
       }
@@ -1149,7 +1149,7 @@ export const CFG = {
        negative area". At 0.49 the slab's foot sits within a few pixels of the 840
        walking line and the composition closes up, with the crossing it is about
        visible just under it rather than stranded at the bottom of the frame. */
-    focusX: 0.5, focusY: 0.53, focusK: 2.63,
+    focusX: 0.5, focusY: 0.56, focusK: 2.63,
     dragSnap: 1.9,            // x cut.vertexSnap: how near a corner a finger has to land
     wrongMs: 700,             // how long a nudge holds before the slab is live again
     holdMs: 200, unfocusMs: 320,
@@ -5781,9 +5781,11 @@ export function createGame(canvas, hooks = {}) {
       /* A tutorial line is a SENTENCE, not a question: it is too long for the plank's left band,
          so the HUD widens and centres the plank for it (see .instruction.banner). */
       signBanner: !!G.signSay,
-      /* The crossing's second line, where it has one. Blank while a tutorial sentence
-         has the board, so the two never stack. */
-      sub: (!G.signSay && G.subline) || '',
+      /* NO SECOND LINE. It was added so the two-answer crossings could say 'both' when
+         their sentence is singular, and it reads as a second instruction competing with
+         the first — which is the thing Part 1 removed on purpose and was right to. The
+         count is carried by the level itself instead: the crossing simply stays open
+         until every answer is in, which is what the crossing already does. */
       /* PART 2's FOCUS LAYER, and whether the plank should move to the middle.
          `p2Focus` raises the blur sheet and the sharp-slab canvas; `signCentre` is
          true for the whole of Part 2's crossing so the question does not hop back to
@@ -5948,9 +5950,11 @@ export function createGame(canvas, hooks = {}) {
         audio.setDuck(0.4);
         quake(reduced ? 5 : 13, T.avalancheRoar + T.avalancheSweep, T.avalancheRoar);
         G.avGap = -9999;                    // the first crevasse opens on the next tick
+        G.avLead = 0;
         break;
       case 'RUN_SEGMENT_1':
         G.avT = 0;                          // the wall is gone; nothing left to draw
+        G.avLead = 0; if (mammoth) mammoth.dx = 0;   // and he settles back to his mark
         /* AND THE TRAIL GOES WITH IT. The collapsing ice behind him is scenery for the
            opening and nothing else: left in ground.gaps it would still be there when the
            first crossing is laid out, and the pruner only drops gaps that are behind the
@@ -8047,6 +8051,22 @@ export function createGame(canvas, hooks = {}) {
         const roar = T.avalancheRoar, sweep = T.avalancheSweep, settle = T.avalancheSettle;
         const total = roar + sweep + settle;
         G.avT = clamp(G.st / total, 0, 1);
+        /* HE RUNS FORWARD, OUT OF THE CORNER. He stands at x 430 for the whole game,
+           which is right for a runner — the world scrolls past a fixed character — and
+           wrong for this one shot: it pins him against the left edge with the thing
+           chasing him squeezed into the quarter of the frame behind him, so there is
+           no room for the avalanche to BE anything. He is carried forward to about a
+           third of the way in while it lasts and eased back as it clears.
+
+           A DRAW OFFSET AND NOTHING ELSE — the same rule the jump's forward lead
+           follows. The collider, the crevasse layout and every distance in the game
+           are still measured from mammothX; only the picture moves. */
+        {
+          const inK = easeOut(clamp(G.st / (roar + sweep * 0.5), 0, 1));
+          const outK = easeInOut(clamp((G.st - (roar + sweep)) / settle, 0, 1));
+          G.avLead = 300 * inK * (1 - outK);
+          if (mammoth) mammoth.dx = G.avLead;
+        }
         /* SNOW REACHING THE GROUND. The cloud itself is drawn as a falling field (see
            drawAvalanche); this is what it throws up where it lands, so the wave has a
            foot on the ice rather than floating over it. Along the left of the pass,
@@ -8160,7 +8180,7 @@ export function createGame(canvas, hooks = {}) {
       case 'LEVEL_2_OVERVIEW':
         if (G.st > (L2.overviewMs || 1350)) setState('LEVEL_2_FOCUS');
         break;
-      case 'LEVEL_2_FOCUS': if (G.st > (L2.focusMs || T.focus)) setState('LEVEL_2_ACTIVE'); break;
+      case 'LEVEL_2_FOCUS': if (G.st > (p2Cfg().focusMs || T.focus)) setState('LEVEL_2_ACTIVE'); break;
       case 'LEVEL_2_ACTIVE': break;
       /* THE NUDGE HOLDS, AND SO DOES ANYTHING STILL MOVING. A wrong cut that only
          wobbled the slab is over in wrongMs; one that tipped it into the river is over
@@ -10564,7 +10584,12 @@ export function createGame(canvas, hooks = {}) {
     /* THE HANDLES FADE IN once they are wanted — on the first touch, or on their own
        after a few seconds, so a child who is still looking is not left with nothing to
        aim at. Eased rather than switched, or six beads appear between two frames. */
-    if (G.state === 'LEVEL_2_ACTIVE' && (L.wantReveal || G.idle > 2.6)) L.wantReveal = true;
+    /* THEY COME UP WITH THE QUESTION, as part of the sequence. They used to wait for
+       the first touch, which put the child in the position of having to discover that
+       there was anything to take hold of before being shown it — and on a level whose
+       whole instruction is 'draw between the corners', the corners are not a reward for
+       guessing right. The slab arrives, it settles, the handles fade up on it. */
+    if (G.state === 'LEVEL_2_ACTIVE') L.wantReveal = true;
     L.reveal = clamp((L.reveal || 0) + (L.wantReveal ? dt * 3.2 : 0), 0, 1);
     if (L.shear) { L.shear.t += dt; if (L.shear.t > 0.9) L.shear = null; }
     if (L.badLine) { L.badLine.t += dt; if (L.badLine.t > 0.65) L.badLine = null; }
@@ -10577,7 +10602,7 @@ export function createGame(canvas, hooks = {}) {
       const p = clamp((G.st - (L2.overviewMs - (L2.glowMs || 620))) / (L2.glowMs || 620), 0, 1);
       L.glow = easeOut(p);
       L.pop = easeBackOut(clamp((G.st - (L2.overviewMs - (L2.popMs || 420))) / (L2.popMs || 420), 0, 1));
-      L.scale = 1 + (L2.popK - 1) * L.pop;
+      L.scale = 1 + ((p2Cfg().popK || L2.popK) - 1) * L.pop;
       return;
     }
 
@@ -10669,13 +10694,20 @@ export function createGame(canvas, hooks = {}) {
     }
 
     if (['LEVEL_2_FOCUS', 'LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state)) {
-      const p = G.state === 'LEVEL_2_FOCUS' ? clamp(G.st / (L2.focusMs || T.focus), 0, 1) : 1;
+      /* THE FRAMING IS PER CROSSING. focusK lives on the level, because the three slabs
+         are different sizes at rest — 278px of hexagon against 156 of quadrilateral —
+         and one multiplier cannot bring them to the same working size on screen. This
+         read the SHARED value, so the two smaller slabs were drawn at the hexagon's
+         multiplier and came out at 420 and 472 against its 730: the reported "level 2
+         and 3 look small to cut". Every framing number is read through p2Cfg() now. */
+      const C = p2Cfg();
+      const p = G.state === 'LEVEL_2_FOCUS' ? clamp(G.st / (C.focusMs || T.focus), 0, 1) : 1;
       const e = easeInOut(p);
       L.focusT = e;
       L.glow = Math.max(0, (L.glow || 0) - dt * 1.6);
-      L.pos.x = lerp(L.home.x, CFG.W * L2.focusX, e);
-      L.pos.y = lerp(L.home.y, CFG.H * L2.focusY, e);
-      L.scale = lerp(L2.popK, L2.focusK, e);
+      L.pos.x = lerp(L.home.x, CFG.W * C.focusX, e);
+      L.pos.y = lerp(L.home.y, CFG.H * C.focusY, e);
+      L.scale = lerp(C.popK, C.focusK, e);
     }
   }
 
@@ -10716,9 +10748,10 @@ export function createGame(canvas, hooks = {}) {
     L.split = 1;
     if (G.st <= unfocusEnd) {
       const q = clamp((G.st - holdEnd) / (unfocusEnd - holdEnd), 0, 1), e = easeInOut(q);
-      L.scale = lerp(L2.focusK, 1, e);
-      L.pos.x = lerp(CFG.W * L2.focusX, L.home.x, e);
-      L.pos.y = lerp(CFG.H * L2.focusY, L.home.y, e);
+      const C = p2Cfg();
+      L.scale = lerp(C.focusK, 1, e);
+      L.pos.x = lerp(CFG.W * C.focusX, L.home.x, e);
+      L.pos.y = lerp(CFG.H * C.focusY, L.home.y, e);
       L.focusT = 1 - e;
       place();
       return;
@@ -11155,10 +11188,14 @@ export function createGame(canvas, hooks = {}) {
        past his tail instead: his hindquarters are in the snow, his head and the ice
        ahead of him are clear, and a good half of the frame is wall. Caught but not
        buried, which is the shot. */
-    const front = Math.min(
-      lerp(-620, CFG.mammothX + 420, Math.pow(q, 0.8)),
-      CFG.mammothX + 240
-    );
+    /* IT CHASES WHERE HE IS DRAWN, not where his collider sits. He is carried forward
+       to about a third of the frame while this lasts (see the AVALANCHE update), which
+       is the whole point — it opens up the space behind him for the wave to actually
+       be something. Measured against his mark instead, the wall would stay pinned to
+       the left edge and the room he just made would sit empty between them.
+       It closes to his heels and stops: caught, not buried. */
+    const him = CFG.mammothX + (G.avLead || 0);
+    const front = Math.min(lerp(-620, him + 420, Math.pow(q, 0.8)), him - 120);
     ctx.save();
     /* NORMAL BLENDING, NOT ADDITIVE — and this is what turned it from a glow into snow.
        Additive white over a bright sky can only ever get brighter, so the cloud had no
