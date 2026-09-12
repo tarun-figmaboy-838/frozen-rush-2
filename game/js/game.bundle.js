@@ -8535,6 +8535,11 @@ function createGame(canvas, hooks = {}) {
      long enough to watch, and still inside bridgeMs (620) plus the flight before it, so
      nothing that waits on the crossing waits on this. */
   const PIECE_FREEZE = 1.15;
+  /* THE WRONG-ANSWER WASH, decaying on the game clock so it is frame-rate independent
+     like everything else that moves. ~0.9s, which is long enough to register and short
+     enough not to sit over the retry. */
+  function updateWrongFx(dt) { if (G.wrongFx > 0) G.wrongFx = Math.max(0, G.wrongFx - dt * 1.1); }
+
   function updatePieces(dt) {
     for (const g of ground.gaps) {
       if (!(g.pieces && g.pieces.length)) continue;
@@ -9372,6 +9377,7 @@ function createGame(canvas, hooks = {}) {
     }
     if (G.l1) updateL1(dt);
     updatePieces(dt);
+    updateWrongFx(dt);
     /* CULL CROSSINGS THAT ARE OFF SCREEN BEHIND US.
 
        Repaired crevasses were kept forever: layoutPhase only ever filtered out the
@@ -11229,6 +11235,31 @@ function createGame(canvas, hooks = {}) {
     ctx.restore();
   }
 
+  /* "THAT WAS WRONG" — one wash of warm red in from the edges of the stage.
+   *
+   * The wrong-answer feedback used to be entirely inside the world: a small character
+   * trembling on the far left, a splash down a hole, chips at the cut. All correct, all
+   * easy to miss, and the most important of them fired a second and a half after the
+   * answer. A child who has just cut the wrong line is looking AT the line.
+   *
+   * A vignette is the one shape that cannot be looked away from, and it costs one
+   * gradient. Warm red rather than the game's blue so it reads as a different KIND of
+   * event, edges only so the answer itself is never obscured, and gone inside a second
+   * so it is a reaction rather than a state. Under drawTaps, so the player's own mark
+   * still sits on top of it. */
+  function drawWrongFlash(ctx) {
+    const k = G.wrongFx || 0;
+    if (k <= 0.01) return;
+    const a = Math.sin(Math.min(1, k) * Math.PI * 0.5) * (reduced ? 0.24 : 0.42);
+    const g = ctx.createRadialGradient(CFG.W / 2, CFG.H / 2, CFG.H * 0.30,
+                                       CFG.W / 2, CFG.H / 2, CFG.W * 0.62);
+    g.addColorStop(0, 'rgba(210,40,40,0)');
+    g.addColorStop(1, 'rgba(198,32,32,' + a.toFixed(3) + ')');
+    ctx.save();
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, CFG.W, CFG.H);
+    ctx.restore();
+  }
   function drawRepairedPieces(ctx) {
     for (const g of ground.gaps) {
       if (!(g.pieces && g.pieces.length)) continue;
@@ -11492,6 +11523,7 @@ function createGame(canvas, hooks = {}) {
        the slab is drawn here as normal. */
     // ...unless it is falling, in which case it was already drawn behind the ice above
     if (G.l2 && !G.l2.fall && !p2FocusOn()) drawL2(ctx);
+    drawWrongFlash(ctx);              // the 'that was wrong' wash, under the player's own mark
     drawTaps(ctx);                    // over everything: it is the player's own mark
     ctx.restore();
   }
@@ -12054,9 +12086,22 @@ function createGame(canvas, hooks = {}) {
     /* THE SHEAR, on the line that was drawn. It cracks where the learner cut, which is
        the one piece of feedback that says WHY it is falling rather than just that it is. */
     L.shear = { a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, t: 0 };
+    /* THE TREMBLE IS NOW, NOT LATER. It used to fire only when the slab hit the water
+       — about a second and a half after the cut, by which time the slab has shrunk back
+       to resting size and travelled to the far side of the stage, so the one beat that
+       says YOU GOT THIS WRONG happened small, late, and nowhere near the eye. Reported
+       repeatedly as "the user cannot see the wrong stage where Momo trembles". It fires
+       on the frame the cut is judged, while the slab is still big and centred and the
+       player is still looking at what they just did. */
+    mammoth.startle(reduced ? 0.6 : 1);
+    /* AND THE SCREEN SAYS IT TOO. One red wash from the edges, decaying — the cheapest
+       unmistakable "wrong" there is, and it cannot be missed the way a small character
+       animation on the far left can. See drawWrongFlash. */
+    G.wrongFx = 1;
     audio.crack();
-    particles.chips(mid.x, mid.y, 10, -170);
-    shake(reduced ? 1.2 : 3, 200);
+    audio.reject();
+    particles.chips(mid.x, mid.y, 14, -170);
+    shake(reduced ? 1.4 : 3.4, 260);
     hitStop(CFG.juice.stopHit * 0.5);
     punch(CFG.juice.punchHit * 0.6, 260, mid.x, mid.y);
   }
