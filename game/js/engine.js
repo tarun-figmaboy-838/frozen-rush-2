@@ -1381,6 +1381,15 @@ export const CFG = {
       'sign-heptagon':      [28.29, 1.44, [0.06, 0.37, 0.80]],
       'sign-pentagons':     [30.12, 1.98, [0.06, 0.39, 1.05, 1.66]],
       'sign-hexagons':      [32.47, 2.05, [0.06, 0.42, 1.29, 1.76]],
+      /* THE CHEER AT THE END, which was in the recording the whole time and unused.
+         The note below says the take still held the ending's seconds and nothing asked
+         for them — true, and a shame, because the one moment in the game that deserves
+         a voice is the moment Momo reaches his friend. Found by reading the take's own
+         energy envelope rather than guessing: every other line ends by 34.52, the file
+         runs to 36.13, and silencedetect puts a single spoken burst at 34.763..35.658.
+         Padded the way every other window here is — 60ms before the attack, 120ms after
+         the tail — which is well inside the silence either side. */
+      'win-yay':            [34.70, 1.08, [0.06]],
       /* THE ENDING SPEAKS NO MORE. 'win-title' ("You did it!") and 'win-sub' ("Momo crossed
          the Frozen Pass!") lived here and were cut with the banner that showed them: the
          ending is the dance now, the camera pushes in on it, and a voice over the top was
@@ -6418,6 +6427,12 @@ export function createGame(canvas, hooks = {}) {
         // a proper shower for the end of the journey, thrown from over his head
         particles.sparkle(CFG.mammothX + 40, CFG.surfaceY - 320, reduced ? 8 : 26, 340);
         audio.fanfare();
+        /* AND HE CHEERS. The ending deliberately lost its spoken BANNER — a title card
+           read aloud over the dance was an interruption, and removing it was right. A
+           cheer is not that: it is one word, it lands with the confetti, and it is the
+           only line in the game that is a reaction rather than an instruction. Said
+           after the fanfare so the two do not start on the same frame. */
+        audio.say('win-yay');
         break;
     }
   }
