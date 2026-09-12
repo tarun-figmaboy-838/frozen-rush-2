@@ -133,8 +133,17 @@ export const CFG = {
      The other half of "slow" was not the physics at all — see the JUMP_AIR poses, which
      were keyed to absolute vertical speeds and so held one static frame for longer and
      longer as the airtime grew. They are keyed to the fraction of the flight now. */
-  gravity: 2469,
-  jumpVel: -1333,          // apex 360px (unchanged), airtime 1.08s (was 1.30s, 0.98s before that)
+  /* AND SHORTER AGAIN, to 0.96s. Called slow twice more after the drop to 1.08, and the
+     arithmetic says why it would be: at 1.08s each of the four flight drawings was on
+     screen for 270ms. Six drawings (see the JUMP_AIR keys) and a 0.96s flight puts each
+     at 160ms, which is six frames at 60Hz — the rate an animation is actually drawn at.
+     Same two formulas, apex still pinned at 360 because his head is at y 10 there:
+     v = 4*apex/T, g = 8*apex/T^2.
+     The press window comes to T*sqrt(1 - 63/360) - 0.44 = 0.43s, which is where it was
+     before any of this widening started, and coyoteMs + bufferMs add 0.45s of their own
+     on top of it. */
+  gravity: 3125,
+  jumpVel: -1500,          // apex 360px (unchanged), airtime 0.96s (1.08 before, 1.30 before that)
   coyoteMs: 200,           // pressed a moment late off the ground still counts
   bufferMs: 250,           // pressed a moment early still fires on landing
   /* THE LEAP GOES FORWARD, AND LANDS FORWARD.
@@ -768,6 +777,10 @@ export const CFG = {
        water now read 190px instead of 152, which is most of what makes the crevasse
        look like a crack rather than a notch. */
     waterDepth: 190,       // open water at the foot of the ice shelf
+    /* HOW LONG A WRONG PIECE TEETERS ON THE LIP BEFORE IT GIVES WAY. Long enough to
+       read as trying to fit and failing; short enough that it is not a delay between
+       the answer and the consequence. */
+    teeterMs: 420,
     slabW: 340, slabH: 132,
     /* The box a hanging chunk is fitted into. Nearly square rather than the old
        wide-and-flat slab, because a chunk is now scaled UNIFORMLY into it: a
@@ -4223,7 +4236,22 @@ class PlayerController {
          *
          * The keys sit at the middles of the old bands rather than at their edges,
          * because a keyframe is the moment a pose is TRUE, not the moment it starts. */
-        const KEY = [[0.10, J.rise], [0.42, J.apex], [0.64, J.fall], [0.88, J.preLand]];
+        /* SIX DRAWINGS ACROSS THE FLIGHT, NOT FOUR — and this is the half of "the frames
+         * look slow" that the transform could not fix.
+         *
+         * The sheet holds ten poses; the flight was using four of them. Making the tilt
+         * and the stretch continuous means every FRAME differs, which is necessary and
+         * was not sufficient: the underlying PICTURE still only changed four times in
+         * about a second, and a long crossfade between two stills is a dissolve, not an
+         * animation.
+         *
+         * `launch` and `land` were sitting unused in the middle of the arc's own story —
+         * launch belongs to leaving the ground and land to arriving, and both were being
+         * shown only in the 80ms JUMP_START and the LAND state either side. Bringing
+         * them into the flight adds 50% more distinct drawings for nothing: no new art,
+         * no new frames, just the ones that were already there put where they belong. */
+        const KEY = [[0.00, J.launch], [0.18, J.rise], [0.42, J.apex],
+                     [0.63, J.fall], [0.82, J.preLand], [1.00, J.land]];
         if (u <= KEY[0][0]) f = KEY[0][1];
         else if (u >= KEY[KEY.length - 1][0]) f = KEY[KEY.length - 1][1];
         else {
@@ -5749,7 +5777,8 @@ export function createGame(canvas, hooks = {}) {
   let rs = 1, rsCap = 2;
   let pausedAsking = false;             // see api.setPaused
   function setRenderScale(k) {
-    k = clamp(Math.min(Number(k) || 1, rsCap), 1, 2);
+    // floor 0.5, not 1: see the note in main.js wantScale() for why 1 was costing 2.25x
+    k = clamp(Math.min(Number(k) || 1, rsCap), 0.5, 2);
     const w = Math.round(CFG.W * k), h = Math.round(CFG.H * k);
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     rs = k;
@@ -5765,7 +5794,7 @@ export function createGame(canvas, hooks = {}) {
   const scaleForced = !!hooks.renderScaleForced;
   let fpsMean = 60, fpsClock = 0;
   function guardScale(dtWall) {
-    if (scaleForced || rs <= 1 || !(dtWall > 0) || dtWall > 0.5) return;
+    if (scaleForced || rs <= 0.5 || !(dtWall > 0) || dtWall > 0.5) return;
     fpsMean += (1 / dtWall - fpsMean) * 0.05;
     fpsClock += dtWall;
     /* HOW FAST IT GIVES UP. It used to need four seconds under 40fps for each quarter-step, so
@@ -5775,7 +5804,7 @@ export function createGame(canvas, hooks = {}) {
        step), under 30 it takes a half, otherwise a quarter. It still never steps back up. */
     if (fpsClock > 1.2 && fpsMean < 40) {
       const step = fpsMean < 22 ? rs / 2 : fpsMean < 30 ? 0.5 : 0.25;
-      rsCap = Math.max(1, Math.round((rs - step) * 4) / 4);
+      rsCap = Math.max(0.5, Math.round((rs - step) * 4) / 4);
       setRenderScale(rsCap);
       fpsClock = 0; fpsMean = 60;
     }
@@ -5794,6 +5823,9 @@ export function createGame(canvas, hooks = {}) {
   const images = {};
   let ground, obstacles, bgm, mammoth;
   let raf = 0, last = 0, destroyed = false, paused = false;
+  /* REVIEW TOOLS, off unless ?dev=1. Only the skip-to-ending control reads this;
+     see the note where skippable is published. */
+  let devTools = false;
   // simulation steps per rendered frame; 1 is normal play (see setOptions)
   let fastForward = 1;
   let reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6032,7 +6064,21 @@ export function createGame(canvas, hooks = {}) {
       steps: p2Count() + L1.phases.length,
       jumpEnabled: G.jumpEnabled, complete: G.complete,
       // TEMPORARY: whether the review control that jumps to the ending may show
-      skippable: G.state !== 'BOOT' && G.state !== 'TITLE' && !G.complete,
+      /* THE REVIEW CONTROL IS OFF UNLESS IT IS ASKED FOR.
+       *
+       * "Skip to ending" is a tool for looking at the last screen without playing nine
+       * crossings, and it was on for every state except BOOT, TITLE and COMPLETE —
+       * which is to say, for the whole game, for every player. A button that skips the
+       * entire game, in the corner, in a game for five-year-olds. It was found by
+       * playing the build rather than by reading it, which is the point of playing it.
+       *
+       * `dev` comes from ?dev=1 and is false by default, so a shipped build has no such
+       * control. The tests that need it pass the flag (tests/skip-end.spec.mjs). */
+      skippable: devTools && G.state !== 'BOOT' && G.state !== 'TITLE' && !G.complete,
+      /* THE JOURNEY CARD IS NOT A DEV TOOL, and used to be gated on the flag above
+         because the two happened to want the same states. Its own rule: from the moment
+         the journey starts until it is over. */
+      playing: G.state !== 'BOOT' && G.state !== 'TITLE' && !G.complete,
 
       oops: G.oops,
       // the hint control asks for attention once the learner has been stuck a while
@@ -7298,6 +7344,48 @@ export function createGame(canvas, hooks = {}) {
           const halfW = (sh.w || SHAPE_W) / 2;
           const floorX = CFG.mammothX + 300 + halfW;
           if (sh.x < floorX) { sh.x = floorX; sh.vx = 0; }
+        }
+        /* IT TRIES TO SIT ON THE HOLE, AND IT CANNOT.
+         *
+         * Asked for: the wrong piece should try to fit the ditch and then drop through
+         * it, with the mammoth trembling as it goes. Before this it simply fell past
+         * the mouth at full speed and vanished into the dark — the splash fires 190px
+         * down at the pool, inside a narrow slot, where almost none of it is visible.
+         * So the moment that carries the teaching — THIS SHAPE DOES NOT FIT — was
+         * happening off screen, in about four frames.
+         *
+         * Now it arrives at the lip, lands with a knock and a scatter of chips, rocks
+         * there for a beat while it fails to bridge, and gives way. The rock decays so
+         * it reads as losing its balance rather than as a wobble animation, and the
+         * tremble fires three quarters of the way through — as it goes, not after.
+         *
+         * Only over a hole: a chunk that ends up on solid ice has nothing to teeter on
+         * and keeps the old behaviour. */
+        const mouthY = CFG.surfaceY - (sh.h || SHAPE_H) * 0.16;
+        if (!sh.teetered && !sh.splashed && gapUnder(sh.x) && sh.y >= mouthY) {
+          sh.teetered = true; sh.teeterT = 0; sh.teeterRot = sh.rot;
+          audio.clunk();
+          particles.chips(sh.x, CFG.surfaceY, reduced ? 3 : 7, -140);
+          shake(reduced ? 0.5 : 1.6, 170);
+        }
+        if (sh.teetered && !sh.splashed) {
+          sh.teeterT += dt;
+          const T_ = (L1.teeterMs || 420) / 1000;
+          if (sh.teeterT < T_) {
+            const t = sh.teeterT / T_;
+            sh.y = mouthY + t * t * 30;            // barely sinking, then it goes
+            sh.vy = 0;
+            sh.rot = sh.teeterRot + Math.sin(t * 30) * 0.19 * (1 - t);
+            if (!sh.gaveWay && t > 0.7) {
+              sh.gaveWay = true;
+              /* THE TREMBLE, and it is the performance the game already owns — the same
+                 one the ground giving way produces. Momo watching his answer drop
+                 through the hole is exactly what it is for. */
+              mammoth.startle(reduced ? 0.5 : 1);
+              audio.crack();
+            }
+            return;
+          }
         }
         sh.rot += dt * 1.9;
         sh.scale = lerp(sh.scale, 0.62, dt * 1.6);
@@ -12254,6 +12342,7 @@ export function createGame(canvas, hooks = {}) {
       if (o.reduced !== undefined) reduced = !!o.reduced || mqReduced;
       if (o.speed) CFG.runSpeed = o.speed;
       if (o.fast !== undefined) fastForward = clamp(Math.round(o.fast) || 1, 1, 8);
+      if (o.dev !== undefined) devTools = !!o.dev;
     },
     get paused() { return paused; },
     destroy() {

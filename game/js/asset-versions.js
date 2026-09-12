@@ -8,7 +8,7 @@
 export const ASSET_V = {
   "assets/art/Bubble.svg": "5f1ee1ef",
   "assets/art/cover.webp": "e0c7a5db",
-  "assets/audio/bgm-ice-hunt.mp3": "7c459447",
+  "assets/audio/bgm-ice-hunt.mp3": "3fdf4d24",
   "assets/audio/bgm-ice-hunt.ogg": "9ee115a7",
   "assets/audio/dragon-studio-cartoon-blinking-372481.mp3": "e1ba0c6b",
   "assets/audio/dragon-studio-cartoon-blinking-372481.ogg": "f5305723",
@@ -63,7 +63,6 @@ export const ASSET_V = {
   "assets/option-shape/concavePentagon.webp": "25cd2560",
   "assets/option-shape/concavePentagon2.webp": "3ab7834c",
   "assets/option-shape/iceQuadrilateral.webp": "346a8175",
-  "assets/option-shape/image.png": "9475ea1d",
   "assets/option-shape/irregularConvexHexagon.webp": "34026be0",
   "assets/option-shape/irregularConvexOctagon.webp": "c9da4f1e",
   "assets/option-shape/irregularConvexPentagon.webp": "9d83d4f8",

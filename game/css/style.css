@@ -168,12 +168,21 @@ a:hover { color: var(--ice-pale); }
   /* THE ONE NUMBER. Clamped at both ends: under about 16px a platform is a smudge, and
      over 92 the card would be taller than the top band it has to live in. Asked to be
      smaller than the 2.71 it was drawn at first, while still plainly readable. */
-  --node: clamp(15px, calc(2.3 * var(--u)), 78px);
+  /* SMALL. Reported three times as too big, too wide and "like a cutout", and the
+     arithmetic says why: at 2.3u the card was 1007x97, which is 52.5% of the stage by
+     9% of it — 4.7% of the whole screen for a read-out, sitting over the sky. A HUD
+     element that large is not read as part of the world no matter how it is painted.
+     1.46u makes it 479x62 — 25% by 5.7%, a bit over 1.4% of the screen. Seventy per
+     cent less area, and the platforms are still 28px with the mammoth at 32. */
+  --node: clamp(11px, calc(1.46 * var(--u)), 46px);
   /* THE SPACE BETWEEN TWO PLATFORMS, and it is the CONNECTOR’s visible length: the
      link runs centre to centre and is covered by a platform at each end, so what shows
      of it is exactly this. At 0.33 the platforms were almost touching and the line
      between them was a 15px stub. A full node apart reads as a path with steps on it. */
-  --gap: calc(var(--node) * 1);
+  /* 0.4 of a platform. This is also the connector’s visible length, and at a full node
+     the chain was longer than the things it joined — which is most of where the extra
+     width went. Two fifths still plainly links one platform to the next. */
+  --gap: calc(var(--node) * 0.4);
   --pad: calc(var(--node) * 0.36);
   /* IT SLIDES OUT OF THE WAY, LEFT, WHEN A QUESTION ARRIVES — and back when the
      question goes. Both directions are this one transition, so the card cannot get
@@ -240,7 +249,10 @@ a:hover { color: var(--ice-pale); }
   border-image-slice: 73 300 17 330 fill;
   border-image-repeat: stretch;
   padding: calc(var(--node) * 0.12) 0 calc(var(--node) * 0.1);
-  filter: drop-shadow(0 calc(var(--node) * 0.1) calc(var(--node) * 0.16) rgba(6, 26, 56, 0.45));
+  /* A SOFTER, SHALLOWER SHADOW. A hard offset shadow is the single strongest cue that
+     something is a panel lying ON a picture rather than a thing in it; halved and
+     spread, it still lifts the card off a pale sky without announcing a pasted layer. */
+  filter: drop-shadow(0 calc(var(--node) * 0.05) calc(var(--node) * 0.2) rgba(6, 26, 56, 0.3));
 }
 /* THE ROW. Platform, link, platform, link ... platform, link, cave — the connectors
    are IN the row rather than one bar behind it, so each one runs from the middle of

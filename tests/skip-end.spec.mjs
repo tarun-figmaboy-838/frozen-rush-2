@@ -3,6 +3,10 @@
  * It exists so the ending can be checked without playing seven phases. This holds what it
  * has to do while it exists: be up during play and gone on the cover and at the end, and
  * drive the REAL ending — the run home, the arrival, the banner with all seven stamps. */
+/* THE REVIEW CONTROL IS BEHIND ?dev=1 NOW. It used to show for every state except the
+   cover and the ending, which meant a button that skips the whole game sat in the
+   corner of a shipped build for five-year-olds. Found by playing the game rather than
+   by reading it. These tests ask for it explicitly; players never get it. */
 import { test, expect } from '@playwright/test';
 import { boot, waitState } from './helpers.mjs';
 
@@ -10,7 +14,7 @@ test.describe('skip to ending (temporary)', () => {
   test.setTimeout(90_000);
 
   test('hidden on the cover, shown in play, and it plays the whole ending', async ({ page }) => {
-    const errors = await boot(page, { skipScreens: false });
+    const errors = await boot(page, { skipScreens: false, query: 'dev=1' });
     const btn = page.locator('#btn-skip-end');
     await expect(btn).toBeHidden();                 // the cover is not play
 
@@ -66,7 +70,7 @@ test.describe('skip to ending (temporary)', () => {
   });
 
   test('does nothing on the cover or once complete', async ({ page }) => {
-    await boot(page, { skipScreens: false });
+    await boot(page, { skipScreens: false, query: 'dev=1' });
     expect(await page.evaluate(() => window.iceAgeGame.skipToEnd())).toBe(false);
     await page.evaluate(() => window.iceAgeGame.begin());
     expect(await page.evaluate(() => window.iceAgeGame.skipToEnd())).toBe(true);

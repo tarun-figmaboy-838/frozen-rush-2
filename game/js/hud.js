@@ -516,7 +516,7 @@ export class Hud {
        whether the board shows at all, a few lines below, so the two can never disagree
        about which of them owns the band. */
     this.setTrail(h.step || 0, h.steps || 0,
-                  !!h.steps && !h.complete && !!h.skippable, !!message);
+                  !!h.steps && !h.complete && !!h.playing, !!message);
 
     const el = this.el.instruction;
     this._voDur = h.voDur || 0;          // paces the word reveal, see setInstruction
