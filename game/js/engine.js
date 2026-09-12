@@ -10519,7 +10519,16 @@ export function createGame(canvas, hooks = {}) {
        The rope crossings never had this: their chunks go in at drawHangingShapes above,
        BEFORE the water front, so the pool closes over them. A falling slab is the same
        kind of thing and belongs in the same place. */
-    if (G.l2 && G.l2.fall && !p2FocusOn()) drawL2(ctx);
+    /* ONLY ONCE IT IS BELOW THE ICE LINE. Drawing every falling frame back here put
+       it behind the PILLAR as well — the strip of solid ice between the two holes that
+       it starts its fall on top of — so the first half of the drop happened behind the
+       scenery. Reported as "why does the wrong cut drop behind the path".
+       Above the surface it is in open air and belongs in front, like anything else
+       falling through the sky; below it, it is inside the ground and the ice and the
+       pool close over it. One line decides which, and it is the same line the world
+       uses for everything else. */
+    const l2Sinking = !!(G.l2 && G.l2.fall && G.l2.pos.y > CFG.surfaceY);
+    if (l2Sinking && !p2FocusOn()) drawL2(ctx);
     // the pool surface closes over anything that fell into it
     ground.drawWaterFront(ctx, G.worldX, G.t);
     ground.draw(ctx, G.worldX, G.t);
@@ -10564,8 +10573,8 @@ export function createGame(canvas, hooks = {}) {
        outline that layering like this produces if you forget. Outside those beats
        (the overview, the fall, the flight into the holes) the focus layer is down and
        the slab is drawn here as normal. */
-    // ...unless it is falling, in which case it was already drawn behind the ice above
-    if (G.l2 && !G.l2.fall && !p2FocusOn()) drawL2(ctx);
+    // ...unless it has already sunk below the ice line, where it was drawn behind it
+    if (G.l2 && !l2Sinking && !p2FocusOn()) drawL2(ctx);
     drawWrongFlash(ctx);              // the 'that was wrong' wash, under the player's own mark
     drawTaps(ctx);                    // over everything: it is the player's own mark
     ctx.restore();
