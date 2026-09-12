@@ -86,14 +86,22 @@
              cover a crevasse, a block or the character. Pointer events off: it is a
              read-out, and a tap anywhere on the stage is the jump control. -->
         <div class="trail" id="trail" aria-hidden="true" hidden>
-          <!-- THE TRACK THE STONES STAND ON. Without it the row read as nine tiles
-               floating in the sky with nothing holding them together — reported as
-               exactly that. The track is the ledge of ice they are set into, and the
-               fill running along it is how far the journey has got: a progress bar
-               whose handle is a mammoth. -->
-          <div class="trail-track" aria-hidden="true"><i class="trail-fill"></i></div>
-          <div class="trail-steps" id="trail-steps"></div>
-          <img class="trail-momo" id="trail-momo" alt="" src="assets/progress/step-momo.webp" />
+          <div class="trail-card">
+            <!-- The row. Nine platforms then the cave, built in script (Hud.buildTrail)
+                 because the count is the engine's, not the markup's. The shelf they
+                 stand on is a child of the row so it spans exactly what the row spans,
+                 however many platforms there turn out to be. -->
+            <div class="trail-rail" id="trail-rail">
+              <!-- .trail-node / .trail-link x N, then .trail-goal, inserted here -->
+              <!-- MOMO IS IN THE ROW, not in the card, and that is load-bearing. He is
+                   placed by `left: var(--at)` where --at is a platform's offsetLeft —
+                   which is measured against the ROW. Parented to the card instead, the
+                   card's own padding and border sat between the two coordinate systems
+                   and he stood exactly that far to the left of the platform he was
+                   supposed to be on: 21px of a 52px platform, at every viewport. -->
+              <img class="trail-momo" id="trail-momo" alt="" src="assets/progress/step-momo.webp" />
+            </div>
+          </div>
         </div>
 
         <div class="instruction" id="instruction" hidden>

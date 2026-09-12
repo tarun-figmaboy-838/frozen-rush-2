@@ -3,6 +3,25 @@
 
 import { fitBubble } from './bubble.js';
 
+/* THE WORD THE QUESTION IS ABOUT, which is set apart in capitals and blue.
+ *
+ * This was /^(.*?\bthe\s+)([a-z]+?)(s?)([.!]?)$/i — everything up to "the", then ONE
+ * word, then the full stop. Right for Part 1, whose questions were "Cut the TRIANGLE.";
+ * wrong for every question this game now asks, because Part 2's curriculum puts an
+ * adjective in front of the noun. Measured across the nine: EIGHT of them failed to
+ * match and were rendered with no highlight at all. Only "Draw all the diagonals."
+ * still worked, which is why it went unnoticed — the one line anybody spot-checked.
+ *
+ * It is the same assumption that made voIdFor() silent for the six rope crossings, and
+ * it is fixed the same way: allow any number of words between "the" and the noun, and
+ * highlight the LAST of them.
+ *
+ * Exported because the tests assert what the board renders and were carrying their own
+ * copy of the old pattern — two copies of a rule is how they drifted apart in the first
+ * place. A tutorial sentence is never run through this (see `_plain`/signBanner): the
+ * key-word treatment is for questions. */
+export const KEY_WORD = /^(.*?\bthe\s+(?:[a-z]+\s+)*)([a-z]+?)(s?)([.!]?)$/i;
+
 export class Hud {
   /** A stage point where the zoomed canvas actually draws it. */
   static toView(view, p) {
@@ -44,143 +63,196 @@ export class Hud {
          gets resurrected by the next person reading this file. */
       rotate: root.getElementById('rotate'),
       trail: root.getElementById('trail'),
-      trailSteps: root.getElementById('trail-steps'),
+      trailRail: root.getElementById('trail-rail'),
       trailMomo: root.getElementById('trail-momo')
     };
     this.paused = false;
     this.lastMessage = null;
-    /* THE TRAIL'S OWN STATE. `_steps` is how many stones have been built (0 until the
-       engine says how many crossings there are), `_at` the last stone Momo was put on.
-       -1 rather than 0, so the FIRST crossing is a real change and gets the arrival
-       animation instead of being silently already-correct. */
+    /* THE JOURNEY CARD'S OWN STATE. `_steps` is how many platforms have been built (0
+       until the engine says how many crossings there are), `_at` the platform Momo was
+       last put on. -1 rather than 0, so the FIRST crossing is a real change and gets
+       the card's arrival rather than being silently already-correct. `_goal` is the
+       cave, kept because it is looked at on every change. */
     this._steps = 0;
     this._at = -1;
+    this._goal = null;
     this._onResize = () => this.checkOrientation();
   }
 
-  /* ---------- the progress trail ----------
+  /* ---------- the journey card ----------
 
-     Nine stones and a cave, with Momo on the one in play. The count comes from the
-     engine rather than from the markup, so adding or removing a crossing needs no
-     change here and none in index.html. */
+     Nine platforms, a cave, and Momo on the platform being played. ONE number drives
+     all of it — how many crossings are behind the learner — and that number comes from
+     the engine (pushHud publishes `step` and `steps`). There is deliberately no second
+     copy of the progress here: everything below is derived from those two integers on
+     the frame they change.
 
-  /** Build the row, once, for `n` crossings. Cheap to call again — it returns unless
-      the count has actually changed, which is how the first HUD push builds it and
-      every later one does nothing. */
+       index <  step   ->  done      bright, cyan-lit
+       index === step  ->  now       cyan rim, pulsing, Momo on it
+       index >  step   ->  next      muted, desaturated
+       step === steps  ->  the journey is over; the cave lights
+
+     The DOM is built once for the count the engine reports rather than written out
+     nine times in the markup, so adding or removing a crossing needs no change here
+     and none in index.html. */
+
+  /** Build the row for `n` crossings. Cheap to call again — it returns unless the
+      count has actually changed, so the first HUD push builds it and every later one
+      does nothing. */
   buildTrail(n) {
-    const box = this.el.trailSteps;
-    if (!box || n <= 0 || n === this._steps) return;
+    const rail = this.el.trailRail;
+    if (!rail || n <= 0 || n === this._steps) return;
     this._steps = n;
     this._at = -1;
-    box.textContent = '';
+    rail.textContent = '';
+    /* PLATFORM, LINK, PLATFORM, LINK ... PLATFORM, LINK, CAVE. One link between every
+       pair, and one more between the last platform and the cave, so the chain runs
+       unbroken from the first step to the destination. The links carry the progress —
+       there is no separate bar — so link i is the stretch from platform i to i+1. */
     for (let i = 0; i < n; i++) {
       const img = document.createElement('img');
-      img.className = 'trail-step locked';
+      img.className = 'trail-node next';
       img.alt = '';
       img.src = 'assets/progress/step-locked.webp';
-      box.appendChild(img);
+      rail.appendChild(img);
+      const link = document.createElement('i');
+      link.className = 'trail-link';
+      rail.appendChild(link);
     }
     const goal = document.createElement('img');
-    goal.className = 'trail-step goal';
+    goal.className = 'trail-goal';
     goal.alt = '';
     goal.src = 'assets/progress/step-goal.webp';
-    box.appendChild(goal);
+    rail.appendChild(goal);
+    this._goal = goal;
+    /* Momo is a child of the row and was cleared with it — see index.html for why he
+       has to be parented here and not to the card. */
+    if (this.el.trailMomo) rail.appendChild(this.el.trailMomo);
   }
 
-  /** Put Momo on stone `i`. `hop` arcs him across; without it he is simply placed,
-      which is what a resize or a restart wants. */
+  /** Every platform, in order. The cave is a sibling in the same row, so it has to be
+      filtered out rather than indexed past. */
+  _nodes() {
+    const rail = this.el.trailRail;
+    return rail ? [...rail.querySelectorAll('.trail-node')] : [];
+  }
+
+  /** Put Momo on platform `i`, and run the fill out to meet him. `hop` arcs him across;
+      without it he is simply placed, which is what a rebuild or a resize wants. */
   _momoTo(i, hop) {
-    const momo = this.el.trailMomo, box = this.el.trailSteps;
-    if (!momo || !box) return;
-    const stone = box.children[Math.min(i, box.children.length - 1)];
-    if (!stone) return;
-    /* Measured off the stone itself rather than computed from --step and --gap. The
-       two would agree today and drift the first time either is touched, and a marker
-       standing between two stones is worse than no marker. */
-    const mid = stone.offsetLeft + stone.offsetWidth / 2;
+    const momo = this.el.trailMomo;
+    const nodes = this._nodes();
+    if (!momo || !nodes.length) return;
+    const node = nodes[Math.min(i, nodes.length - 1)];
+    if (!node) return;
+    /* MEASURED OFF THE PLATFORM, not computed from --node and --gap. The two would
+       agree today and drift the first time either is touched, and a mammoth standing
+       between two platforms is worse than no mammoth. offsetLeft is relative to the
+       row, which is the offset parent of both him and the fill. */
+    const mid = node.offsetLeft + node.offsetWidth / 2;
     momo.style.setProperty('--at', mid + 'px');
-    /* THE GOLD RUNS TO THE SAME POINT. Same measurement, so the bar's end and the
-       mammoth standing on it can never drift apart — and both carry the same 560ms
-       travel, so the fill flows along underneath him as he hops rather than snapping
-       ahead of him. The track is inset past the stones at each end (see the CSS), so
-       the fill is offset by that inset to start at the track's real left edge. */
-    const wrap = this.el.trail;
-    if (wrap) {
-      const inset = parseFloat(getComputedStyle(wrap).getPropertyValue('--step')) * 0.16 || 0;
-      wrap.style.setProperty('--fill', (mid + inset) + 'px');
-    }
     momo.classList.toggle('idle', !hop);
     if (hop) {
-      // restarted by hand: re-adding a class the element already has replays nothing
+      // restarted by hand: re-adding a class an element already has replays nothing
       momo.classList.remove('hop');
       void momo.offsetWidth;
       momo.classList.add('hop');
-      const off = () => { momo.classList.remove('hop'); momo.classList.add('idle'); };
-      momo.addEventListener('animationend', off, { once: true });
+      momo.addEventListener('animationend', () => {
+        momo.classList.remove('hop');
+        momo.classList.add('idle');
+      }, { once: true });
     }
   }
 
-  /** A burst of light over stone `i`, for the frame it is won. */
-  _trailPop(i) {
-    const box = this.el.trailSteps, wrap = this.el.trail;
-    if (!box || !wrap) return;
-    const stone = box.children[i];
-    if (!stone) return;
-    const pop = document.createElement('div');
-    pop.className = 'trail-pop';
-    pop.style.left = (stone.offsetLeft + stone.offsetWidth / 2) + 'px';
-    pop.style.top = (stone.offsetTop + stone.offsetHeight / 2) + 'px';
-    wrap.appendChild(pop);
-    pop.addEventListener('animationend', () => pop.remove(), { once: true });
+  /** One spark of ice over platform `i`, on the frame it is won. */
+  _spark(i) {
+    const rail = this.el.trailRail;
+    const node = this._nodes()[i];
+    if (!rail || !node) return;
+    const s = document.createElement('div');
+    s.className = 'trail-spark';
+    s.style.left = (node.offsetLeft + node.offsetWidth / 2) + 'px';
+    s.style.top = (node.offsetTop + node.offsetHeight / 2) + 'px';
+    rail.appendChild(s);
+    s.addEventListener('animationend', () => s.remove(), { once: true });
   }
 
-  /** `done` crossings are behind the learner, out of `total`. Everything else — which
-      stone glows, where Momo stands, whether the cave lights — follows from that one
-      number, so the engine publishes a count and nothing more. */
-  setTrail(done, total, visible) {
+  /** `done` crossings are behind the learner, out of `total`. `visible` is whether the
+      card belongs on screen at all (it does not on the cover or the ending); `asking`
+      is whether a question is up, which slides it out of the way rather than removing
+      it — the two are different things and used to be the same one. */
+  setTrail(done, total, visible, asking) {
     const wrap = this.el.trail;
     if (!wrap) return;
     this.buildTrail(total);
-    const box = this.el.trailSteps;
-    if (!box || !this._steps) return;
+    if (!this._steps) return;
 
     if (!visible) { wrap.hidden = true; return; }
     if (wrap.hidden) {
+      /* FIRST SHOW: put it off-stage, lay it out, then let it slide in. Revealed on the
+         spot it would simply appear, which is the thing every other arrival in this
+         game is written to avoid. Two frames, because `hidden` -> laid out -> animated
+         cannot happen in one. */
       wrap.hidden = false;
-      wrap.classList.remove('enter');
-      void wrap.offsetWidth;
-      wrap.classList.add('enter');
+      wrap.classList.add('away');
+      this._at = -1;
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (!wrap.hidden) wrap.classList.toggle('away', !!this._asking);
+        }));
+      }
     }
+    /* THE BOARD AND THE CARD SHARE THE LEFT BAND and are never shown together: the
+       card slides out to the left as the question arrives and comes back when it
+       leaves. That is what lets it sit on the board's own line (see the CSS) instead
+       of being squeezed onto the one below. */
+    this._asking = !!asking;
+    if (!wrap.classList.contains('away') || !asking) wrap.classList.toggle('away', !!asking);
 
-    const at = Math.min(done, this._steps);     // the stone in play; === steps when finished
+    const at = Math.min(done, this._steps);   // the platform in play; === steps when finished
     if (at === this._at) return;
     const first = this._at < 0;
-    const won = !first && at > this._at;        // a crossing was just completed
+    const won = !first && at > this._at;      // a crossing was just completed
 
-    for (let i = 0; i < this._steps; i++) {
-      const s = box.children[i];
-      if (!s) continue;
-      const want = i < at ? 'done' : i === at ? 'now' : 'locked';
-      if (s.classList.contains(want)) continue;
-      s.classList.remove('locked', 'now', 'done');
-      s.classList.add(want);
-      s.src = 'assets/progress/step-' + want + '.webp';
-      /* THE ONE THAT WAS JUST WON gets the overshoot and the spark. Only on a real
-         advance — restoring the trail after a resize must not fire nine of them. */
+    const nodes = this._nodes();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const want = i < at ? 'done' : i === at ? 'now' : 'next';
+      if (n.classList.contains(want)) continue;
+      n.classList.remove('done', 'now', 'next');
+      n.classList.add(want);
+      n.src = 'assets/progress/step-' + (want === 'next' ? 'locked' : want) + '.webp';
+      /* THE ONE JUST WON gets the overshoot and the spark. Only on a real advance —
+         restoring the card after a resize must not fire nine of them. */
       if (want === 'done' && won && i === at - 1) {
-        s.classList.remove('just');
-        void s.offsetWidth;
-        s.classList.add('just');
-        s.addEventListener('animationend', () => s.classList.remove('just'), { once: true });
-        this._trailPop(i);
+        n.classList.remove('just');
+        void n.offsetWidth;
+        n.classList.add('just');
+        n.addEventListener('animationend', () => n.classList.remove('just'), { once: true });
+        this._spark(i);
       }
     }
 
-    const goal = box.children[this._steps];
-    if (goal) goal.classList.toggle('lit', at >= this._steps);
+    /* THE CHAIN. Link i is the stretch from platform i to platform i+1, so it is walked
+       once the learner has passed platform i — and the last one, to the cave, only when
+       the journey is over. This is the progress bar: there is no separate fill. */
+    const links = this.el.trailRail ? [...this.el.trailRail.querySelectorAll('.trail-link')] : [];
+    links.forEach((l, i) => l.classList.toggle('done', i < at));
+
+    /* THE CAVE WARMS AS IT IS APPROACHED and lights when it is reached. A cave glowing
+       from crossing one has stopped meaning anything by crossing nine. */
+    if (this._goal) {
+      this._goal.classList.toggle('near', at >= this._steps - 1 && at < this._steps);
+      this._goal.classList.toggle('lit', at >= this._steps);
+    }
 
     this._at = at;
+    /* After a rebuild the images may not have loaded, so the row's width is not final;
+       measure on the next frame as well as now, and the second one wins. */
     this._momoTo(at, won);
+    if (first && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => this._momoTo(at, false));
+    }
   }
 
   /* Pick an icon by NAME. The mask URLs live in the stylesheet: a url() inside a
@@ -263,7 +335,7 @@ export class Hud {
   setInstruction(message) {
     const el = this.el.text;
     if (!el) return;
-    const m = this._plain ? null : /^(.*?\bthe\s+)([a-z]+?)(s?)([.!]?)$/i.exec((message || '').trim());
+    const m = this._plain ? null : KEY_WORD.exec((message || '').trim());
     el.textContent = '';
     let n = 0;
     /* IN STEP WITH THE VOICE, like the dialogue: when the question is spoken the reveal is
@@ -439,7 +511,12 @@ export class Hud {
     /* THE TRAIL, from the two numbers the engine publishes. Shown for the whole of the
        journey and hidden on the cover, the tutorial and the ending — the ending has a
        celebration of its own and does not need a scoreboard over it. */
-    this.setTrail(h.step || 0, h.steps || 0, !!h.steps && !h.complete && !!h.skippable);
+    /* The card is on screen for the whole journey, and slides out of the left band
+       whenever the question board is in it — `message` is the same value that decides
+       whether the board shows at all, a few lines below, so the two can never disagree
+       about which of them owns the band. */
+    this.setTrail(h.step || 0, h.steps || 0,
+                  !!h.steps && !h.complete && !!h.skippable, !!message);
 
     const el = this.el.instruction;
     this._voDur = h.voDur || 0;          // paces the word reveal, see setInstruction

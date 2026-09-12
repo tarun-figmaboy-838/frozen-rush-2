@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { boot, G, waitState, force, cut } from './helpers.mjs';
+/* The board's own rule for which word is set apart, imported rather than copied. This
+   test carried its own copy of it, the curriculum grew an adjective ("Cut the concave
+   polygon."), and the two drifted — the copy here still matched Part 1's shape, so the
+   test asserted a highlight the board had stopped producing on eight of nine questions. */
+import { KEY_WORD } from '../game/js/hud.js';
 
 /* The interface: controls, feedback, progress and tutorial guidance.
    Every assertion here is something a player would notice if it broke. */
@@ -139,7 +144,7 @@ test.describe('ui', () => {
     });
     // the sentence with the polygon in capitals, full stop kept: "Cut the TRIANGLE."
     const shown = (await page.locator('#instruction-text').innerText()).trim();
-    const m = /^(.*?\bthe\s+)([a-z]+?)(s?)([.!]?)$/i.exec(want);
+    const m = KEY_WORD.exec(want);
     expect(shown).toBe(m[1] + (m[2] + m[3]).toUpperCase() + m[4]);
     await expect(page.locator('#instruction-text .key')).toHaveText(/^[A-Z]+$/);
 

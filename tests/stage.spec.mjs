@@ -88,7 +88,7 @@ test.describe('the staged intro, the sign and the script', () => {
       const leftRope = mid - half + (half * 2 / 3) / 2;
       let worst = { right: 0 };
       for (const p of L1.phases) {
-        const mm = /^(.*?\bthe\s+)([a-z]+?)(s?)([.!]?)$/i.exec(p.instruction.trim());
+        const mm = /^(.*?\bthe\s+(?:[a-z]+\s+)*)([a-z]+?)(s?)([.!]?)$/i.exec(p.instruction.trim());
         txt.textContent = ''; let n = 0;
         const word = (t, cls, sp) => { if (!t) return; if (sp && txt.childNodes.length) txt.appendChild(document.createTextNode(' ')); const s = document.createElement('span'); s.className = cls; s.style.setProperty('--i', n++); s.textContent = t; txt.appendChild(s); };
         for (const w of mm[1].trim().split(/\s+/)) word(w, 'iw', true);

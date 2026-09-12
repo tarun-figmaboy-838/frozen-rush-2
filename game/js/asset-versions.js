@@ -75,6 +75,7 @@ export const ASSET_V = {
   "assets/option-shape/regularPentagon.webp": "04a3a89a",
   "assets/option-shape/regularQuadrilateral.webp": "63fa2bf0",
   "assets/option-shape/regularTriangle.webp": "b16acb47",
+  "assets/progress/panel.webp": "f7c0aba6",
   "assets/progress/step-done.webp": "f8eb3ea6",
   "assets/progress/step-goal.webp": "7cdbdd5c",
   "assets/progress/step-locked.webp": "b769b557",

@@ -27,12 +27,21 @@ const STONE = 144;
 const GOAL = 190;        // the cave is the destination and is allowed to be bigger
 const MOMO = 150;        // the marker that walks the trail
 
+/* The card the whole thing sits on. Delivered as one wide ice frame with snow caps at
+   each end; it is stretched to the card's box in CSS, which is safe here in a way it
+   was not for the question plank — the middle of this art is a smooth gradient with no
+   grain to smear, and the card's aspect (about 5.9) is within 15% of the art's 5.06, so
+   the caps are never visibly squashed. 1100 wide covers a 4K stage at the size the card
+   is drawn. */
+const PANEL = 1100;
+
 const JOBS = [
   { file: 'step-locked.png', out: 'step-locked.webp', w: STONE },
   { file: 'step-now.png', out: 'step-now.webp', w: STONE },
   { file: 'step-done.png', out: 'step-done.webp', w: STONE },
   { file: 'step-goal.png', out: 'step-goal.webp', w: GOAL },
-  { file: 'step-momo.png', out: 'step-momo.webp', w: MOMO }
+  { file: 'step-momo.png', out: 'step-momo.webp', w: MOMO },
+  { file: 'panel.png', out: 'panel.webp', w: PANEL }
 ];
 
 await mkdir(OUT, { recursive: true });

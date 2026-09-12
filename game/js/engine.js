@@ -3722,7 +3722,7 @@ class PlayerController {
        Draw only — see the note in CFG. */
     this.dx = 0; this.dxFrom = 0; this.dxT = 0;
     this.airborne = false; this.lastGround = 0; this.bufferedJump = -1;
-    this.squash = 1; this.tilt = 0; this.hop = 0;
+    this.squash = 1; this.tilt = 0; this.hop = 0; this.airSq = 1;
     this.runDist = 0; this.lastStepFrame = -1;
     this.skidP = 0; this.sprayClock = 0; this.breath = 0;
     this.fromSheet = null; this.fromFrame = -1;     // the pose a hand-over dissolves from
@@ -4093,9 +4093,42 @@ class PlayerController {
                        : lerp(this.breath || 0, 0, clamp(dt * 8, 0, 1));
     // snappier recovery: a squash that eases back slowly reads as a wobble in the art
     this.squash = lerp(this.squash, 1, clamp(dt * 12, 0, 1));
-    // the skid sheet already carries the backward lean, so don't rotate on top of it
-    const wantTilt = this.state === 'JUMP_AIR' ? (this.vy < 0 ? -0.1 : 0.05) : 0;
-    this.tilt = lerp(this.tilt, wantTilt, dt * 7);
+    /* THE ARC IS ROTATED AND STRETCHED, CONTINUOUSLY — and this is what finally stops
+     * the jump reading as slow.
+     *
+     * The delivered sheet has FOUR drawings for the whole flight (rise, apex, fall,
+     * preLand; the run has thirty-six). At 1.08s that is 270ms a drawing, and no amount
+     * of retuning the physics or crossfading the poses changes the fact that the
+     * underlying picture only changes four times. Dissolving between two stills reads
+     * as ghosting, which is what "slow frames, lagging" is describing.
+     *
+     * What was here made it worse: the tilt had TWO values, -0.1 going up and +0.05
+     * coming down, so it was one more thing that changed discretely — and it was eased
+     * at dt*7, a 140ms constant, so it lagged behind even that.
+     *
+     * Both are continuous functions of where he is in the flight now, so EVERY FRAME IS
+     * A DIFFERENT PICTURE however few drawings there are underneath. `u` runs 0 to 1
+     * across the arc and is linear in time (vy is), the same value the poses key off.
+     *
+     *   tilt     nose up off the ground, level at the apex, nose down into the landing.
+     *            One sweep through the arc rather than a switch at the top.
+     *   airSq    squash and stretch, driven by SPEED: elongated when he is moving fast
+     *            at either end, rounded at the apex where he is barely moving. Squared,
+     *            so it is subtle through most of the arc and only reads at the extremes.
+     *            Folded into the draw's own `sq`, which preserves volume on X for free.
+     *
+     * Draw only. The collider is a fixed box at mammothX and the physics are global —
+     * see CFG.jumpVel — so none of this can make a jump easier or harder to land. */
+    if (this.airborne) {
+      const u = clamp((this.vy - CFG.jumpVel) / Math.max(1, -2 * CFG.jumpVel), 0, 1);
+      const spd = clamp(Math.abs(this.vy) / Math.max(1, Math.abs(CFG.jumpVel)), 0, 1);
+      this.tilt = lerp(this.tilt, lerp(-0.16, 0.14, u), clamp(dt * 16, 0, 1));
+      this.airSq = lerp(this.airSq || 1, 1 + 0.13 * spd * spd, clamp(dt * 18, 0, 1));
+    } else {
+      // the skid sheet already carries the backward lean, so don't rotate on top of it
+      this.tilt = lerp(this.tilt, 0, clamp(dt * 9, 0, 1));
+      this.airSq = lerp(this.airSq || 1, 1, clamp(dt * 12, 0, 1));
+    }
   }
   get feetY() { return CFG.surfaceY + this.y - this.hop; }
   /* WHERE HE IS DRAWN. mammothX is where the COLLIDER is and it never moves; this is
@@ -4423,7 +4456,12 @@ class PlayerController {
        shorter without making him wider and read as the sprite being resized rather
        than as weight arriving. Taking the inverse square root on X is the standard
        constant-area cheat and it is what turns the same number into an impact. */
-    const sq = this.squash * (1 + br * 0.006) * (1 - this.wobSq) * (1 - this.gulp * 0.05);
+    /* airSq is the flight's own stretch — see the note where it is set. Multiplied in
+       here rather than written into `squash`, which carries the discrete beats (the
+       1.13 off the ground, the 0.82 on landing) and is eased back to 1 every frame;
+       the two would fight. sqX below divides by sqrt(sq), so volume is preserved for
+       this exactly as it is for everything else. */
+    const sq = this.squash * (this.airSq || 1) * (1 + br * 0.006) * (1 - this.wobSq) * (1 - this.gulp * 0.05);
     const sqX = (1 - br * 0.008) * (1 + this.wobSq * 0.85) / Math.sqrt(Math.max(0.35, sq));
     ctx.save();
     // knock is subtracted: a recoil is backward, which is left on this stage
