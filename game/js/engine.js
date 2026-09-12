@@ -142,8 +142,26 @@ export const CFG = {
      The press window comes to T*sqrt(1 - 63/360) - 0.44 = 0.43s, which is where it was
      before any of this widening started, and coyoteMs + bufferMs add 0.45s of their own
      on top of it. */
-  gravity: 3125,
-  jumpVel: -1500,          // apex 360px (unchanged), airtime 0.96s (1.08 before, 1.30 before that)
+  /* AND BACK UP TO 1.12s, NOW THAT IT IS ACTUALLY BEING DRAWN.
+
+     This was cut three times chasing "the jump looks slow" — 1.30 to 1.08 to 0.96 —
+     and the cause turned out not to be the arc at all: the game was filling 2.25x the
+     pixels the screen could show and running at 20fps (see wantScale in main.js). At
+     20fps a 0.96s flight is drawn about 19 times. At the 49fps it renders at now it is
+     drawn 47.
+
+     Each of those cuts also shortened the LEAP, because leap is runSpeed x airtime —
+     676px at 1.30, 499 at 0.96 — which is the "the arc is small" report. That trade
+     bought nothing, so most of it is given back: 1.12s is a 582px leap, 86% of the
+     widest it ever had, while staying 14% shorter than the flight that was called slow
+     — and it is drawn at two and a half times the frame rate that one was.
+
+     Same two formulas, apex still pinned at 360 (his head is at y 10 there):
+     v = 4*apex/T, g = 8*apex/T^2. Press window T*sqrt(1 - 63/360) - 0.44 = 0.58s, with
+     coyoteMs + bufferMs adding 0.45s on top. Obstacle spacing derives from the leap
+     (see runRoomS), so the stretches re-space themselves. */
+  gravity: 2296,
+  jumpVel: -1286,          // apex 360px (unchanged), airtime 1.12s, leap 582px
   coyoteMs: 200,           // pressed a moment late off the ground still counts
   bufferMs: 250,           // pressed a moment early still fires on landing
   /* THE LEAP GOES FORWARD, AND LANDS FORWARD.
@@ -1079,7 +1097,10 @@ export const CFG = {
         shape: 'regularHexagon',
         /* 139: the only size at which two properly undercut crevasses (mouth = throat
            x 1.6) are both wide enough to be unjumpable and still fit the row. */
-        hexR: 139,
+        hexR: 167,   /* +20%: it read as too small standing on the path. The ditches
+                                are cut from the piece (pieceDecks), so they grow with it and
+                                the halves still bridge; focusK below comes down by the same
+                                factor so the POPPED size is exactly as it was. */
         ditches: 2,
         /* 30% DOWN FROM 3.71, on the owner's call. At 3.71 the hexagon was 1030px
            across a 1920 stage and its corners sat within a handle's width of the
@@ -1087,7 +1108,7 @@ export const CFG = {
            cannot reach past is a handle you cannot drag from. 2.60 brings it to about
            720, which is still the largest thing on the screen by a distance. The same
            0.7 is applied to all three so the crossings stay a set. */
-        focusK: 2.60,
+        focusK: 2.17,
         instruction: 'Cut the shape along its diagonal.',
         voId: 'p2-1-diagonal'
       },
@@ -1108,7 +1129,7 @@ export const CFG = {
            hole, so the crossing has to leave room for it on the ice beyond: at 95 the
            mouth is 923 and the slab lands past the right edge of the stage. At 80 the
            mouth is 778, the far lip 1684, and the slab sits comfortably on the path. */
-        hexR: 80,
+        hexR: 96,    // +20%, with focusK cut by the same factor — see crossing 1
         /* TWO CREVASSES, and the slab stands on the pillar between them exactly as it
            does on crossing 1 — the owner's ask, and the better picture: a block plainly
            too big for what it is balanced on, with the holes it is about to fill either
@@ -1119,7 +1140,7 @@ export const CFG = {
            190px against the hexagon's 278, so the same on-screen working size needs a
            larger multiplier. 6.16 put it at about 1170 across, which overran the stage
            on the right; 0.7 of that — the same cut taken on all three — is 4.31. */
-        focusK: 4.31,
+        focusK: 3.59,
         instruction: 'Draw all the diagonals.',
         voId: 'p2-2-diagonals'
       },
@@ -1141,14 +1162,14 @@ export const CFG = {
         // 80, for the same reason as crossing 2: the slab has to stand past the far lip
         // 90 with two crevasses: the three pieces share out 1 and 2, and at this size the
         // pair of holes plus the pillar comes to 934 against the 960 the row allows
-        hexR: 90,
+        hexR: 108,   // +20%, with focusK cut by the same factor — see crossing 1
         ditches: 2,
         /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
            width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
            in behind the question board — which it was doing again at 5.16, the crown
            touching the board's underside. 0.7 of that, the same cut as the other two,
            is 3.61 and leaves real air above the apex. */
-        focusK: 3.61,
+        focusK: 3.01,
         instruction: 'Draw 2 diagonals from the same vertex.',
         voId: 'p2-3-samevertex'
       }
@@ -10864,7 +10885,14 @@ export function createGame(canvas, hooks = {}) {
          replacement after a wrong cut is lowered in from above the frame instead (see
          respawn), and it plainly arriving is already the thing formation exists to
          achieve — doing both would say it twice. */
-      form: keepScore ? 1 : 0
+      /* THE REPLACEMENT FREEZES INTO BEING TOO — it does not drop in from above.
+         This was , so only the FIRST slab of a crossing grew out of
+         the pillar and the one after a wrong cut was lowered in from off the top of the
+         frame instead. Two different arrivals for the same object, and the lowering is
+         the weaker of them: ice forming says the world made another one, a block
+         descending on an invisible wire says the game handed you one. Asked for
+         directly — "the new frozen ice appear, not drop from top". */
+      form: 0
     };
   }
 
@@ -11016,7 +11044,36 @@ export function createGame(canvas, hooks = {}) {
          child sees where it was, watches it go, and sees what it fell into. */
       phase: 'return', t: 0,
       spin: away * rand(1.6, 2.6),
-      vx: away * rand(40, 110),
+      /* IT GOES INTO A CREVASSE, and it did not used to.
+       *
+       * vx was `away * rand(40, 110)` — a drift of about fifty pixels across the whole
+       * fall. The slab returns to its PILLAR first, and the pillar is the strip of solid
+       * ice BETWEEN the two holes (see buildLevel2: home.x is the midpoint of the gap
+       * between them). So it tipped, fell straight down onto solid ground, and the
+       * splash fired anyway because the water line is a constant — a block sinking into
+       * the ice shelf with a splash sound over it. Reported as exactly that: the wrong
+       * cut does not drop in the ditches.
+       *
+       * So the hole is chosen and the speed is SOLVED to reach it, the same way a wrong
+       * chunk is thrown in the rope crossings: distance over the time the fall actually
+       * takes. It still leaves on the side the cut weakened where there is a hole that
+       * way, so the tip and the travel agree with each other.
+       *
+       * The fall is 0.5 * dropGravity * 0.55 * t^2 (see the drop beat in updateL2), so
+       * the time to the water is sqrt(2h / (0.55 * dropGravity)). */
+      vx: (() => {
+        const holes = [G.gapA, G.gapB].filter(Boolean)
+          .map(g => (g.x0 + g.x1) / 2 - G.worldX);
+        if (!holes.length) return away * rand(40, 110);
+        // prefer one on the side it is tipping towards; otherwise the nearer one
+        const side = holes.filter(x => (x - L.home.x) * away > 0);
+        const pick = (side.length ? side : holes)
+          .reduce((best, x) => Math.abs(x - L.home.x) < Math.abs(best - L.home.x) ? x : best,
+                  (side.length ? side : holes)[0]);
+        const h = Math.max(60, (CFG.surfaceY + CFG.levelOne.waterDepth) - L.home.y);
+        const t = Math.sqrt(2 * h / (0.55 * L1.dropGravity));
+        return clamp((pick - L.home.x) / Math.max(0.08, t), -900, 900);
+      })(),
       from: { x: L.pos.x, y: L.pos.y, scale: L.scale },
       splashed: false
     };
@@ -11414,8 +11471,11 @@ export function createGame(canvas, hooks = {}) {
     buildLevel2(true);
     if (!G.l2) return;
     G.l2.wrong = wrong;
-    G.l2.respawn = 1;
-    G.l2.pos.y = -260;
+    /* NO LOWERING-IN. The replacement grows out of the pillar exactly as the first one
+       does (see  in buildLevel2), so it starts where it belongs rather than above
+       the frame. respawn stays 0; the beats that gate on it — the handles, the cut, the
+       demo — simply never see a respawn any more. */
+    G.l2.respawn = 0;
   }
 
   /* THE ANSWER, in four beats: it parts, it is held apart long enough to be seen as two

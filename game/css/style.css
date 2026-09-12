@@ -509,7 +509,15 @@ a:hover { color: var(--ice-pale); }
      4K (4.72 x 38.4 = 181), so the panel is the same share of the stage there as at 1920,
      which is what the interface-share test measures. The floor keeps the wood at the size
      the old 86px floor gave it: 37.6px of wood is 44px of this art. */
-  --sign-h: clamp(44px, calc(4.72 * var(--u)), 182px);   /* rendered height of the trimmed art */
+  /* TALLER, AND THE BOARD NARROWER WITH IT — the two together are what stops it
+     reading as squashed.
+     The plank’s middle is one artwork stretched across whatever width the board is, and
+     at 730 wide by 91 tall that stretch was 2.13x: the grain and the snow pulled to more
+     than twice their drawn width, which an eye reads as the board being squashed
+     vertically. Raising the height to 5.6u and taking the width to 33 units brings it to
+     about 1.44x, and the extra height is also the breathing room the sentence was
+     missing above and below. The type follows --k, so it grows with the board. */
+  --sign-h: clamp(52px, calc(5.6 * var(--u)), 215px);   /* rendered height of the trimmed art */
   --k: calc(var(--sign-h) / 478);         /* art pixels -> screen */
   left: 1.6%;
   transform: none;
@@ -702,7 +710,7 @@ a:hover { color: var(--ice-pale); }
    * band (the six rope crossings, left: 1.6%) it runs 31..761 and the option row's safe
    * area starts at 770. Both by about 20px, at every viewport, because this is in stage
    * units and so is everything it has to miss. */
-  width: calc(38 * var(--u));
+  width: calc(33 * var(--u));
 
   position: relative;
   display: inline-flex;
