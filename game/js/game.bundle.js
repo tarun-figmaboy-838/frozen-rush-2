@@ -12420,6 +12420,10 @@ function createGame(canvas, hooks = {}) {
      moves, not the camera: there is one subject here, so moving it is steadier than
      zooming the world around it — and it leaves the character, the holes and the water
      exactly where the learner last saw them. */
+  /* The speed the slab already has when it finishes tipping back onto its pillar, so
+     the drop continues that motion instead of restarting from a standstill. */
+  const L2_FALL_V0 = 130;
+
   function updateL2(dt) {
     const L = G.l2; if (!L) return;
     L.cornerPulse = Math.max(0, L.cornerPulse - dt * 1.4);
@@ -12507,52 +12511,34 @@ function createGame(canvas, hooks = {}) {
          Where the bad cut made real pieces, THEY fall — each on its own arc, tumbling
          apart — and the slab's own position is carried along with them so the splash
          and the recovery still have something to measure from. */
-      /* THEY TRY TO SIT ON THEIR HOLES FIRST. Each piece arrives over its own crevasse
-         (see the aim in loseSlab), catches on the lip, rocks while it fails to bridge,
-         and gives way — the same beat a wrong chunk gets in the rope crossings, and the
-         one that says THESE DO NOT FIT rather than merely that they fell. f.t is wound
-         back by dt while this runs so the fall itself is paused rather than accruing
-         underneath and jumping when it resumes. */
+      /* A KNOCK AS IT PASSES THE LIP, and nothing more.
+       *
+       * There was a catch here: the fall paused at the mouth so the piece could be seen
+       * TRYING to fit, with a rock and a screen shake. The rock read as trembling rather
+       * than falling and went; the shake made a soft arrival feel like an impact and
+       * went; and what was left was the fall simply stopping for 190ms, which is a hitch,
+       * not an attempt. A block sliding off an edge does not hang there.
+       *
+       * So the hold is gone and the chips stay: they fire once as it crosses the mouth,
+       * which is the part that actually said "this touched the edge on its way in". */
       const mouthY = CFG.surfaceY - 34;
-      if (!f.teeterDone && !f.splashed) {
-        const dropNow = 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
-        if (f.from.y + dropNow >= mouthY) {
-          f.teeterT = (f.teeterT || 0) + dt;
-          const T_ = (L2.teeterMs || 460) / 1000;
-          if (f.teeterT < T_) {
-            f.t -= dt;                       // hold the fall where it is
-            const q = f.teeterT / T_;
-            const sink = q * q * 24;
-            L.pos.x = f.from.x + f.vx * f.t;
-            L.pos.y = mouthY + sink;
-            if (L.debris) for (const pc of L.debris) {
-              pc.x = f.from.x + pc.cx * f.from.scale + pc.vx * f.t;
-              /* ON THE LIP, BY ITS OWN LOWEST POINT. Placed by pc.cy — the piece’s offset
-                 from the slab’s centre — a piece from the top of the slab hovered well
-                 above the ice and one from the bottom sank through it, because a centre
-                 is not a contact edge. Each piece rests on the surface by the lowest
-                 point of its own outline, which is the part that would actually touch. */
-              const lb = polyBounds(pc.local);
-              pc.y = CFG.surfaceY - lb.y1 * f.from.scale + sink;
-              /* NO ROCKING. It wobbled on the lip to say "this does not fit", and read as
-                 the piece shaking rather than as it falling. Asked for plainly: let it
-                 reach the mouth naturally and go in. It keeps whatever angle the cut left
-                 it at, which is the honest one. */
-              pc.scale = f.from.scale;
-            }
-            if (!f.knocked) {
-              f.knocked = true;
-              /* A touch of ice off the lip as it passes, and nothing more. The screen
-                 shake that was here made a soft arrival feel like an impact. */
-              particles.chips(L.pos.x, CFG.surfaceY, reduced ? 3 : 6, -120);
-            }
-            if (!f.gaveWay && q > 0.72) { f.gaveWay = true; audio.crack(); }
-            return;
-          }
-          f.teeterDone = true;
-        }
+      if (!f.knocked && !f.splashed &&
+          f.from.y + 0.5 * L1.dropGravity * 0.55 * f.t * f.t >= mouthY) {
+        f.knocked = true;
+        particles.chips(L.pos.x, CFG.surfaceY, reduced ? 3 : 6, -120);
       }
-      const drop = 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
+      /* IT DOES NOT START FROM REST, and that was the pause.
+
+         The fall has two beats: it travels back to its pillar over 260ms, then f.t is
+         reset to 0 and the drop begins. With the drop as pure 0.5*g*t^2 the slab arrived
+         at the pillar, STOPPED DEAD for a handful of frames while t climbed off zero,
+         and only then started down. Measured as a 19px-per-frame loss of speed in the
+         middle of the fall, and seen as "why does the drop pause for a second".
+
+         A v0 term carries the motion through the handover, so the tip and the fall are
+         one movement. 130px/s is roughly the speed it is already travelling at when the
+         return ends, so nothing jumps either. */
+      const drop = L2_FALL_V0 * f.t + 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
       L.pos.x = f.from.x + f.vx * f.t;
       L.pos.y = f.from.y + drop;
       L.spin = f.spin * f.t;
