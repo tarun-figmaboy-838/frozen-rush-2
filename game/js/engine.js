@@ -1223,7 +1223,7 @@ export const CFG = {
        Long enough for the tremble to play out and be read; the formation that follows
        adds its own 900ms, so a wrong answer is about two seconds of watchable
        consequence rather than two thirds of a second of blur. */
-    afterFallMs: 1150,
+    afterFallMs: 3000,   // ceiling only: the tremble finishing is what actually ends the hold
     // how long a lost piece catches on its lip before it gives way
     teeterMs: 460,
     /* Then the slab announces itself: it glows and swells in place before it travels.
@@ -11120,7 +11120,11 @@ export function createGame(canvas, hooks = {}) {
       const holes = [G.gapA, G.gapB].filter(Boolean)
         .map(h => (h.x0 + h.x1) / 2 - G.worldX).sort((u, v) => u - v);
       if (holes.length) {
-        const hFall = Math.max(60, (CFG.surfaceY + CFG.levelOne.waterDepth) - L.home.y);
+        /* SOLVED TO THE MOUTH, not to the water. Aimed at the water line the pieces
+           were only part of the way across when they reached the lip, so they caught and
+           rocked in mid-air beside their holes instead of on them. The catch happens at
+           the mouth, so that is the moment they have to have arrived. */
+        const hFall = Math.max(60, (CFG.surfaceY - 34) - L.home.y);
         const tFall = Math.sqrt(2 * hFall / (0.55 * L1.dropGravity));
         const order = L.debris.slice().sort((u, v) => u.cx - v.cx);
         order.forEach((pc, k) => {
@@ -11184,7 +11188,12 @@ export function createGame(canvas, hooks = {}) {
        repeatedly as "the user cannot see the wrong stage where Momo trembles". It fires
        on the frame the cut is judged, while the slab is still big and centred and the
        player is still looking at what they just did. */
-    mammoth.startle(reduced ? 0.6 : 1);
+    /* NO TREMBLE HERE. It was added at the cut to make the reaction visible, and the
+       splash already fires one — so it played TWICE: once as the slab tipped and again
+       as it went in, with the second restarting the first. The sequence the owner wants
+       is the honest one anyway: the pieces go in the river, THEN he reacts, then the ice
+       comes back. What stays here is the wash, which is instant feedback of a different
+       kind and does not compete with the performance. */
     /* AND THE SCREEN SAYS IT TOO. One red wash from the edges, decaying — the cheapest
        unmistakable "wrong" there is, and it cannot be missed the way a small character
        animation on the far left can. See drawWrongFlash. */
@@ -11521,7 +11530,13 @@ export function createGame(canvas, hooks = {}) {
             L.pos.y = mouthY + sink;
             if (L.debris) for (const pc of L.debris) {
               pc.x = f.from.x + pc.cx * f.from.scale + pc.vx * f.t;
-              pc.y = mouthY + pc.cy * f.from.scale + sink;
+              /* ON THE LIP, BY ITS OWN LOWEST POINT. Placed by pc.cy — the piece’s offset
+                 from the slab’s centre — a piece from the top of the slab hovered well
+                 above the ice and one from the bottom sank through it, because a centre
+                 is not a contact edge. Each piece rests on the surface by the lowest
+                 point of its own outline, which is the part that would actually touch. */
+              const lb = polyBounds(pc.local);
+              pc.y = CFG.surfaceY - lb.y1 * f.from.scale + sink;
               pc.rot = Math.sin(q * 26 + (pc.cx > 0 ? 1.7 : 0)) * 0.22 * (1 - q);
               pc.scale = f.from.scale;
             }
@@ -11581,8 +11596,13 @@ export function createGame(canvas, hooks = {}) {
          down: the scene stays sharp and ordinary while he shakes over the empty
          pillar. */
       if (L.pos.y > wy + 200) {
+        /* WAIT FOR HIM TO FINISH SHAKING, then bring the next one. A fixed hold could
+           end mid-performance or sit idle after it; the animation itself is the honest
+           clock. The ceiling is a guard, not the plan — if the tremble is ever cut
+           short or skipped the level still moves on. */
         f.holdT = (f.holdT || 0) + dt;
-        if (f.holdT * 1000 > (L2.afterFallMs || 1150)) rebuildSlab();
+        const done = mammoth.state !== 'SHAKE';
+        if ((done && f.holdT * 1000 > 260) || f.holdT * 1000 > (L2.afterFallMs || 3000)) rebuildSlab();
       }
       return;
     }
