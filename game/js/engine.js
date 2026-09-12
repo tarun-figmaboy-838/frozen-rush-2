@@ -1129,7 +1129,12 @@ export const CFG = {
            hole, so the crossing has to leave room for it on the ice beyond: at 95 the
            mouth is 923 and the slab lands past the right edge of the stage. At 80 the
            mouth is 778, the far lip 1684, and the slab sits comfortably on the path. */
-        hexR: 96,    // +20%, with focusK cut by the same factor — see crossing 1
+        /* AS BIG AS THE ROW ALLOWS. This slab cuts into FOUR quarters, so it needs four
+           slots and its two crevasses come out wider per pixel of slab than crossing 1's
+           do — groupW was already 1053 of the 1195 the lead clamp permits at hexR 96.
+           105 takes it to about 1150, which is the most that still fits. focusK comes
+           down by the same factor so the popped size does not move. */
+        hexR: 105,
         /* TWO CREVASSES, and the slab stands on the pillar between them exactly as it
            does on crossing 1 — the owner's ask, and the better picture: a block plainly
            too big for what it is balanced on, with the holes it is about to fill either
@@ -1140,7 +1145,7 @@ export const CFG = {
            190px against the hexagon's 278, so the same on-screen working size needs a
            larger multiplier. 6.16 put it at about 1170 across, which overran the stage
            on the right; 0.7 of that — the same cut taken on all three — is 4.31. */
-        focusK: 3.59,
+        focusK: 3.28,
         instruction: 'Draw all the diagonals.',
         voId: 'p2-2-diagonals'
       },
@@ -1162,14 +1167,16 @@ export const CFG = {
         // 80, for the same reason as crossing 2: the slab has to stand past the far lip
         // 90 with two crevasses: the three pieces share out 1 and 2, and at this size the
         // pair of holes plus the pillar comes to 934 against the 960 the row allows
-        hexR: 108,   // +20%, with focusK cut by the same factor — see crossing 1
+        /* Same ceiling as crossing 2, for the same reason: three fan pieces, three
+           slots, groupW 1097 of 1195 at hexR 108. 114 is the most the row takes. */
+        hexR: 114,
         ditches: 2,
         /* SMALLER THAN THE OTHER TWO. A pentagon is the tallest of the three for its
            width, and at the multiplier the hexagon uses its crown reaches y 156 and runs
            in behind the question board — which it was doing again at 5.16, the crown
            touching the board's underside. 0.7 of that, the same cut as the other two,
            is 3.61 and leaves real air above the apex. */
-        focusK: 3.01,
+        focusK: 2.85,
         instruction: 'Draw 2 diagonals from the same vertex.',
         voId: 'p2-3-samevertex'
       }
