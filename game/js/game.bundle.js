@@ -11431,6 +11431,21 @@ function createGame(canvas, hooks = {}) {
     atmos.drawBack(ctx, G.worldX, G.t, reduced, bgm.light());
     ground.drawDitch(ctx, G.worldX, G.t);
     drawHangingShapes(ctx, true);
+    /* A LOST SLAB GOES IN BEHIND THE ICE, with them.
+
+       drawL2 is called at the very END of the frame, over the ground, the pool and
+       everything else — which is right for a slab standing on its pillar or held at
+       centre stage, and wrong for one that is falling into a hole. It was painted on
+       top of the ice shelf and on top of the pool surface, so a slab whose COORDINATES
+       put it inside the crevasse (measured: x874 inside a hole spanning 642..1144) was
+       still drawn sliding down the front of the ice and floating over the rock. The
+       geometry was right and the picture was wrong, which is the whole of "it still
+       does not drop in the ditches".
+
+       The rope crossings never had this: their chunks go in at drawHangingShapes above,
+       BEFORE the water front, so the pool closes over them. A falling slab is the same
+       kind of thing and belongs in the same place. */
+    if (G.l2 && G.l2.fall && !p2FocusOn()) drawL2(ctx);
     // the pool surface closes over anything that fell into it
     ground.drawWaterFront(ctx, G.worldX, G.t);
     ground.draw(ctx, G.worldX, G.t);
@@ -11475,7 +11490,8 @@ function createGame(canvas, hooks = {}) {
        outline that layering like this produces if you forget. Outside those beats
        (the overview, the fall, the flight into the holes) the focus layer is down and
        the slab is drawn here as normal. */
-    if (G.l2 && !p2FocusOn()) drawL2(ctx);
+    // ...unless it is falling, in which case it was already drawn behind the ice above
+    if (G.l2 && !G.l2.fall && !p2FocusOn()) drawL2(ctx);
     drawTaps(ctx);                    // over everything: it is the player's own mark
     ctx.restore();
   }
@@ -14035,7 +14051,15 @@ class Hud {
        spread across the clip. The engine hands the seconds over in the HUD state. */
     const words = (message || '').trim().split(/\s+/).filter(Boolean).length || 1;
     // spread across the whole spoken line, measured on the last word (see Tutorial.setWords)
-    const step = this._voDur > 0 ? Math.min(0.55, Math.max(0.07, (this._voDur * 0.82) / Math.max(1, words - 1))) : 0.07;
+    /* WITHOUT A VOICE THE REVEAL WAS 0.21 SECONDS. The stagger falls back to 0.07s a
+       word, so a four-word question finished revealing in 0.21s while each word's own
+       ease is 420ms — every word was still animating when the last one started, which
+       reads as one pop rather than as a sentence arriving. The whole point of the
+       word-at-a-time treatment was invisible.
+       0.16 spreads a four-word line over about half a second and a seven-word one over
+       a second, which is close to the pace a recording would set. When there IS a
+       recording voDur wins, exactly as before — this only changes the silent case. */
+    const step = this._voDur > 0 ? Math.min(0.55, Math.max(0.07, (this._voDur * 0.82) / Math.max(1, words - 1))) : 0.16;
     const word = (text, cls, space) => {
       if (!text) return;
       if (space && el.childNodes.length) el.appendChild(document.createTextNode(' '));
@@ -14097,7 +14121,13 @@ class Hud {
       /* A floor at 0.62. Below that the type is too small to be the thing you look at,
          and a sentence that cannot fit even then should be shortened rather than
          shrunk — none of the nine comes close (the longest needs 0.88). */
-      const fit = Math.max(0.62, Math.min(1, avail / need));
+      /* NINETY-FOUR PER CENT OF THE SPACE, NOT ALL OF IT. Filling  exactly means
+         a sentence that needs shrinking ends up flush against the caps with no clear
+         wood at all — measured at 0u for the four longest questions, against 15-35u for
+         the ones that fit. A board where the long lines touch the ends and the short
+         ones do not is the "does not fit dynamically" report. Leaving a margin in the
+         fit gives every line some wood either side, whatever its length. */
+      const fit = Math.max(0.62, Math.min(1, (avail * 0.94) / need));
       el.style.setProperty('--fit', fit.toFixed(3));
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();

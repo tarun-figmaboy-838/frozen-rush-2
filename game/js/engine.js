@@ -10474,6 +10474,21 @@ export function createGame(canvas, hooks = {}) {
     atmos.drawBack(ctx, G.worldX, G.t, reduced, bgm.light());
     ground.drawDitch(ctx, G.worldX, G.t);
     drawHangingShapes(ctx, true);
+    /* A LOST SLAB GOES IN BEHIND THE ICE, with them.
+
+       drawL2 is called at the very END of the frame, over the ground, the pool and
+       everything else — which is right for a slab standing on its pillar or held at
+       centre stage, and wrong for one that is falling into a hole. It was painted on
+       top of the ice shelf and on top of the pool surface, so a slab whose COORDINATES
+       put it inside the crevasse (measured: x874 inside a hole spanning 642..1144) was
+       still drawn sliding down the front of the ice and floating over the rock. The
+       geometry was right and the picture was wrong, which is the whole of "it still
+       does not drop in the ditches".
+
+       The rope crossings never had this: their chunks go in at drawHangingShapes above,
+       BEFORE the water front, so the pool closes over them. A falling slab is the same
+       kind of thing and belongs in the same place. */
+    if (G.l2 && G.l2.fall && !p2FocusOn()) drawL2(ctx);
     // the pool surface closes over anything that fell into it
     ground.drawWaterFront(ctx, G.worldX, G.t);
     ground.draw(ctx, G.worldX, G.t);
@@ -10518,7 +10533,8 @@ export function createGame(canvas, hooks = {}) {
        outline that layering like this produces if you forget. Outside those beats
        (the overview, the fall, the flight into the holes) the focus layer is down and
        the slab is drawn here as normal. */
-    if (G.l2 && !p2FocusOn()) drawL2(ctx);
+    // ...unless it is falling, in which case it was already drawn behind the ice above
+    if (G.l2 && !G.l2.fall && !p2FocusOn()) drawL2(ctx);
     drawTaps(ctx);                    // over everything: it is the player's own mark
     ctx.restore();
   }

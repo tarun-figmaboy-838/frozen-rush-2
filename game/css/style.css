@@ -538,7 +538,7 @@ a:hover { color: var(--ice-pale); }
 /* A teaching line is a whole sentence, so its board is longer — but still a FIXED
    length, for the same reason the question board is (see .instruction-pill). */
 .instruction.banner .instruction-pill { width: calc(44 * var(--u)); }
-.instruction.banner .instruction-text { font-size: calc(193 * var(--k) * 0.78 * var(--fit, 1)); }
+.instruction.banner .instruction-text { font-size: calc(168 * var(--k) * 0.85 * var(--fit, 1)); }
 /* AND IT IS LIT while it speaks (asked for): a soft icy glow around the plank, breathing, so the
    eye goes to the words being read out. It is the panel that glows, not the words. */
 .instruction.banner .instruction-pill {
@@ -780,7 +780,16 @@ a:hover { color: var(--ice-pale); }
   /* --fit is set by Hud.fitInstruction: 1 for a sentence that fits the fixed board, and
      the ratio it needs for one that does not. The board no longer grows to the words —
      see the note on that method for why, and for what it looked like when it did. */
-  font-size: calc(193 * var(--k) * var(--fit, 1));
+  /* 168 ART-PX, NOT 193 — because 193 did not fit the band and --fit was papering over
+     it. Measured across the nine questions at 193: the sentence shrank on EIGHT of them,
+     down to the 0.62 floor on the longest, and the clear wood each side came out at 0 to
+     6 stage units — with the longest actually overlapping the caps at -11. That is the
+     "no side space, does not fit dynamically" report, and shrinking type is the wrong
+     lever for it: it makes the board look like it is coping rather than like it was
+     designed. At 168 most lines sit at --fit 1 with real wood either side, and the
+     longest needs only 0.82. Still 0.034 of the stage height, comfortably over the
+     0.03 the readability test requires. */
+  font-size: calc(168 * var(--k) * var(--fit, 1));
   line-height: 1;
   font-weight: 900;
   /* dark warm brown, which is what reads on pale timber; the old deep blue was chosen
