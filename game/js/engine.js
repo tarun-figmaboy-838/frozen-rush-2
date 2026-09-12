@@ -1232,7 +1232,7 @@ export const CFG = {
        consequence rather than two thirds of a second of blur. */
     afterFallMs: 3000,   // ceiling only: the tremble finishing is what actually ends the hold
     // how long a lost piece catches on its lip before it gives way
-    teeterMs: 460,
+    teeterMs: 190,   // just long enough to see it reach the mouth; it is not a wobble any more
     /* Then the slab announces itself: it glows and swells in place before it travels.
        The glow is what says "this one" — without it the move reads as the game taking
        the object away rather than as the object being picked up.
@@ -11121,7 +11121,12 @@ export function createGame(canvas, hooks = {}) {
       pc.scale = L.scale; pc.rot = 0; pc.offset = 0;
       const side = Math.sign((pc.cx - vi.x) * nx + (pc.cy - vi.y) * ny) || 1;
       pc.sep = { x: nx * side, y: ny * side };
-      pc.spin = side * rand(1.4, 2.4);
+      /* A LEAN, NOT A TUMBLE. At 1.4-2.4 rad/s a piece turned more than a full circle
+         on the way down — measured 6.4 radians across one drop — which is what read as
+         the wrong cut "shaking" rather than falling. Asked for: let it reach the ditch
+         mouth naturally and go in. A fifth of that is a slab tipping as it goes, which
+         is what a block sliding off a lip actually does. */
+      pc.spin = side * rand(0.13, 0.24);
       pc.vx = side * rand(60, 150) + rand(-30, 30);
       pc.art = L.art ? Object.assign({}, L.art, {
         off: { x: L.art.off.x + pc.x, y: L.art.off.y + pc.y }
@@ -11178,7 +11183,7 @@ export function createGame(canvas, hooks = {}) {
          standing on at the size it was standing there, and only then does it tip. The
          child sees where it was, watches it go, and sees what it fell into. */
       phase: 'return', t: 0,
-      spin: away * rand(1.6, 2.6),
+      spin: away * rand(0.14, 0.26),   // a lean, not a tumble — see pc.spin in splitUnfit
       /* IT GOES INTO A CREVASSE, and it did not used to.
        *
        * vx was `away * rand(40, 110)` — a drift of about fifty pixels across the whole
@@ -11572,14 +11577,17 @@ export function createGame(canvas, hooks = {}) {
                  point of its own outline, which is the part that would actually touch. */
               const lb = polyBounds(pc.local);
               pc.y = CFG.surfaceY - lb.y1 * f.from.scale + sink;
-              pc.rot = Math.sin(q * 26 + (pc.cx > 0 ? 1.7 : 0)) * 0.22 * (1 - q);
+              /* NO ROCKING. It wobbled on the lip to say "this does not fit", and read as
+                 the piece shaking rather than as it falling. Asked for plainly: let it
+                 reach the mouth naturally and go in. It keeps whatever angle the cut left
+                 it at, which is the honest one. */
               pc.scale = f.from.scale;
             }
             if (!f.knocked) {
               f.knocked = true;
-              audio.clunk();
-              particles.chips(L.pos.x, CFG.surfaceY, reduced ? 4 : 9, -150);
-              shake(reduced ? 0.5 : 1.5, 160);
+              /* A touch of ice off the lip as it passes, and nothing more. The screen
+                 shake that was here made a soft arrival feel like an impact. */
+              particles.chips(L.pos.x, CFG.surfaceY, reduced ? 3 : 6, -120);
             }
             if (!f.gaveWay && q > 0.72) { f.gaveWay = true; audio.crack(); }
             return;
