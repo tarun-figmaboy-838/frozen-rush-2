@@ -8052,9 +8052,22 @@ function createGame(canvas, hooks = {}) {
          performance, not a frame — with a shove on the world and a spray of chips off
          the rope so the miss is felt as well as seen. The splash when the block lands
          is still the punchline; this is the flinch that answers the finger. */
+      /* THE FLINCH IS THE WASH AND THE POSE; THE TREMBLE WAITS FOR THE DROP.
+       *
+       * The startle was moved here, to the cut, so the answer would not arrive late.
+       * Then a teeter was added at the ditch mouth with a tremble of its own, and the
+       * two ran back to back — the second restarting the first. The whole performance
+       * twice for one mistake.
+       *
+       * The owner's order, stated plainly and more than once: the piece goes in, THEN
+       * he trembles, then the ice comes back. So the immediate answer to the finger is
+       * the red wash and the SURPRISED pose — both instant, neither a performance — and
+       * the tremble belongs to the moment the answer is actually lost. Part 2 was fixed
+       * the same way; this is the same bug in the other half of the game. */
+      G.wrongFx = 1;
       mammoth.setState('SURPRISED');
       mammoth.scare = 0;
-      mammoth.startle(reduced ? 0.5 : 0.95);
+      // (no startle here: it fires when the piece gives way at the lip — see the note above)
       shake(reduced ? 1.2 : 3, 260);
       hitStop(CFG.juice.stopHit * 0.45);
       punch(CFG.juice.punchHit * 0.5, 240, sh.x, sh.y);
