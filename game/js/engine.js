@@ -1224,6 +1224,8 @@ export const CFG = {
        adds its own 900ms, so a wrong answer is about two seconds of watchable
        consequence rather than two thirds of a second of blur. */
     afterFallMs: 1150,
+    // how long a lost piece catches on its lip before it gives way
+    teeterMs: 460,
     /* Then the slab announces itself: it glows and swells in place before it travels.
        The glow is what says "this one" — without it the move reads as the game taking
        the object away rather than as the object being picked up.
@@ -11101,6 +11103,34 @@ export function createGame(canvas, hooks = {}) {
        off, so there the whole slab goes; a diagonal that cannot bridge comes apart and
        both halves go. Either way what falls is what the learner produced. */
     L.debris = splitUnfit(i, j);
+    /* EACH PIECE GOES TO ITS OWN HOLE — the left one left, the right one right.
+     *
+     * splitUnfit gives every piece vx = side * rand(60,150): a nudge apart, the same
+     * size whichever hole is where, aimed at nothing. So both halves of a wrong cut
+     * drifted a few dozen pixels and went down the SAME crevasse, or between them.
+     * Asked for directly: both cuts should try the left and the right ditch and drop
+     * into them.
+     *
+     * The pieces are ordered left to right by their own centroid and the holes left to
+     * right by position, then each piece is given the speed that puts it over its hole
+     * by the time the fall reaches the water — the same solve the slab itself uses.
+     * With four quarters and two holes the first two take the left and the last two the
+     * right, so it still works when the cut makes more than two. */
+    if (L.debris && L.debris.length) {
+      const holes = [G.gapA, G.gapB].filter(Boolean)
+        .map(h => (h.x0 + h.x1) / 2 - G.worldX).sort((u, v) => u - v);
+      if (holes.length) {
+        const hFall = Math.max(60, (CFG.surfaceY + CFG.levelOne.waterDepth) - L.home.y);
+        const tFall = Math.sqrt(2 * hFall / (0.55 * L1.dropGravity));
+        const order = L.debris.slice().sort((u, v) => u.cx - v.cx);
+        order.forEach((pc, k) => {
+          const hole = holes[Math.min(holes.length - 1,
+            Math.floor(k * holes.length / order.length))];
+          const startX = L.home.x + pc.cx;
+          pc.vx = clamp((hole - startX) / Math.max(0.08, tFall), -1200, 1200);
+        });
+      }
+    }
     L.fall = {
       /* TWO BEATS, and the first one is what was missing. The slab is at centre stage
          at 1.66 when the wrong cut lands, and dropping it from there is a block falling
@@ -11471,6 +11501,42 @@ export function createGame(canvas, hooks = {}) {
          Where the bad cut made real pieces, THEY fall — each on its own arc, tumbling
          apart — and the slab's own position is carried along with them so the splash
          and the recovery still have something to measure from. */
+      /* THEY TRY TO SIT ON THEIR HOLES FIRST. Each piece arrives over its own crevasse
+         (see the aim in loseSlab), catches on the lip, rocks while it fails to bridge,
+         and gives way — the same beat a wrong chunk gets in the rope crossings, and the
+         one that says THESE DO NOT FIT rather than merely that they fell. f.t is wound
+         back by dt while this runs so the fall itself is paused rather than accruing
+         underneath and jumping when it resumes. */
+      const mouthY = CFG.surfaceY - 34;
+      if (!f.teeterDone && !f.splashed) {
+        const dropNow = 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
+        if (f.from.y + dropNow >= mouthY) {
+          f.teeterT = (f.teeterT || 0) + dt;
+          const T_ = (L2.teeterMs || 460) / 1000;
+          if (f.teeterT < T_) {
+            f.t -= dt;                       // hold the fall where it is
+            const q = f.teeterT / T_;
+            const sink = q * q * 24;
+            L.pos.x = f.from.x + f.vx * f.t;
+            L.pos.y = mouthY + sink;
+            if (L.debris) for (const pc of L.debris) {
+              pc.x = f.from.x + pc.cx * f.from.scale + pc.vx * f.t;
+              pc.y = mouthY + pc.cy * f.from.scale + sink;
+              pc.rot = Math.sin(q * 26 + (pc.cx > 0 ? 1.7 : 0)) * 0.22 * (1 - q);
+              pc.scale = f.from.scale;
+            }
+            if (!f.knocked) {
+              f.knocked = true;
+              audio.clunk();
+              particles.chips(L.pos.x, CFG.surfaceY, reduced ? 4 : 9, -150);
+              shake(reduced ? 0.5 : 1.5, 160);
+            }
+            if (!f.gaveWay && q > 0.72) { f.gaveWay = true; audio.crack(); }
+            return;
+          }
+          f.teeterDone = true;
+        }
+      }
       const drop = 0.5 * L1.dropGravity * 0.55 * f.t * f.t;
       L.pos.x = f.from.x + f.vx * f.t;
       L.pos.y = f.from.y + drop;
