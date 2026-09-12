@@ -2176,6 +2176,11 @@ const CFG = {
        finished and the picture is settled long before the glow singles it out at 1440.
        See drawSlabForming for what actually happens on screen. */
     formMs: 900,
+    /* HOW LONG THE SCENE IS HELD AFTER A LOST SLAB GOES IN, before another is grown.
+       Long enough for the tremble to play out and be read; the formation that follows
+       adds its own 900ms, so a wrong answer is about two seconds of watchable
+       consequence rather than two thirds of a second of blur. */
+    afterFallMs: 1150,
     /* Then the slab announces itself: it glows and swells in place before it travels.
        The glow is what says "this one" — without it the move reads as the game taking
        the object away rather than as the object being picked up.
@@ -11369,7 +11374,11 @@ function createGame(canvas, hooks = {}) {
        focus drops the instant the slab is lost, the scene comes back, and it is put up
        again with the replacement. Reported as exactly this: the wrong cut never "showed
        back to normal screen". */
-    if (L.fall || L.respawn > 0) return false;
+    /* NOR WHILE THE REPLACEMENT IS STILL FORMING. The ice growing back out of the
+       pillar is part of the same recovery the player is being shown, and blurring it
+       hides the one beat that says "here is another one, try again". The focus goes
+       up when the new slab is whole, not when it starts. */
+    if (L.fall || L.respawn > 0 || (L.form !== undefined && L.form < 1)) return false;
     return ['LEVEL_2_FOCUS', 'LEVEL_2_ACTIVE', 'LEVEL_2_WRONG_FEEDBACK'].includes(G.state);
   }
 
@@ -12451,7 +12460,21 @@ function createGame(canvas, hooks = {}) {
         mammoth.startle(reduced ? 0.55 : 1);
       }
       // once it is under the water it is gone; bring the next one down
-      if (L.pos.y > wy + 260) { rebuildSlab(); }
+      /* AND THEN THE GAME WAITS, which it did not.
+         The replacement was built the instant the slab was 260px under the water —
+         about 660ms after the cut — while Momo was still mid-tremble. The blur then
+         snapped straight back on (p2FocusOn goes true again the moment L.fall is
+         cleared) and the question was re-asked over the top of a reaction the player
+         had not finished watching. Reported as "the tremble plays, the screen blurs,
+         the game restarts, no sequence, everything runs fast and I cannot see what
+         happened" — all of which is a fair description of 660ms.
+         The fall record is KEPT alive through the hold, which is what keeps the blur
+         down: the scene stays sharp and ordinary while he shakes over the empty
+         pillar. */
+      if (L.pos.y > wy + 200) {
+        f.holdT = (f.holdT || 0) + dt;
+        if (f.holdT * 1000 > (L2.afterFallMs || 1150)) rebuildSlab();
+      }
       return;
     }
 
