@@ -12655,6 +12655,21 @@ function createGame(canvas, hooks = {}) {
        the frame. respawn stays 0; the beats that gate on it — the handles, the cut, the
        demo — simply never see a respawn any more. */
     G.l2.respawn = 0;
+    /* AND THE ARRIVAL IS REPLAYED, not skipped.
+     *
+     * The replacement was built while the state was still LEVEL_2_WRONG_FEEDBACK, and
+     * that branch of updateL2 puts the slab straight at centre stage at full focus
+     * scale — so a retry SNAPPED into place behind the blur with no ditch, no forming,
+     * no pop. The first slab of a crossing gets the whole sequence and the second got
+     * none of it, which is the "it should appear like the first time, not blur and
+     * appear" note.
+     *
+     * Going back to LEVEL_2_OVERVIEW replays it exactly: the overview is not in the
+     * focus list, so the blur stays down while the ice grows out of the pillar over
+     * the open scene (formMs 900), it glows at 1440 and pops at 1680, and only then
+     * does LEVEL_2_FOCUS carry it to the middle. Identical to a first attempt, because
+     * it IS the first attempt's code path. */
+    setState('LEVEL_2_OVERVIEW');
   }
 
   /* THE ANSWER, in four beats: it parts, it is held apart long enough to be seen as two
