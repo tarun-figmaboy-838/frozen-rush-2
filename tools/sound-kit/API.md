@@ -1,16 +1,24 @@
 # Sound kit — API reference
 
-Six files. Two ship with your game; the rest are authoring tools you run from
-the VS Code terminal.
+WHERE THE FILES ACTUALLY ARE IN THIS REPO. The two that ship live in `game/js/`,
+because that is what `game/index.html` loads — there is no second copy in this
+folder to keep in step by hand. The authoring tools stay here and read the shipping
+copy directly. (`pack.js` is kept as reference: this game synthesises and streams
+its own audio through `engine.js`, and the page never loads `pack.js`.)
 
-| File | Role | Ships in build? |
+| File | Role | Loaded by the game? |
 | --- | --- | --- |
-| `sfx.js` | 45 effects, mixing, ducking, voice caps, key, comic timing | yes (~40 KB) |
-| `pack.js` | Plays sampled effects and voice-over through the same mix | yes (~7 KB) |
-| `fetch-sounds.js` | Freesound APIv2 client — pulls CC0 files into the project | no |
-| `sounds.config.json` | Maps your event names to Freesound search queries | no |
-| `tools/measure-loudness.js` | Renders every sound offline and derives its trim | no |
-| `tools/verify-mix.js` | Proves ducking, levels and headroom by rendering them | no |
+| `game/js/sfx.js` | 45 effects, mixing, ducking, voice caps, key, comic timing | yes (~40 KB) |
+| `game/js/juice.js` | Squash, pop, shake, dust, hitstop for the DOM controls | yes (~29 KB) |
+| `tools/sound-kit/pack.js` | Plays sampled effects and voice-over through the same mix | no — reference only |
+| `tools/sound-kit/fetch-sounds.js` | Freesound APIv2 client — pulls CC0 files into the project | no |
+| `tools/sound-kit/sounds.config.json` | Maps your event names to Freesound search queries | no |
+| `tools/sound-kit/measure-loudness.js` | Renders every sound offline and derives its trim | no |
+| `tools/sound-kit/verify-mix.js` | Proves ducking, levels and headroom by rendering them | no |
+
+The last two need `node-web-audio-api`, which is deliberately NOT in package.json —
+the game has no use for a native renderer. Install it only to run them:
+`npm i -D node-web-audio-api`.
 
 Synth first, samples only where synthesis can't reach.
 

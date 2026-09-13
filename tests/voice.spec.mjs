@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 test.describe('the voice and the crossing order', () => {
   test.setTimeout(300_000);
 
-  test('fourteen windows, inside the take, none overlapping, one per scripted line', async ({ page }) => {
+  test('fifteen windows, inside the take, none overlapping, one per scripted line', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
       const m = await import('/js/engine.js');
@@ -19,10 +19,13 @@ test.describe('the voice and the crossing order', () => {
       return { src: V.src, dur: +buf.duration.toFixed(2), lines: Object.entries(V.lines) };
     });
     expect(r.src).toBe('assets/audio/vo-lines.mp3');
-    /* FOURTEEN, not sixteen. 'win-title' and 'win-sub' were cut with the ending banner that
-       showed them — the ending is the dance and the camera pushes in on it, so nothing speaks
-       over the top. The seconds of audio are still in the take; no window points at them. */
-    expect(r.lines.length, 'fourteen lines').toBe(14);
+    /* FIFTEEN: seven tutorial lines, seven signs and the cheer. It was sixteen — 'win-title'
+       and 'win-sub' were cut with the ending banner that showed them, taking it to fourteen —
+       and then 'win-yay', which had been sitting unused in the take, was wired up and put it
+       back to fifteen. The number here was left at fourteen and the suite has been red on it
+       since; the seconds 'win-title' and 'win-sub' occupy are still in the take with no window
+       pointing at them, which is what this count is really guarding. */
+    expect(r.lines.length, 'fifteen lines').toBe(15);
     const ordered = r.lines.slice().sort((a, b) => a[1][0] - b[1][0]);
     let prevEnd = 0;
     for (const [id, [at, dur]] of ordered) {
@@ -41,8 +44,8 @@ test.describe('the voice and the crossing order', () => {
     await boot(page, { sound: true, tutorial: true, skipScreens: true });
     await page.evaluate(() => window.iceAgeGame.sfx('ui'));         // unlocks the context
     await page.waitForFunction(() => window.iceAgeGame._voice().ready, null, { timeout: 60_000 });
-    // 14 since the ending stopped speaking: win-title and win-sub went with the banner
-    expect((await page.evaluate(() => window.iceAgeGame._voice())).lines).toBe(14);
+    // 15: the ending's two sentences went with the banner, and the cheer (win-yay) came back
+    expect((await page.evaluate(() => window.iceAgeGame._voice())).lines).toBe(15);
     const r = await page.evaluate(async () => {
       const m = await import('/js/engine.js');
       /* THE SECOND SENTENCE, not the whole line. The box shows one sentence at a time now
@@ -195,39 +198,54 @@ test('a word appears when it is spoken, and holds when the voice does', async ({
       null, { timeout: 20_000 });
   });
 
-  test('a phase question is spoken once, and its id comes from its own sentence', async ({ page }) => {
+  /* THE ID IS NAMED ON THE CROSSING, NOT GUESSED FROM THE SENTENCE.
+     This asked signVoId() for each id and demanded a recorded window for it — both of
+     which belonged to Part 1. signVoId pulls "the <word>" off the end of a question, which
+     matched "Cut the TRIANGLE." and matches nothing in Part 2, where every sentence has an
+     adjective in the way; and Part 2's take has not been recorded at all (docs/VO-PART2.md).
+     So it was comparing seven against six and asserting windows that do not exist yet.
+     What still has to be true — and is what the original bug was about — is that a crossing
+     NAMES its line and announces it exactly once. */
+  test('a phase question is announced once, under the id the crossing names', async ({ page }) => {
     await boot(page, { sound: true, fast: 1 });
     const ids = await page.evaluate(async () => {
-      const m = await import('/js/engine.js'), g = window.iceAgeGame;
-      return m.CFG.levelOne.phases.map(p => ({ text: p.instruction, id: g.signVoId(p.instruction), known: !!m.CFG.vo.lines[g.signVoId(p.instruction)] }));
+      const m = await import('/js/engine.js');
+      return m.CFG.levelOne.phases.map(p => ({ text: p.instruction, id: p.voId || '' }));
     });
-    expect(ids.length).toBe(7);
-    for (const p of ids) expect(p.known, `${p.text} -> ${p.id} has no recorded line`).toBe(true);
-    // and it is not spoken twice for the same phase
+    expect(ids.length, 'six rope crossings').toBe(6);
+    for (const p of ids) expect(p.id, `"${p.text}" names no line`).toBeTruthy();
+    // and it is not announced twice for the same phase
     await force(page, 'GLACIER_BREAK_1');
     await waitState(page, 'PHASE_ACTIVE', 120_000);
     const said = await page.evaluate(() => window.iceAgeGame.debug().saidQuestion);
-    expect(said).toBe('sign-triangle');
+    expect(said).toBe(ids[0].id);
   });
 
-  test('every question is actually spoken, first and last included', async ({ page }) => {
+  test('every question is announced, first and last included', async ({ page }) => {
     /* THE FIRST ONE WAS NOT. The only call was on entering PHASE_ACTIVE, and in the tutorial the
-       teaching line still had the plank at that moment, so "Cut the TRIANGLE." — the first
-       question in the game — was never said. Measured over a playthrough: fifteen of sixteen. */
+       teaching line still had the plank at that moment, so the first question in the game was
+       never announced. That is the regression this guards, and it is about the ORDER of the
+       plank and the announcement — not about the take.
+
+       The ids and the "was it heard" check went with Part 1: they named sign-triangle and
+       friends, and demanded that a window exist for each. Part 2's nine lines are not recorded
+       yet (docs/VO-PART2.md) and say() returns 0 for an id it has no window for, so hearing
+       cannot be asserted until the take lands. Announcing can, and it is the half that broke. */
     await boot(page, { sound: true, fast: 2 });
     await page.evaluate(() => window.iceAgeGame.sfx('ui'));
     await page.waitForFunction(() => window.iceAgeGame._voice().ready, null, { timeout: 60_000 });
+    const want = await page.evaluate(async () => {
+      const m = await import('/js/engine.js');
+      return m.CFG.levelOne.phases.map(p => p.voId);
+    });
     const seen = [];
-    for (const phase of [0, 3, 6]) {
+    for (const phase of [0, 3, 5]) {
       await page.evaluate(p => { const g = window.iceAgeGame, G = g.debug(); G.phase = p; G.saidQuestion = ''; g._force('GLACIER_BREAK_1'); }, phase);
       await waitState(page, 'PHASE_ACTIVE', 120_000);
       await page.waitForFunction(() => !!window.iceAgeGame.debug().saidQuestion, null, { timeout: 30_000 });
-      seen.push(await page.evaluate(() => ({ id: window.iceAgeGame.debug().saidQuestion,
-                                             heard: window.iceAgeGame._voice().said.slice(-1)[0] })));
+      seen.push(await page.evaluate(() => window.iceAgeGame.debug().saidQuestion));
     }
-    expect(seen.map(s => s.id)).toEqual(['sign-triangle', 'sign-hexagon', 'sign-hexagons']);
-    // and nothing was skipped for want of a window, a mute or an unloaded take
-    for (const s of seen) expect(s.heard, `${s.id} was not heard: ${s.heard}`).toBe(s.id);
+    expect(seen).toEqual([want[0], want[3], want[5]]);
   });
 
   test('the crossing runs in order: the hole, the line on the plank, then the question, then the hand', async ({ page }) => {
@@ -250,7 +268,10 @@ test('a word appears when it is spoken, and holds when the voice does', async ({
     await page.waitForFunction(() => /path is broken/.test(document.getElementById('tut-text').textContent), null, { timeout: 200_000 });
     expect((await plank()).text, 'the plank is empty while the hole is described').toBe('');
     // then the teaching line, as a banner, with its own words (no key-word capitals)
-    await page.waitForFunction(() => { const t = document.getElementById('instruction-text'); const el = document.getElementById('instruction'); return el && !el.hidden && /Use the right ice piece/.test(t.textContent); }, null, { timeout: 200_000 });
+    /* "Cut this ice block", not "Use the right ice piece": the step was rewritten when the
+       tutorial moved onto Part 2's crossing 1, which has a single slab and so nothing to
+       pick the RIGHT one from. See the note on VO.use in tutorial.js. */
+    await page.waitForFunction(() => { const t = document.getElementById('instruction-text'); const el = document.getElementById('instruction'); return el && !el.hidden && /Cut this ice block/.test(t.textContent); }, null, { timeout: 200_000 });
     const banner = await plank();
     expect(banner.banner, 'it is the banner state').toBe(true);
     expect(banner.text).toBe('Use the right ice piece to fix the path.');

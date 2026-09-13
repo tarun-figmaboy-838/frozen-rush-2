@@ -8,9 +8,24 @@
  */
 'use strict';
 const path = require('path');
-const { OfflineAudioContext } = require('node-web-audio-api');
+/* NOT A DEPENDENCY OF THIS REPO. node-web-audio-api is a native module and the game
+   never needs it — only this script and measure-loudness.js do, to render the kit
+   offline. Left bare it died with a MODULE_NOT_FOUND stack that read like a broken
+   script rather than a missing optional tool, so say which it is. */
+let OfflineAudioContext;
+try {
+  ({ OfflineAudioContext } = require('node-web-audio-api'));
+} catch (e) {
+  console.error('verify-mix.js needs the optional renderer that is not installed here:\n' +
+                '  npm i -D node-web-audio-api\n' +
+                'It is deliberately not in package.json — the game does not use it.');
+  process.exit(1);
+}
 
-const SR = 48000, SFX_PATH = path.resolve(__dirname, '../sfx.js');
+/* The kit's one copy lives in game/js — it is the file the page actually loads, so
+   measuring anything else would be measuring a stale twin. This used to resolve
+   '../sfx.js' (tools/sfx.js), a path that has not existed since the kit moved. */
+const SR = 48000, SFX_PATH = path.resolve(__dirname, '../../game/js/sfx.js');
 const PRE = { b:[1.53512485958697,-2.69169618940638,1.19839281085285], a:[1,-1.69065929318241,0.73248077421585] };
 const RLB = { b:[1,-2,1], a:[1,-1.99004745483398,0.99007225036621] };
 

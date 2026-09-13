@@ -76,7 +76,14 @@ export class Hud {
     this._steps = 0;
     this._at = -1;
     this._goal = null;
-    this._onResize = () => this.checkOrientation();
+    /* The board's one type size is measured in pixels, so it is only valid for the stage
+       it was measured at — and only for the face it was measured in. A resize invalidates
+       it, and so does Baloo 2 arriving after the first paint: measured in the fallback
+       face the longest question needs a different ratio than it does in the real one. */
+    this._onResize = () => { this._fit = null; this.checkOrientation(); this.fitInstruction(); };
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => { this._fit = null; this.fitInstruction(); }).catch(() => {});
+    }
   }
 
   /* ---------- the journey card ----------
@@ -397,29 +404,112 @@ export class Hud {
    * measured rect would be whatever the scale was on that frame. scrollWidth is layout,
    * which transforms do not touch.
    */
-  fitInstruction() {
+  /* ONE SIZE FOR EVERY QUESTION, NOT ONE SIZE PER QUESTION.
+   *
+   * This used to measure the sentence that happened to be up and scale the type to it.
+   * Each question fitted its own board, so the type was a different size on nearly every
+   * crossing — "Cut the convex polygon." set large, "Draw 2 diagonals from the same
+   * vertex." set small — and the sign changed character as you played. That is the
+   * "text size is not constant in whole game" report, and it is the same fault the plank
+   * itself had before it was given a fixed width: something that should be one physical
+   * object being rebuilt to suit each string.
+   *
+   * So the fit is now measured ACROSS EVERY QUESTION THE GAME CAN ASK, once, and the
+   * smallest one wins. The longest sentence is the one that sets the type size, exactly
+   * as a signwriter would lay out a set of signs; every shorter question is set at that
+   * same size with more clear wood either side. Nothing ever overflows, because the
+   * sentence that defines the size is by construction the one that fits worst.
+   *
+   * The corpus comes from setQuestions() (main.js passes it from CFG), so a question
+   * added later is measured with the rest and cannot silently push a line off the plank.
+   * With no corpus it falls back to fitting the current sentence, which is what a
+   * banner line — a different element with its own width — still does.
+   */
+  /* TWO BOARDS, MEASURED SEPARATELY. The six rope crossings sit in the left band, where
+     the plank is 33 stage units — all the option row leaves room for. Part 2's three sit
+     in the middle, where there is no option row and the plank is 40u. Different widths
+     hold different sentences, so each is fitted to its own longest and the two land at
+     the same type size rather than one being shrunk to the other's constraint.
+     @param {{band?: string[], centered?: string[]}} sets */
+  setQuestions(sets) {
+    const clean = a => (a || []).filter(s => typeof s === 'string' && s.trim());
+    this._questions = { band: clean(sets && sets.band), centered: clean(sets && sets.centered) };
+    this._fit = null;
+    this.fitInstruction();
+  }
+
+  /** Widest-sentence fit for the board as it is currently classed. */
+  _measureFit(mode) {
     const el = this.el.text, pill = this.el.pill;
+    const cs = getComputedStyle(pill);
+    const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (!(avail > 0)) return null;
+    /* NINETY-FOUR PER CENT OF THE SPACE, NOT ALL OF IT. Filling it exactly means the
+       sentence that sets the size ends up flush against the caps with no clear wood at
+       all. Leaving a margin in the fit gives every line some wood either side. */
+    const fitFor = need => (need > 0 ? (avail * 0.94) / need : 1);
+    const lines = this._questions && this._questions[mode];
+    if (!lines || !lines.length) return fitFor(el.scrollWidth);
+    /* MEASURED IN A PROBE, NOT IN THE LIVE ELEMENT.
+     *
+     * The first version wrote each sentence into #instruction-text and put the real words
+     * back afterwards. That is synchronous and never paints, but it does mean the board
+     * briefly HOLDS a sentence it is not showing — and anything that reads the DOM from
+     * outside this call (a test, an assistive tool, a MutationObserver) can be handed it.
+     * The plank is the one element in the game whose contents are an assertion about what
+     * the learner is being asked, so it is not the place to scribble.
+     *
+     * The probe is a clone with the same class inside the same pill, so it inherits every
+     * font rule including --k, and it is measured in the REAL face — Baloo 2 loads late
+     * and a detached element with fallback metrics would size the board to the wrong one.
+     * visibility:hidden keeps it out of the picture; absolute keeps it out of the layout. */
+    const probe = el.cloneNode(false);
+    probe.removeAttribute('id');
+    probe.removeAttribute('aria-live');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;' +
+                          'white-space:nowrap;pointer-events:none;';
+    probe.style.setProperty('--fit', '1');
+    pill.appendChild(probe);
+    let worst = 1;
+    try {
+      for (const s of lines) {
+        probe.textContent = s;
+        worst = Math.min(worst, fitFor(probe.scrollWidth));
+      }
+    } finally {
+      probe.remove();
+    }
+    return worst;
+  }
+
+  fitInstruction() {
+    const el = this.el.text, pill = this.el.pill, root = this.el.instruction;
     if (!el || !pill) return;
+    /* A banner is a different board — wider, and its own type size (see the .banner
+       rules) — so it keeps fitting the line it is showing. Only the question board,
+       the one the player sees on all nine crossings, is held constant. */
+    const banner = !!(root && root.classList.contains('banner'));
+    const mode = (root && root.classList.contains('centered')) ? 'centered' : 'band';
+    this._fit = this._fit || {};
+    if (!banner && this._fit[mode] != null) { el.style.setProperty('--fit', this._fit[mode]); return; }
     el.style.setProperty('--fit', '1');
     /* Deferred one frame: called straight after the words are appended, the pill has
        not been laid out at the new content yet and clientWidth is the previous
        question's. */
     const run = () => {
-      const cs = getComputedStyle(pill);
-      const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const need = el.scrollWidth;
-      if (!(avail > 0) || !(need > 0)) return;
+      const raw = banner ? (() => {
+        const cs = getComputedStyle(pill);
+        const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const need = el.scrollWidth;
+        return (avail > 0 && need > 0) ? (avail * 0.94) / need : null;
+      })() : this._measureFit(mode);
+      if (raw == null) return;
       /* A floor at 0.62. Below that the type is too small to be the thing you look at,
-         and a sentence that cannot fit even then should be shortened rather than
-         shrunk — none of the nine comes close (the longest needs 0.88). */
-      /* NINETY-FOUR PER CENT OF THE SPACE, NOT ALL OF IT. Filling  exactly means
-         a sentence that needs shrinking ends up flush against the caps with no clear
-         wood at all — measured at 0u for the four longest questions, against 15-35u for
-         the ones that fit. A board where the long lines touch the ends and the short
-         ones do not is the "does not fit dynamically" report. Leaving a margin in the
-         fit gives every line some wood either side, whatever its length. */
-      const fit = Math.max(0.62, Math.min(1, (avail * 0.94) / need));
-      el.style.setProperty('--fit', fit.toFixed(3));
+         and a sentence that cannot fit even then should be shortened rather than shrunk. */
+      const fit = Math.max(0.62, Math.min(1, raw)).toFixed(3);
+      if (!banner) this._fit[mode] = fit;
+      el.style.setProperty('--fit', fit);
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();
   }

@@ -125,9 +125,7 @@
                         middle: an earlier version used a hard stop at 47%, which on
                         a wide pill reads as a seam across the button rather than as
                         gloss, and the seam sat right behind the label. */
-.btn-chunky,
-.btn-primary {
-  --cap: clamp(3px, 0.31vw, 6px);
+.btn-chunky {
   --r: 999px;
   /* BEGIN — green. Brighter and more saturated than before: this is the button the
      game is entered through, and against an ice world that is itself very light a
@@ -167,20 +165,6 @@
     0 0 clamp(14px, 1.5vw, 28px) var(--halo, transparent);
   transition: box-shadow 160ms ease;
 }
-/* SECOND GO — Try Again is a retry, not a beginning */
-.btn-retry {
-  /* Violet. Blue-on-blue read poorly against an ice world, and it was too close
-     to the sky to find at a glance. Violet is the one warm-cool hue no other role
-     uses here: green begins a run, amber is the in-world verb, ice is the aside.
-     A retry needs to be unmistakable and calm, not alarming. */
-  --gloss:   .92;
-  --top:     #F0E4FF;
-  --body-a:  #B583FF;
-  --body-b:  #8434FF;
-  --edge:    #5C10CC;
-  --ink:     #400E96;
-  --halo:    rgba(146, 74, 255, 0.55);
-}
 
 .btn-chunky-face {
   position: relative;
@@ -218,8 +202,7 @@
 }
 .btn-chunky:hover .btn-chunky-face { filter: brightness(1.1) saturate(1.06); }
 /* the halo swelling is most of what makes the set feel alive under a pointer */
-.btn-chunky:hover,
-.btn-primary:hover {
+.btn-chunky:hover {
   box-shadow:
     inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 1),
     inset 0 clamp(-3px, -0.31vw, -2px) 0 rgba(74, 86, 96, 0.5),
@@ -242,8 +225,7 @@
     inset 0 0 clamp(14px, 1.5vw, 28px) rgba(0, 0, 0, 0.3);
 }
 .btn-chunky:active, .btn-chunky.pressed { animation: none; }
-.btn-chunky:focus-visible,
-.btn-primary:focus-visible {
+.btn-chunky:focus-visible {
   outline: clamp(3px, 0.31vw, 5px) solid #FFD34A;
   outline-offset: clamp(3px, 0.31vw, 6px);
 }
@@ -251,43 +233,6 @@
    CSS-built PLAY pill. The picture buttons are their own family (.btn-art, below) and
    .btn-start has had no element in the markup for a long time. */
 
-/* Replay wears the same rim and gloss — it is the same act */
-.btn-primary { padding: clamp(3px, 0.31vw, 6px); }
-.btn-primary-face {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(8px, 0.85vw, 16px) clamp(22px, 2.1vw, 40px);
-  border-radius: var(--r);
-  background:
-    radial-gradient(122% var(--gloss-h, 88%) at 50% -10%,
-      rgba(255, 255, 255, var(--gloss, .88)) 0%,
-      rgba(255, 255, 255, calc(var(--gloss, .88) * 0.42)) 38%,
-      rgba(255, 255, 255, 0) 74%),
-    linear-gradient(180deg, var(--top) 0%, var(--body-a) 42%, var(--body-b) 80%, var(--edge) 100%);
-  box-shadow:
-    inset 0 clamp(2px, 0.21vw, 3px) 0 rgba(255, 255, 255, 0.9),
-    inset 0 clamp(-7px, -0.7vw, -4px) 0 rgba(0, 0, 0, 0.24);
-  color: #FFFFFF;
-  font-weight: 800;
-  font-size: clamp(15px, 1.45vw, 28px);
-  letter-spacing: .02em;
-  -webkit-text-stroke: clamp(1.5px, 0.16vw, 3px) var(--ink);
-  paint-order: stroke fill;
-  transition: filter 110ms ease, box-shadow 110ms ease, background 110ms ease;
-}
-.btn-primary:hover .btn-primary-face { filter: brightness(1.07); }
-.btn-primary:active .btn-primary-face,
-.btn-primary.pressed .btn-primary-face {
-  --gloss: .34;
-  --gloss-h: 56%;
-  filter: brightness(.82);
-  box-shadow:
-    inset 0 clamp(1px, 0.1vw, 2px) 0 rgba(255, 255, 255, 0.45),
-    inset 0 clamp(-7px, -0.7vw, -4px) 0 rgba(0, 0, 0, 0.24),
-    inset 0 0 clamp(12px, 1.25vw, 22px) rgba(0, 0, 0, 0.3);
-}
 /* position lives with the rest of the .btn-play rules at the end of this file */
 
 /* ---------- character select: REMOVED ----------
@@ -297,7 +242,7 @@
    .sel-snow, .card-pick, .card-burst, .select-title and .btn-start rules for elements
    that have not been in index.html for a long time. Deleted here.
 
-   The one survivor is .card-hero just below, which the Ouch panel still uses. */
+   .card-hero went the same way once the Ouch panel it belonged to was removed. */
 
 /* The scissors cursor’s stylesheet was here — .cursor, .cur-half, .cur-blade,
    .cur-loop, .cur-arm, .cur-rivet and .stage.cursor-on. The pointer is now an
@@ -398,12 +343,6 @@
      on a software renderer, which starved the whole game while a tutorial step was up.
      Static, the browser filters it once and composites the result. The lifted button
      keeps its breath - it is a small element. */
-}
-@keyframes tutFocusBreathe {
-  0%, 100% { filter: drop-shadow(0 0 clamp(5px, 0.5vw, 10px) rgba(255, 201, 77, 0.95))
-                     drop-shadow(0 0 clamp(14px, 1.5vw, 28px) rgba(255, 186, 56, 0.55)); }
-  50%      { filter: drop-shadow(0 0 clamp(7px, 0.7vw, 14px) rgba(255, 210, 100, 1))
-                     drop-shadow(0 0 clamp(20px, 2.1vw, 40px) rgba(255, 186, 56, 0.75)); }
 }
 .tut-focus[hidden] { display: none; }
 
@@ -790,30 +729,6 @@
 .btn-replay:hover .btn-chunky-face { filter: brightness(1.07); }
 .btn-replay:active .btn-chunky-face { filter: brightness(.88); }
 
-/* ---------- the Ouch panel's character hero ---------- */
-.card-hero {
-  /* BIGGER. It is the only picture on the panel and it was thumbnail-sized, which is
-     most of why the card read as a form with an icon on it. */
-  width: clamp(150px, 16vw, 300px);
-  height: clamp(126px, 13.4vw, 254px);
-  margin-bottom: clamp(-6px, -0.6vw, -2px);
-  background-repeat: no-repeat;
-  background-position-x: 0%;
-  filter: drop-shadow(0 clamp(6px, 0.63vw, 13px) clamp(8px, 0.85vw, 17px) rgba(8,40,72,.45));
-  /* drops in first, then keeps the idle wobble — two animations, not one */
-  animation: heroDrop 520ms cubic-bezier(.2, 1.7, .4, 1) both,
-             heroWobble 900ms ease-in-out 520ms infinite;
-}
-@keyframes heroDrop {
-  from { opacity: 0; translate: 0 -38px; scale: .7; }
-  to   { opacity: 1; translate: 0 0;     scale: 1; }
-}
-@keyframes heroWobble {
-  0%, 100% { transform: rotate(-2.5deg); }
-  50%      { transform: rotate(2.5deg); }
-}
-@media (prefers-reduced-motion: reduce) { .card-hero { animation: none; } }
-
 /* the panels themselves read as game furniture, not a web modal */
 .card {
   border-width: clamp(4px, 0.42vw, 8px) !important;
@@ -1110,51 +1025,10 @@
   .btn-play:active, .btn-play.pressed { scale: 1; }
 }
 
-/* ---------- TRY AGAIN ----------
-   The supplied art, and a member of the .btn-art family like PLAY and JUMP.
-
-   ONE TAKE ONLY. There is no pressed version of this one, so the press cannot be an
-   image swap — it is a darkening plus a squash instead, which is the same call the round
-   jump button makes and for the same reason. The family's rule is precisely "the press
-   is in the art WHERE THERE IS pressed art"; where there is not, CSS does it. */
-.btn-retry {
-  /* the common box the art was trimmed to */
-  aspect-ratio: 1947 / 635;
-  width: clamp(180px, 19vw, 340px);
-  background-image: url("../assets/ui/btn-tryagain.webp?v=f17bd92f");
-  filter: drop-shadow(0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(6, 40, 78, 0.45));
-  /* it is the only thing to do on this card, so it asks */
-  animation: playBob 2.2s cubic-bezier(.45, 0, .55, 1) infinite;
-}
-.btn-retry:hover {
-  filter: drop-shadow(0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(6, 40, 78, 0.45))
-          drop-shadow(0 0 clamp(12px, 1.3vw, 26px) rgba(64, 190, 255, 0.95));
-}
-.btn-retry:active,
-.btn-retry.pressed {
-  animation: none;
-  scale: 1.03 0.93;
-  filter: brightness(.86) saturate(1.1)
-          drop-shadow(0 clamp(1px, 0.1vw, 2px) clamp(3px, 0.31vw, 6px) rgba(6, 40, 78, 0.5));
-}
-/* NO RING AT ALL ON THIS ONE — see the note on .btn-play:focus-visible.
-
-   The first attempt at this gave the pill a border-radius so the outline would follow
-   it, and that is what put a gold hoop around TRY AGAIN. It was the most visible
-   instance of the problem because the HUD focuses this button the moment the card
-   opens — so it was not a keyboard affordance anybody had asked for, it was a gold
-   ring drawn around the button for every player, mouse and touch included.
-
-   Both halves are fixed. Here, the indicator is the same alpha-following halo the
-   other picture buttons use; in hud.js, the auto-focus now only happens when the
-   player is actually using a keyboard, so a touch player never sees an indicator. */
-.btn-retry { border-radius: 999px; }
-.btn-retry:focus-visible {
-  outline: none;
-  filter: drop-shadow(0 clamp(4px, 0.42vw, 8px) clamp(8px, 0.85vw, 16px) rgba(6, 40, 78, 0.45))
-          drop-shadow(0 0 clamp(4px, 0.42vw, 8px) rgba(255, 255, 255, 0.95))
-          drop-shadow(0 0 clamp(14px, 1.5vw, 30px) rgba(255, 196, 74, 0.9));
-}
+/* NO TRY AGAIN RULES. The Ouch card and its button were removed (see index.html and
+   hud.js): a crash now plays the knockout out and the run resumes at the nearest
+   checkpoint, so the button has no element. Its .btn-art member rules, its focus halo
+   and its btn-tryagain.webp went with it. */
 
 /* ---------- the cartoon card ----------
    `card-fun` is the Ouch panel's own treatment. The overlays all shared one flat pale
@@ -1260,7 +1134,4 @@
   .card-fun { animation: none; rotate: none; }
   .card-fun::before { animation: none; }
   .card-fun h1 { rotate: none; }
-  .card-hero { animation: none; opacity: 1; translate: none; scale: 1; }
-  .btn-retry { animation: none; }
-  .btn-retry:active, .btn-retry.pressed { scale: 1; }
 }

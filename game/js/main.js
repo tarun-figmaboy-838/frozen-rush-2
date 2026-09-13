@@ -19,13 +19,22 @@
                                milliseconds, so ?speed cannot shorten a playthrough.
 */
 
-import { createGame, assetUrl } from './engine.js';
+import { createGame, assetUrl, CFG } from './engine.js';
 import { Hud } from './hud.js';
 import { Frontend } from './frontend.js';
 import { Tutorial } from './tutorial.js';
 
 const canvas = document.getElementById('game-canvas');
 const hud = new Hud(document);
+
+/* EVERY QUESTION THE PLANK CAN CARRY, handed over before the first one is shown.
+   The board sizes its type to the longest of them once and keeps that size for the whole
+   game, instead of re-fitting itself to each sentence — see Hud.setQuestions. Read from
+   CFG rather than listed here, so a crossing added later is measured with the rest. */
+hud.setQuestions({
+  band: CFG.levelOne.phases.map(p => p.instruction),        // the six rope crossings, left band
+  centered: CFG.levelTwo.levels.map(c => c.instruction)     // Part 2's three, middle of the stage
+});
 
 const params = new URLSearchParams(location.search);
 const num = (key, min, max, fallback) => {

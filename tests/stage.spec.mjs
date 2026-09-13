@@ -190,16 +190,36 @@ test.describe('the staged intro, the sign and the script', () => {
     expect(turns, 'it rebounds rather than stopping dead').toBeGreaterThanOrEqual(2);
   });
 
-  test('the VO script holds every line the learner is shown', async () => {
-    const doc = readFileSync('docs/VO-SCRIPT.md', 'utf8');
+  /* THE TWO SCRIPTS BETWEEN THEM HOLD EVERY SPOKEN LINE, and this is what stops a
+     sentence being reworded in the engine while the sheet the voice is read from still
+     says the old words — which is precisely how a take gets recorded wrong.
+
+     It used to look for `instruction: '...' }` and expect SEVEN of them: Part 1's
+     crossings were one-line objects. Part 2's carry targets, distractors, art and a voId,
+     so every one of them ends in a comma instead and the pattern matched nothing at all —
+     the assertion had been comparing an empty list against 7 and failing ever since the
+     curriculum changed. Nine crossings now, matched however the object is laid out. */
+  test('the VO scripts hold every line the learner is shown', async () => {
+    const tutDoc = readFileSync('docs/VO-SCRIPT.md', 'utf8');
+    const p2Doc = readFileSync('docs/VO-PART2.md', 'utf8');
     const engine = readFileSync('game/js/engine.js', 'utf8');
     const tut = readFileSync('game/js/tutorial.js', 'utf8');
-    const instructions = [...engine.matchAll(/^\s*instruction: '([^']+)' \}/gm)].map(m => m[1]);
-    expect(instructions.length, 'the seven crossings').toBe(7);
-    for (const line of instructions) expect(doc, `the script is missing: ${line}`).toContain(line);
-    // the tutorial's own seven lines, as written in its step list
+
+    const instructions = [...engine.matchAll(/^\s*instruction: '([^']+)',?\s*$/gm)].map(m => m[1]);
+    expect(instructions.length, 'six rope crossings and three drawn ones').toBe(9);
+    for (const line of instructions) {
+      expect(p2Doc, `docs/VO-PART2.md is missing: ${line}`).toContain(line);
+    }
+    /* The tutorial's own seven lines, as written in its step list. Either script may
+       hold one: six were recorded with Part 1 and are in VO-SCRIPT.md, and the 'use'
+       step was rewritten for Part 2's single slab, so its replacement is waiting in
+       VO-PART2.md with the nine questions. What must never happen is a line the learner
+       is shown that appears in NEITHER — that is a line nobody will know to record. */
     const spoken = [...tut.matchAll(/^\s*text: '([^']+)',$/gm)].map(m => m[1]);
     expect(spoken.length).toBeGreaterThanOrEqual(7);
-    for (const line of spoken) expect(doc, `the script is missing: ${line}`).toContain(line);
+    for (const line of spoken) {
+      expect(tutDoc.includes(line) || p2Doc.includes(line),
+        `neither VO script holds: ${line}`).toBe(true);
+    }
   });
 });

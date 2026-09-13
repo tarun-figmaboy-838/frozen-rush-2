@@ -49,12 +49,21 @@ coloured; say it with the same emphasis.
 | sign-pentagons | Cut all the pentagons. | 6 (two answers) |
 | sign-hexagons | Cut all the hexagons. | 7 (two answers) |
 
-## 3. The ending — NO SPOKEN LINES
+## 3. The ending — ONE CHEER, NO SENTENCES
 
-The ending used to open with a banner: **You did it!** over **Momo crossed the Frozen Pass!**,
+| id | line | moment |
+|---|---|---|
+| win-yay | *(the cheer — wordless)* | Momo reaches his friend and the pair dance. |
+
+The ending used to open with a banner too: **You did it!** over **Momo crossed the Frozen Pass!**,
 both spoken (`win-title`, `win-sub`). Both were removed on request, panel and voice together.
-The journey now finishes on the dance alone — the camera pushes in on Momo and his friend and
-nothing is drawn or said over the top. Do not record anything for this section.
+The journey now finishes on the dance — the camera pushes in on Momo and his friend and no
+words are drawn or said over the top.
+
+`win-yay` was in the original take all along and went unused for a while: every other line ends
+by 34.52 and the file runs to 36.13, with a single spoken burst at 34.763–35.658. It is a cheer,
+not a sentence, so there is nothing to read — but it IS in `CFG.vo.lines` and it does play, which
+is why it is listed here. Do not re-record it and do not add sentences to this section.
 
 ## 4. Interface and screens
 

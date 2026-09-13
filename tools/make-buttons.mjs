@@ -118,9 +118,26 @@ async function build(name, cfg) {
               `  (${(boxW / boxH).toFixed(4)})`);
 }
 
+/* SHELVED RECIPES DO NOT RUN BY DEFAULT.
+ *
+ * `tryagain` and `jump` build art for controls the game no longer has. The recipes are
+ * kept — the delivered PNGs are still in art-source/ and this is how they are rebuilt if
+ * a control comes back — but their OUTPUT is not wanted in game/assets: it was 149KB
+ * downloaded by every visitor for buttons that cannot appear, and because a tool named
+ * the files, tools/check-assets.mjs counted them as referenced and reported a clean run.
+ *
+ * So a bare run builds only what the game loads. Name one explicitly to rebuild it
+ * (`node tools/make-buttons.mjs jump`), and remember that writes into game/assets/ui
+ * are exactly what --strict is there to catch. */
+const SHELVED = new Set(['tryagain', 'jump']);
+
 const only = process.argv[2];
 for (const [name, cfg] of Object.entries(BUTTONS)) {
   if (only && only !== name) continue;
+  if (!only && SHELVED.has(name)) {
+    console.log(`${name}: SHELVED — the control is gone; run \`node tools/make-buttons.mjs ${name}\` to rebuild it anyway`);
+    continue;
+  }
   console.log(name + ':');
   await build(name, cfg);
 }

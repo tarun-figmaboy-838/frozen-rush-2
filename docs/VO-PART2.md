@@ -9,15 +9,24 @@ energy, and anything under about half a second runs two lines together.
 
 | # | id | say this |
 |---|----|----------|
-| 1 | `p2-1-diagonal` | Cut the shape along its diagonal. |
+| 1 | `p2-1-diagonal` | Cut along a diagonal. |
 | 2 | `p2-2-diagonals` | Draw all the diagonals. |
-| 3 | `p2-3-samevertex` | Draw 2 diagonals from the same vertex. |
+| 3 | `p2-3-samevertex` | Draw 2 diagonals from one corner. |
 | 4 | `p2-4-concave` | Cut the concave polygon. |
 | 5 | `p2-5-convex` | Cut the convex polygon. |
 | 6 | `p2-6-concave-pentagon` | Cut the concave pentagon. |
 | 7 | `p2-7-convex-hexagon` | Cut the convex hexagon. |
-| 8 | `p2-8-all-concave` | Cut all the concave polygons. |
-| 9 | `p2-9-all-convex` | Cut all the convex polygons. |
+| 8 | `p2-8-all-concave` | Cut all the concave ones. |
+| 9 | `p2-9-all-convex` | Cut all the convex ones. |
+| 10 | `p2-tut-6-cut` | Cut this ice block to fix the path. |
+
+Line 10 REPLACES a tutorial line, and is the one item here that is not a question. The
+take holds `tut-6-use` — "Use the right ice piece to fix the path." — recorded when the
+tutorial ran over a row of hanging blocks. It now runs over Part 2's crossing 1, which
+has a single slab and nothing to choose between, so the step was rewritten to "Cut this
+ice block to fix the path." The old window is still in `CFG.vo.lines` and is now unused;
+until line 10 is recorded the step is silent. Do not re-record `tut-1` … `tut-5` or
+`tut-7`: those still match their steps exactly.
 
 Read line 3 as **"draw two diagonals"** — the numeral is how it is written on the
 board, not how it is spoken.

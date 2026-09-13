@@ -449,7 +449,10 @@ test.describe('Level 2 — the instruction', () => {
     await boot(page);
     const text = await page.evaluate(async () => {
       const m = await import('/js/engine.js');
-      return m.CFG.levels[1].instruction;
+      /* The crossing's OWN sentence — the one p2Cfg() reads and the plank renders.
+         This used to read CFG.levels[1], a duplicate the engine never looked at, so
+         the guard could pass while the words on screen said something else. */
+      return m.CFG.levelTwo.levels[0].instruction;
     });
     expect(text.length, 'there is a sentence').toBeGreaterThan(0);
     for (const banned of ['regular', 'irregular', 'convex', 'concave', 'sides']) {

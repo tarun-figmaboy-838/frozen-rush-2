@@ -56,7 +56,21 @@ import { fitBubble, BUBBLE } from './bubble.js';
 /* WHICH RECORDED LINE BELONGS TO WHICH STEP (docs/VO-SCRIPT.md, CFG.vo.lines). */
 const VO = {
   meet: 'tut-1-meet', goal: 'tut-2-goal', rock: 'tut-3-watch', jump: 'tut-4-jump',
-  gap: 'tut-5-broken', use: 'tut-6-use', fit: 'tut-7-fit'
+  gap: 'tut-5-broken',
+  /* THE 'use' STEP IS SILENT UNTIL IT IS RE-RECORDED, and that is deliberate.
+   *
+   * The take says "Use the right ice piece to fix the path." The step SHOWS "Cut this ice
+   * block to fix the path.", because the tutorial now runs over Part 2's crossing 1 —
+   * one slab, nothing to choose between — so "the RIGHT piece" asks a question the level
+   * does not. The words were changed for that reason and the recording could not be.
+   *
+   * Left pointing at tut-6-use, the bubble printed one sentence while the voice spoke a
+   * different one, and the word reveal ran eight printed words against the take's nine
+   * onsets — so the highlight drifted for the whole line. A line that says the wrong
+   * thing is worse than no line: say() returns 0 for an id with no window, the bubble
+   * reveals on its own pace, and nothing else changes. The replacement is listed in
+   * docs/VO-PART2.md; dropping its window into CFG.vo.lines is all that is needed. */
+  use: 'p2-tut-6-cut', fit: 'tut-7-fit'
   // 'cut' is the hand alone and says nothing: the plank's question is spoken by the engine
 };
 
@@ -451,27 +465,6 @@ export class Tutorial {
     return { x: anchor, y: ropeY, rx: 120, ry: 34,
              aimX: anchor, belowY: bottom,
              handX: ropeX, handY: ropeY, world: true };
-  }
-
-  /** A box around every hanging block, in stage coordinates. */
-  rowBox(g) {
-    const hang = ((g.l1 && g.l1.shapes) || []).filter(s => s.state === 'hang');
-    if (!hang.length) return null;
-    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-    for (const s of hang) {
-      x0 = Math.min(x0, s.x - s.w / 2); x1 = Math.max(x1, s.x + s.w / 2);
-      y0 = Math.min(y0, s.y - s.h / 2); y1 = Math.max(y1, s.y + s.h / 2);
-    }
-    if (y1 < 40) return null;                       // still off the top of the screen
-    /* AN OVAL AROUND THE ROW, not a circle enclosing it. The row is much wider than it
-       is tall, so one radius big enough to cover its width is enormous vertically —
-       1228px across for a 970px row, which is most of the screen. Separate axes hug it. */
-    return {
-      x: (x0 + x1) / 2, y: (y0 + y1) / 2,
-      rx: (x1 - x0) / 2 + 60,
-      ry: (y1 - y0) / 2 + 50,
-      world: true
-    };
   }
 
   /* NO domSpot, AND NO LIFTED DOM TARGET. This measured an element's rect and returned

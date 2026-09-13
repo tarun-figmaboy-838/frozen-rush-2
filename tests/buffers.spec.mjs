@@ -108,7 +108,7 @@ test.describe('the pointer, the buffers and the voice', () => {
     expect(a.textH, 'readable against the stage').toBeGreaterThan(0.03);
   });
 
-  test('the voice is one recording cut into fourteen windows, none overlapping', async ({ page }) => {
+  test('the voice is one recording cut into fifteen windows, none overlapping', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
       const m = await import('/js/engine.js');
@@ -126,16 +126,30 @@ test.describe('the pointer, the buffers and the voice', () => {
          missing, every one of those browsers would fall back silently and nothing else here
          would notice. */
       const ogg = await fetch('/' + V.src.replace('.mp3', '.ogg'), { method: 'HEAD' });
-      // every question's sentence must resolve to a line that exists
-      const missing = m.CFG.levelOne.phases
-        .map(p => window.iceAgeGame.signVoId(p.instruction))
-        .filter(id => !V.lines[id]);
-      return { n: ord.length, bad, missing, status: res.status, oggStatus: ogg.status, last: ord[ord.length - 1][1][0] + ord[ord.length - 1][1][1] };
+      /* EVERY CROSSING NAMES ITS LINE — which is the thing that has to be true now, and
+         is not the same as the line being recorded yet.
+
+         This used to derive the id from the sentence with signVoId() and demand a window
+         for it. That worked while the questions were Part 1's ("Cut the TRIANGLE." ->
+         sign-triangle), and matches nothing in Part 2, where every sentence has an
+         adjective in the way — so it returned '' for all nine and the assertion had been
+         failing ever since the curriculum changed. Part 2's take has not been recorded
+         (docs/VO-PART2.md lists the nine lines); until it is, say() returns 0 for an id
+         with no window and the board reveals its words on the fallback pace, which is
+         deliberate and harmless. What must never happen is a crossing with NO id at all,
+         because that one stays silent even after the recording lands. */
+      const unnamed = [...m.CFG.levelOne.phases, ...m.CFG.levelTwo.levels]
+        .filter(p => !(p.voId && p.voId.trim()))
+        .map(p => p.instruction);
+      return { n: ord.length, bad, unnamed, status: res.status, oggStatus: ogg.status, last: ord[ord.length - 1][1][0] + ord[ord.length - 1][1][1] };
     });
-    // 14, not 16: the ending's two lines were cut with the banner that showed them
-    expect(r.n, 'every line the learner is shown').toBe(14);
+    /* 15: seven tutorial lines, seven signs, and the cheer. It was 16 — the ending's
+       'win-title' and 'win-sub' were cut with the banner that showed them, taking it to
+       14 — and then 'win-yay' was found in the take and wired up, which put it back to
+       15. This number was left at 14 and the suite has been red on it since. */
+    expect(r.n, 'every line the learner is shown').toBe(15);
     expect(r.bad).toEqual([]);
-    expect(r.missing, 'every question has a recorded line').toEqual([]);
+    expect(r.unnamed, 'every crossing names the line that will speak it').toEqual([]);
     expect(r.status, 'the recording ships').toBe(200);
     expect(r.oggStatus, 'and so does the ogg the browser prefers').toBe(200);
     /* 36.2, the length of the take that ships. It was 39.1 — the take before it — which

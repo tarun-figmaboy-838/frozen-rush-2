@@ -14,7 +14,17 @@
 'use strict';
 
 const path = require('path');
-const { OfflineAudioContext } = require('node-web-audio-api');
+/* NOT A DEPENDENCY OF THIS REPO — see the same note in verify-mix.js. The game never
+   needs a native audio renderer; only these two measurement scripts do. */
+let OfflineAudioContext;
+try {
+  ({ OfflineAudioContext } = require('node-web-audio-api'));
+} catch (e) {
+  console.error('measure-loudness.js needs the optional renderer that is not installed here:\n' +
+                '  npm i -D node-web-audio-api\n' +
+                'It is deliberately not in package.json — the game does not use it.');
+  process.exit(1);
+}
 
 const SR       = 48000;   // BS.1770 coefficients below are the 48 kHz set
 const SECONDS  = 3;
@@ -54,7 +64,9 @@ const FAMILY = {
   cuckoo:'comic', rubberChicken:'comic', ricochet:'comic',
   pianoRun:'comic', fallingWhistle:'comic', kazoo:'comic'
 };
-const SFX_PATH = path.resolve(__dirname, '../sfx.js');
+/* game/js/sfx.js is the kit's one copy — the file the page loads. This used to resolve
+   '../sfx.js' (tools/sfx.js), a path that has not existed since the kit moved. */
+const SFX_PATH = path.resolve(__dirname, '../../game/js/sfx.js');
 
 /* --- BS.1770 K-weighting, 48 kHz ---------------------------------- */
 

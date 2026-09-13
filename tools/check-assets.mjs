@@ -36,17 +36,31 @@ const walk = d => readdirSync(d, { withFileTypes: true }).flatMap(e => {
   return e.isDirectory() ? walk(p) : [p];
 });
 
-/* Everywhere a path could be written: the game's own modules, its stylesheet, its page,
-   and the tools (which name the files they produce). NOT the generated manifest, and
-   NOT the bundle, which is a copy of the modules. */
-const sources = [
+/* TWO HAYSTACKS, AND THE DIFFERENCE BETWEEN THEM IS THE POINT.
+ *
+ * `hay` is everywhere the RUNNING GAME could name a path: its modules, its stylesheets,
+ * its page. NOT the generated manifest, and NOT the bundle, which is a copy of the
+ * modules. If a path is not in here, no browser ever requests the file.
+ *
+ * `toolHay` is the tools, which name the files they PRODUCE. That is a different claim
+ * entirely, and folding it into `hay` is what let three dead files hide: the jump
+ * button's normal/pressed pair and TRY AGAIN outlived the controls they belonged to,
+ * but make-buttons.mjs still named them as its outputs, so this check called all three
+ * "referenced" and reported a clean run while 149KB shipped to every visitor. A build
+ * recipe is evidence that a file CAN be produced, never that anything loads it. */
+const gameSources = [
   ...walk('game/js').filter(f => f.endsWith('.js') &&
     !f.endsWith('asset-versions.js') && !f.endsWith('game.bundle.js')),
   ...walk('game/css').filter(f => f.endsWith('.css')),
-  'game/index.html',
-  ...walk('tools').filter(f => f.endsWith('.mjs') && !f.endsWith('check-assets.mjs'))
+  'game/index.html'
 ];
-const hay = sources.map(f => readFileSync(f, 'utf8')).join('\n');
+const toolSources = walk('tools').filter(f => f.endsWith('.mjs') && !f.endsWith('check-assets.mjs'));
+const hay = gameSources.map(f => readFileSync(f, 'utf8')).join('\n');
+const toolHay = toolSources.map(f => readFileSync(f, 'utf8')).join('\n');
+
+/** Does a haystack name this file, by exact path or exact quoted basename? */
+const names = (h, rel, name) => h.includes(rel) || h.includes('/' + name) ||
+  h.includes("'" + name + "'") || h.includes('"' + name + '"');
 
 /* Families the game builds a path for at run time. Each is a folder plus the prefix the
    code concatenates onto; anything matching is credited to the line that builds it. */
@@ -58,6 +72,10 @@ const DYNAMIC = [
      this check exists to replace. */
   { dir: 'assets/option-shape', only: '.webp', built: 'option-shapes.js: one webp per polygon name' },
   { dir: 'assets/sky', prefix: '', built: 'engine.js: the sky set, keyed by time of day' },
+  /* The trail's stones are swapped by state, not by name: hud.js writes
+     'assets/progress/step-' + (want === 'next' ? 'locked' : want) + '.webp', so
+     step-done and step-now appear nowhere as literals even though every run loads both. */
+  { dir: 'assets/progress', prefix: 'step-', built: "hud.js: 'assets/progress/step-' + state" },
   /* EVERY SOUND SHIPS TWICE and only the mp3 is ever written down: assetUrl() swaps the
      extension when the browser can take ogg (Safari under 17.4 cannot, so both are
      needed). The first run of this check called all ten oggs unreferenced — 2.4MB of
@@ -65,7 +83,7 @@ const DYNAMIC = [
   { ext: '.ogg', twin: '.mp3', built: 'engine.js assetUrl(): the .mp3 with its extension swapped' }
 ];
 
-const orphans = [], dynamic = [];
+const orphans = [], dynamic = [], toolOnly = [];
 let total = 0, orphanBytes = 0;
 
 for (const file of walk(ASSETS)) {
@@ -73,8 +91,7 @@ for (const file of walk(ASSETS)) {
   const name = basename(file);
   total++;
   // the exact path, or the exact filename in quotes — nothing looser
-  if (hay.includes(rel) || hay.includes('/' + name) ||
-      hay.includes("'" + name + "'") || hay.includes('"' + name + '"')) continue;
+  if (names(hay, rel, name)) continue;
 
   const dyn = DYNAMIC.find(d => {
     /* A twin is credited only if the file it is a twin OF is actually referenced —
@@ -82,15 +99,17 @@ for (const file of walk(ASSETS)) {
     if (d.ext) {
       if (!rel.endsWith(d.ext)) return false;
       const src = rel.slice(0, -d.ext.length) + d.twin;
-      const srcName = basename(src);
-      return hay.includes(src) || hay.includes('/' + srcName) ||
-             hay.includes("'" + srcName + "'") || hay.includes('"' + srcName + '"');
+      return names(hay, src, basename(src));
     }
     if (d.only && !rel.endsWith(d.only)) return false;
     return rel.startsWith(d.dir + '/') && (!d.prefix || name.startsWith(d.prefix));
   });
   const size = statSync(file).size;
   if (dyn) { dynamic.push({ rel, size, by: dyn.built }); continue; }
+  /* Named by a build recipe and by nothing the game loads: still shipped, still
+     downloaded, just with a tool that knows how to rebuild it. Called out on its own
+     line rather than counted clean, because that is exactly how it hides. */
+  if (names(toolHay, rel, name)) { toolOnly.push({ rel, size }); orphanBytes += size; continue; }
   orphans.push({ rel, size });
   orphanBytes += size;
 }
@@ -107,13 +126,20 @@ if (dynamic.length) {
   }
   console.log('');
 }
+if (toolOnly.length) {
+  console.log(`${toolOnly.length} BUILD OUTPUT ONLY — a tool writes these, nothing in the game loads them:`);
+  for (const o of toolOnly.sort((a, b) => b.size - a.size)) console.log(`  ${kb(o.size)}  ${o.rel}`);
+  console.log('  Keep the recipe in tools/ if the art may come back; the OUTPUT does not belong here.\n');
+}
 if (orphans.length) {
   console.log(`${orphans.length} UNREFERENCED — nothing in the game asks for these:`);
   for (const o of orphans.sort((a, b) => b.size - a.size)) console.log(`  ${kb(o.size)}  ${o.rel}`);
-  console.log(`\n  ${(orphanBytes / 1024 / 1024).toFixed(2)} MB shipped for nothing.`);
-  console.log('  Source art belongs in art-source/, which is outside the deployed folder.');
+  console.log('  Source art belongs in art-source/, which is outside the deployed folder.\n');
+}
+if (orphans.length || toolOnly.length) {
+  console.log(`  ${(orphanBytes / 1024 / 1024).toFixed(2)} MB shipped for nothing.`);
 } else {
-  console.log('No unreferenced assets. Everything in game/assets is loaded by something.');
+  console.log('No unreferenced assets. Everything in game/assets is loaded by the game itself.');
 }
 
-if (strict && orphans.length) process.exit(1);
+if (strict && (orphans.length || toolOnly.length)) process.exit(1);

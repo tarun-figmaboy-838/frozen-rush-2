@@ -92,7 +92,7 @@ const ASSET_V = {
   "assets/option-shape/regularPentagon.webp": "04a3a89a",
   "assets/option-shape/regularQuadrilateral.webp": "63fa2bf0",
   "assets/option-shape/regularTriangle.webp": "b16acb47",
-  "assets/progress/panel.webp": "f7c0aba6",
+  "assets/progress/panel.webp": "ccf5fac1",
   "assets/progress/step-done.webp": "f8eb3ea6",
   "assets/progress/step-goal.webp": "7cdbdd5c",
   "assets/progress/step-locked.webp": "b769b557",
@@ -106,10 +106,7 @@ const ASSET_V = {
   "assets/sky/06-sunset.webp": "6f2a5b77",
   "assets/sky/07-dusk.webp": "d511553c",
   "assets/sky/08-night.webp": "fdbec669",
-  "assets/ui/btn-normal.webp": "ad490138",
   "assets/ui/btn-play.webp": "e75de185",
-  "assets/ui/btn-pressed.webp": "4636e1dd",
-  "assets/ui/btn-tryagain.webp": "f17bd92f",
   "assets/ui/icons/hint.svg": "2eb235fd",
   "assets/ui/icons/pause.svg": "7d4d26a9",
   "assets/ui/icons/play.svg": "058a4e07",
@@ -941,18 +938,6 @@ const optionShapes = {
     ]
   }
 };
-
-/** The ring for a shape, or null if the art does not cover it. */
-function shapeRing(id) {
-  const s = optionShapes[id];
-  return s ? s.points : null;
-}
-
-/** How many sides a shape has, measured from its own artwork. */
-function shapeSides(id) {
-  const s = optionShapes[id];
-  return s ? s.sides : 0;
-}
 
 
 /* ==================== engine.js ==================== */
@@ -1903,7 +1888,7 @@ const CFG = {
         targets: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
         distractors: ['regularPentagon', 'irregularConvexHexagon', 'regularOctagon'],
         rotate: 0, swing: 0,
-        instruction: 'Cut all the concave polygons.',
+        instruction: 'Cut all the concave ones.',
         voId: 'p2-8-all-concave',
         sub: 'Choose all the polygons that are concave.' },
 
@@ -1914,7 +1899,7 @@ const CFG = {
         targets: ['regularTriangle', 'regularQuadrilateral', 'regularOctagon'],
         distractors: ['concavePentagon', 'concaveHexagon', 'concaveHeptagon'],
         rotate: 0, swing: 0,
-        instruction: 'Cut all the convex polygons.',
+        instruction: 'Cut all the convex ones.',
         voId: 'p2-9-all-convex',
         sub: 'Choose all the polygons that are convex.' }
     ],
@@ -2066,7 +2051,7 @@ const CFG = {
            720, which is still the largest thing on the screen by a distance. The same
            0.7 is applied to all three so the crossings stay a set. */
         focusK: 2.17,
-        instruction: 'Cut the shape along its diagonal.',
+        instruction: 'Cut along a diagonal.',
         voId: 'p2-1-diagonal'
       },
       {
@@ -2134,7 +2119,7 @@ const CFG = {
            touching the board's underside. 0.7 of that, the same cut as the other two,
            is 3.61 and leaves real air above the apex. */
         focusK: 2.85,
-        instruction: 'Draw 2 diagonals from the same vertex.',
+        instruction: 'Draw 2 diagonals from one corner.',
         voId: 'p2-3-samevertex'
       }
     ],
@@ -2324,13 +2309,26 @@ const CFG = {
   vo: {
     src: 'assets/audio/vo-lines.mp3', gain: 1,
     lines: {
-      'tut-1-meet':   [0.00, 3.93, [0.05, 0.63, 0.97, 1.70, 1.96, 2.48, 2.59, 2.77, 3.42]],   // "This is Momo. He needs to find his friend."
+      /* "He" and "needs" used to sit at 1.70 and 1.96 — inside the half-second of SILENCE
+         between the two sentences, so both words lit before either was spoken. The take's
+         second sentence starts at 2.06 and says "He needs" as one burst (2.06-2.47). */
+      'tut-1-meet':   [0.00, 3.93, [0.05, 0.63, 0.97, 2.06, 2.26, 2.48, 2.59, 2.77, 3.42]],   // "This is Momo. He needs to find his friend."
       'tut-2-goal':   [4.28, 2.95, [0.07, 0.33, 0.95, 1.40, 1.65, 2.30]],   // "Help Momo cross the Frozen Pass!"
       'tut-3-watch':  [7.54, 0.90, [0.06, 0.33]],   // "Watch out!"
       'tut-4-jump':   [8.56, 2.49, [0.06, 0.33, 0.41, 0.99, 1.54]],   // "Tap to jump over obstacles."
-      'tut-5-broken': [11.23, 2.86, [0.06, 1.03, 1.40, 1.86, 2.19, 2.46]],  // "Oh no! The path is broken."
+      /* "OH NO!" IS ONE BREATH, and reading it as two made every word in the line late.
+         The take's bursts here are 0.06-0.86, 1.16, 1.45, 1.91, 2.20, 2.48 — six bursts for
+         six words, so the old table matched them off one by one. But the first burst is the
+         whole of "Oh no!": the envelope runs smooth to 0.26, carries the periodic dips of a
+         nasal /n/ from 0.26 to 0.34, then holds the vowel of "no" out to 0.86. So "no" was
+         being lit at 1.03 — 0.77s after it is said, and on the word "The" — and "broken"
+         was landing on its second syllable. Measured, not guessed: see tools/vo-words.mjs. */
+      'tut-5-broken': [11.23, 2.86, [0.06, 0.26, 1.16, 1.45, 1.91, 2.20]],  // "Oh no! The path is broken."
       'tut-6-use':    [14.48, 3.30, [0.06, 0.54, 1.22, 1.62, 1.98, 2.19, 2.45, 2.63, 2.79]],  // "Use the right ice piece to fix the path."
-      'tut-7-fit':    [18.31, 2.43, [0.06, 1.27, 1.41, 1.77]],  // "Perfect fit! Keep going!"
+      /* Same fault as tut-5: "fit" at 1.27 and "Keep" at 1.41 both fell in the silence
+         between the two exclamations (1.06-1.48). "Perfect fit!" is bursts 0.12-1.06
+         ("Per-fect" then "fit" at 0.77); "Keep going!" is 1.48 and 1.79. */
+      'tut-7-fit':    [18.31, 2.43, [0.06, 0.77, 1.48, 1.79]],  // "Perfect fit! Keep going!"
       'sign-triangle':      [20.87, 1.40, [0.06, 0.33, 0.60]],
       'sign-quadrilateral': [22.63, 1.67, [0.06, 0.33, 0.56]],
       'sign-pentagon':      [24.70, 1.37, [0.06, 0.33, 0.59]],
@@ -2522,18 +2520,14 @@ const CFG = {
     { key: 'bgDusk',         src: 'assets/sky/07-dusk.webp',          at: 0.78, label: 'Dusk',          light: [201, 203, 238], dim: 0.58 },
     { key: 'bgNight',        src: 'assets/sky/08-night.webp',         at: 0.90, label: 'Night',         light: [143, 166, 200], dim: 0.34 }
   ],
-  /* NOT the curriculum. Every phase's instruction, targets and distractors live in
-     CFG.levelOne.phases and nowhere else — this array used to carry a second copy of
-     level 1's, which is how two definitions of the same level drift apart.
+  /* NO `levels` ARRAY. It held a second copy of Level 2's sentence, and the comment here
+     claimed the level read it — it did not. p2Cfg() has always taken the sentence from
+     CFG.levelTwo.levels, so this was a duplicate that nothing rendered and that could
+     drift from the words on screen without anything noticing. One test did read it, and
+     was therefore guarding a string the game never shows; it now reads the real one.
 
-     What it does still own is LEVEL 2's one sentence, read from levels[1] when the
-     level opens. The first entry is a placeholder holding that index and is read by
-     nothing. Level 2's geometry and timing are in CFG.levelTwo above; only the words
-     are here, because that is the one thing the level shares with the level list. */
-  levels: [
-    { id: 1, mechanic: 'hanging-shape-cut' },
-    { id: 2, instruction: 'Cut the shape along its diagonal.', mechanic: 'polygon-diagonal-cut', polygon: 'hexagon', sides: 6 }
-  ]
+     Every sentence the game speaks or prints lives with the crossing that asks it:
+     level 1 in CFG.levelOne.phases, level 2 in CFG.levelTwo.levels. */
 };
 
 const T = CFG.timing;
@@ -2585,10 +2579,6 @@ const PolygonFactory = {
 
   /** The delivered block for a name: its texture and the box the ring fills. */
   art(kind) { return optionShapes[kind] || null; },
-
-  /** Whether a name resolves to a real polygon at all — used to fail loudly on a
-      typo in the curriculum rather than silently drawing the fallback pentagon. */
-  knows(kind) { return !!this.verified(kind) || this.sides[kind] !== undefined; },
 
   /** Vertex count that defines this polygon. Taken from the artwork's own traced ring
       where there is artwork, because that is what is on screen to be counted; the
@@ -2784,40 +2774,9 @@ const PolygonFactory = {
     const cy = polyBounds(out).y0 + polyBounds(out).h / 2;
     if (edgeY > cy) { rot += Math.PI; out = turn(rot); }
     return { rot, scale: bestLen > 0 ? span / bestLen : 1, pts: this.center(out) };
-  },
-
-  /** The edge a seated shape is resting its top on: the one whose midpoint is
-      highest. For anything that has been through seat() this is the flat top, and its
-      length is what has to span the crevasse. */
-  topEdge(pts) {
-    let bi = 0, best = Infinity;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      const my = (a.y + b.y) / 2;
-      if (my < best) { best = my; bi = i; }
-    }
-    const a = pts[bi], b = pts[(bi + 1) % pts.length];
-    return { i: bi, len: Math.hypot(b.x - a.x, b.y - a.y) };
-  },
-
-  /** Width of a built ring, used to size a ditch to the shape that repairs it. */
-  widthOf(pts) { return polyBounds(pts).w; }
+  }
 };
 
-function shapePoly(kind, w, h) {
-  const hw = w / 2, hh = h / 2;
-  switch (kind) {
-    // Shoulders sit high so the two lower edges meet at ~107 degrees — close to a
-    // regular pentagon's 108. With the old shoulders at +hh*0.25 the apex was 146
-    // degrees, near enough to flat that the shape read as a quadrilateral.
-    case 'pentagon': return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: -hh * 0.2 }, { x: 0, y: hh }, { x: -hw, y: -hh * 0.2 }];
-    case 'trapezoid': return [{ x: -hw * 0.58, y: -hh }, { x: hw * 0.58, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
-    case 'hexagon': return [{ x: -hw * 0.55, y: -hh }, { x: hw * 0.55, y: -hh }, { x: hw, y: 0 }, { x: hw * 0.55, y: hh }, { x: -hw * 0.55, y: hh }, { x: -hw, y: 0 }];
-    case 'triangle': return [{ x: 0, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
-    case 'square': return [{ x: -hh, y: -hh }, { x: hh, y: -hh }, { x: hh, y: hh }, { x: -hh, y: hh }];
-    default: return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
-  }
-}
 function regularHexagon(R) {
   const pts = [];
   for (let i = 0; i < 6; i++) { const a = (i * 60) * Math.PI / 180; pts.push({ x: R * Math.cos(a), y: R * Math.sin(a) }); }
@@ -3034,12 +2993,8 @@ class AudioManager {
   }
   /** A speech bubble arriving. */
   popIn() { if (this.kit('pop')) return; this.bloop(); }
-  /** A stamp landing on the ending panel — a coin, because it is a collection. */
-  stamp() { if (this.kit('coin')) return; this._note(7, 0.12, 0.05, 'triangle'); }
   /** The trample's splat, under the landing thud land() already plays. */
   trample() { this.kit('splat', { volume: 0.55, vary: 0 }); }
-  /** The stomp at the edge: a soft thud under the trample loop (first two stamps only). */
-  stomp() { if (!this.kit('land', { volume: 0.4, vary: 0 })) this.trample(); }
   /** THE TREMBLE'S SOUND: the owner's cartoon blink (CFG.sfx.tremble), played once as the
       strong tremble begins so the picture and the sound land together; the kit's doink
       stands in when the file is not there. */
@@ -3706,7 +3661,6 @@ class AudioManager {
       this._tone(300 + Math.random() * 500, 0.1, 0.022, 'sine', 900, 0.18 + i * 0.075);
     }
   }
-  plop() { this.splash(); }
   clunk() { this.wedge(); }
   /** A chunk arriving on its stem. */
   pop() { this.bloop(); }
@@ -3747,7 +3701,6 @@ class AudioManager {
     this._tone(1050, 0.05, 0.05, 'triangle', 1500);
     this._noise(0.05, 3000, 'bandpass', 0.03, 2);
   }
-  swap() { this._noise(0.24, 900, 'bandpass', 0.06, 0.9, 0, 3200); this._note(5, 0.18, 0.04); }
   fanfare() { if (this.kit('powerUp', { vary: 0 })) return; [0, 4, 7, 9, 12].forEach((iv, i) => this._note(iv, 0.4, 0.05, 'triangle', i * 0.08)); }
 
   /* ---- the comedy ----
@@ -4733,8 +4686,11 @@ class PlayerController {
     this.state = 'RUN'; this.t = 0; this.y = 0; this.vy = 0;
     /* THE FORWARD OFFSET OF A LEAP (CFG.jumpLead). `dx` is where the drawing is,
        relative to mammothX; `dxFrom`/`dxT` are the ease back to zero after the landing.
+       `exitRunF` is the run pose he left the ground in, so the crouch can dissolve over
+       it rather than replacing it on one frame; -1 when he did not take off from a run.
        Draw only — see the note in CFG. */
     this.dx = 0; this.dxFrom = 0; this.dxT = 0;
+    this.exitRunF = -1;
     this.airborne = false; this.lastGround = 0; this.bufferedJump = -1;
     this.squash = 1; this.tilt = 0; this.hop = 0; this.airSq = 1;
     this.runDist = 0; this.lastStepFrame = -1;
@@ -4830,6 +4786,13 @@ class PlayerController {
     this.bufferedJump = now; return false;
   }
   doJump() {
+    /* THE POSE HE IS LEAVING, captured before the state changes. The run cycle is drawn
+       from runDist, so this is the exact frame that was on screen the instant he pushed
+       off — and it is what the crouch dissolves over. Only from a run: a jump out of an
+       idle has no stride to hand over from. */
+    this.exitRunF = this.state === 'RUN' && this.F && this.F.run
+      ? Math.floor((this.runDist / this.stride) * this.F.run) % this.F.run
+      : -1;
     this.vy = CFG.jumpVel; this.airborne = true; this.setState('JUMP_START');
     if (this.onJump) this.onJump();
     /* STRETCH off the ground, not squash. It set 0.92 — shorter — which is the pose
@@ -5194,9 +5157,29 @@ class PlayerController {
         f = Math.floor((this.runDist / this.stride) * F.run) % F.run;
         break;
       case 'JUMP_START':
-        // crouch, launch: the launch dissolves in over the crouch's second half
-        f = this.t < 0.045 ? J.crouch : J.launch;
-        if (f === J.crouch && this.t > 0.022) { blendF = J.launch; blendU = (this.t - 0.022) / 0.023; }
+        /* THE TAKE-OFF IS A DISSOLVE TOO, and it was the one handoff in the leap that
+         * was not.
+         *
+         * Everything after this point crossfades — the crouch into the launch just
+         * below, and the six flight poses into one another in JUMP_AIR, all of it done
+         * precisely so the jump reads as one movement. The take-off itself was a hard
+         * cut: one frame he is mid-stride on the RUN sheet, the next he is crouched on
+         * the JUMP sheet. Different sheet, different pose, no overlap — and it lands on
+         * the exact frame the player is looking at, because they have just pressed.
+         *
+         * 22ms is a frame and a half at 60fps: long enough to read as a body turning
+         * rather than a substitution, and finished before the crouch hands on to the
+         * launch at 22ms, so the two dissolves never fight over the one blend slot. */
+        if (this.t < 0.022 && this.exitRunF >= 0) {
+          sheet = img; f = this.exitRunF;
+          blendSheet = this.jumpSheet; blendF = J.crouch;
+          const c = clamp(this.t / 0.022, 0, 1);
+          blendU = c * c * (3 - 2 * c);
+        } else {
+          // crouch, launch: the launch dissolves in over the crouch's second half
+          f = this.t < 0.045 ? J.crouch : J.launch;
+          if (f === J.crouch && this.t > 0.022) { blendF = J.launch; blendU = (this.t - 0.022) / 0.023; }
+        }
         break;
       case 'JUMP_AIR': {
         /* The pose follows the vertical speed; each hands over to the next by a dissolve across
@@ -8004,6 +7987,17 @@ function createGame(canvas, hooks = {}) {
   function gapUnder(x) {
     return (G.gapsThisPhase || []).find(g => x > g.x0 - G.worldX && x < g.x1 - G.worldX) || null;
   }
+  /* THE LINE A FALLING CHUNK PASSES BEHIND THE PLATFORM AT.
+   *
+   * Shared, because two places have to agree on it and did not. drawHangingShapes
+   * switches a shape into the behind-the-ice pass here, so that a chunk dropping into a
+   * hole is occluded by the lip instead of being painted over it; and cutShape solves a
+   * wrong chunk's sideways throw so that it is ALREADY over the mouth by the time it
+   * gets here. When the throw was solved to the surface instead — 80px lower — the chunk
+   * crossed this line while still out over solid path, so it vanished behind the ice and
+   * travelled the rest of the way there: "it goes to the backside of the path instead of
+   * into the ditch from the ditch mouth". One number, read by both. */
+  function chunkOcclusionY() { return CFG.surfaceY - SHAPE_H * 0.4; }
 
   function cutShape(sh, hit) {
     const L = G.l1;
@@ -8123,7 +8117,12 @@ function createGame(canvas, hooks = {}) {
        across an open chasm at path level, which read as a block sliding on thin air.
        It is aimed at a slot no nearer the character than the near lip, so a chunk
        still cannot travel anywhere near the character. */
-    const drop = Math.max(60, (sh.correct ? sh.rest.wedge : CFG.surfaceY) - sh.y);
+    /* A WRONG CHUNK IS AIMED AT THE MOUTH, NOT AT THE WATER LINE. Its fall time is
+       solved to the height it passes BEHIND the ice at (chunkOcclusionY), not to the
+       surface 80px below: those 80px were travelled sideways with the platform already
+       drawn in front of the chunk, which is what made it look like it slid round the
+       back of the path rather than dropping in through the hole. */
+    const drop = Math.max(60, (sh.correct ? sh.rest.wedge : chunkOcclusionY()) - sh.y);
     sh.vx = clamp((sh.socket.x - sh.x) / Math.sqrt(2 * drop / L1_GRAV), -1400, 1400);
     // correct: fall -> wedge.  wrong: fall -> splash -> gone
     sh.phaseName = 'fall';
@@ -10629,7 +10628,15 @@ function createGame(canvas, hooks = {}) {
       if (!bare) drawFog(ctx);
     }
     for (const sh of L.shapes) {
-      const isBelow = sh.y > CFG.surfaceY - SHAPE_H * 0.4;
+      /* BEHIND THE ICE ONLY WHERE THERE IS A HOLE TO BE BEHIND.
+         Height alone used to decide this, so a chunk low enough — but out over solid
+         path — was drawn behind the platform and appeared to sink into the road. A
+         falling chunk now has to be over a crevasse mouth as well; anywhere else it
+         stays in front, where a thing falling past the camera belongs. The aiming
+         above gets it over the mouth before it is this low, so in the ordinary case
+         both conditions turn true together and the lip does the occluding as intended. */
+      const isBelow = sh.y > chunkOcclusionY() &&
+                      (sh.state !== 'falling' || !!gapUnder(sh.x));
       if (isBelow !== belowSurface) continue;
       const piv = sh.pivot || chunkPivot(sh);
       ctx.save();
@@ -11530,8 +11537,13 @@ function createGame(canvas, hooks = {}) {
        falling through the sky; below it, it is inside the ground and the ice and the
        pool close over it. One line decides which, and it is the same line the world
        uses for everything else. */
+    /* A CUT SLAB IS TWO FALLING THINGS, not one. While it is in pieces both calls run and
+       drawL2 takes only the halves on its own side of the ice line, so a half still in the
+       air stays in front while the one already in the hole is covered. Whole, it is a
+       single object and its own centre decides, which is what this test has always done. */
+    const l2Debris = !!(G.l2 && G.l2.fall && G.l2.debris && G.l2.debris.length);
     const l2Sinking = !!(G.l2 && G.l2.fall && G.l2.pos.y > CFG.surfaceY);
-    if (l2Sinking && !p2FocusOn()) drawL2(ctx);
+    if ((l2Sinking || l2Debris) && !p2FocusOn()) drawL2(ctx, l2Debris ? true : null);
     // the pool surface closes over anything that fell into it
     ground.drawWaterFront(ctx, G.worldX, G.t);
     ground.draw(ctx, G.worldX, G.t);
@@ -11576,8 +11588,10 @@ function createGame(canvas, hooks = {}) {
        outline that layering like this produces if you forget. Outside those beats
        (the overview, the fall, the flight into the holes) the focus layer is down and
        the slab is drawn here as normal. */
-    // ...unless it has already sunk below the ice line, where it was drawn behind it
-    if (G.l2 && !l2Sinking && !p2FocusOn()) drawL2(ctx);
+    /* ...unless it has already sunk below the ice line, where it was drawn behind it.
+       In pieces, this call takes the halves still ABOVE the line; the ones below were
+       drawn back there with the ground. */
+    if (G.l2 && (l2Debris || !l2Sinking) && !p2FocusOn()) drawL2(ctx, l2Debris ? false : null);
     drawWrongFlash(ctx);              // the 'that was wrong' wash, under the player's own mark
     drawTaps(ctx);                    // over everything: it is the player's own mark
     ctx.restore();
@@ -12937,7 +12951,10 @@ function createGame(canvas, hooks = {}) {
     }
   }
 
-  function drawL2(ctx) {
+  /* @param {?boolean} below  null: draw everything (the ordinary, non-sinking call).
+                              true/false: draw only the falling pieces that are below /
+                              above the ice line, so each one is layered on its own. */
+  function drawL2(ctx, below = null) {
     const L = G.l2; if (!L) return;
     if (L.pieces) { L.pieces.forEach(pc => drawL2Piece(ctx, pc)); return; }
     if (L.seated) return;              // the halves belong to the crossing now
@@ -12960,10 +12977,30 @@ function createGame(canvas, hooks = {}) {
        learner drew. Drawing the real pieces from the first frame removes the whole
        class of problem — the cut you see IS the cut that was made, because it is the
        geometry rather than a line drawn on top of it. */
+    /* EACH PIECE PICKS ITS OWN LAYER, and that is the fix for "the wrong cut drops
+       behind the path".
+     *
+     * The whole group used to flip behind the ice together, on one test of the SLAB's
+     * centre (l2Sinking, at the call sites). A cut slab is not a point: its two halves
+     * are offset from that centre by their own cy, which on the big crossings is
+     * hundreds of pixels. So the moment the centre passed the ice line, a half that was
+     * still well up in the air was painted behind the path with it — sliding down the
+     * back of the scenery in open sky, which is exactly what was reported.
+     *
+     * Layering per piece costs one comparison and is the same rule the rope crossings'
+     * chunks already follow: above the surface you are in the air and in front of
+     * everything; below it you are in the ground, and the ice and the pool close over
+     * you. Called twice a frame now — once behind the water front, once in front — and
+     * each call takes only the pieces that belong to it. */
     if (L.debris && L.fall) {
-      for (const pc of L.debris) drawL2Piece(ctx, pc);
+      for (const pc of L.debris) {
+        if (below !== null && (pc.y > CFG.surfaceY) !== below) continue;
+        drawL2Piece(ctx, pc);
+      }
       return;
     }
+    // the slab is whole: it is one object, so its own centre decides, as before
+    if (below === true) return;
     const shakeX = (L.shake || 0) ? Math.sin(G.t * 46) * 7 * L.shake : 0;
     ctx.save();
     ctx.translate(L.pos.x + shakeX, L.pos.y);
@@ -13992,7 +14029,14 @@ class Hud {
     this._steps = 0;
     this._at = -1;
     this._goal = null;
-    this._onResize = () => this.checkOrientation();
+    /* The board's one type size is measured in pixels, so it is only valid for the stage
+       it was measured at — and only for the face it was measured in. A resize invalidates
+       it, and so does Baloo 2 arriving after the first paint: measured in the fallback
+       face the longest question needs a different ratio than it does in the real one. */
+    this._onResize = () => { this._fit = null; this.checkOrientation(); this.fitInstruction(); };
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => { this._fit = null; this.fitInstruction(); }).catch(() => {});
+    }
   }
 
   /* ---------- the journey card ----------
@@ -14313,29 +14357,112 @@ class Hud {
    * measured rect would be whatever the scale was on that frame. scrollWidth is layout,
    * which transforms do not touch.
    */
-  fitInstruction() {
+  /* ONE SIZE FOR EVERY QUESTION, NOT ONE SIZE PER QUESTION.
+   *
+   * This used to measure the sentence that happened to be up and scale the type to it.
+   * Each question fitted its own board, so the type was a different size on nearly every
+   * crossing — "Cut the convex polygon." set large, "Draw 2 diagonals from the same
+   * vertex." set small — and the sign changed character as you played. That is the
+   * "text size is not constant in whole game" report, and it is the same fault the plank
+   * itself had before it was given a fixed width: something that should be one physical
+   * object being rebuilt to suit each string.
+   *
+   * So the fit is now measured ACROSS EVERY QUESTION THE GAME CAN ASK, once, and the
+   * smallest one wins. The longest sentence is the one that sets the type size, exactly
+   * as a signwriter would lay out a set of signs; every shorter question is set at that
+   * same size with more clear wood either side. Nothing ever overflows, because the
+   * sentence that defines the size is by construction the one that fits worst.
+   *
+   * The corpus comes from setQuestions() (main.js passes it from CFG), so a question
+   * added later is measured with the rest and cannot silently push a line off the plank.
+   * With no corpus it falls back to fitting the current sentence, which is what a
+   * banner line — a different element with its own width — still does.
+   */
+  /* TWO BOARDS, MEASURED SEPARATELY. The six rope crossings sit in the left band, where
+     the plank is 33 stage units — all the option row leaves room for. Part 2's three sit
+     in the middle, where there is no option row and the plank is 40u. Different widths
+     hold different sentences, so each is fitted to its own longest and the two land at
+     the same type size rather than one being shrunk to the other's constraint.
+     @param {{band?: string[], centered?: string[]}} sets */
+  setQuestions(sets) {
+    const clean = a => (a || []).filter(s => typeof s === 'string' && s.trim());
+    this._questions = { band: clean(sets && sets.band), centered: clean(sets && sets.centered) };
+    this._fit = null;
+    this.fitInstruction();
+  }
+
+  /** Widest-sentence fit for the board as it is currently classed. */
+  _measureFit(mode) {
     const el = this.el.text, pill = this.el.pill;
+    const cs = getComputedStyle(pill);
+    const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (!(avail > 0)) return null;
+    /* NINETY-FOUR PER CENT OF THE SPACE, NOT ALL OF IT. Filling it exactly means the
+       sentence that sets the size ends up flush against the caps with no clear wood at
+       all. Leaving a margin in the fit gives every line some wood either side. */
+    const fitFor = need => (need > 0 ? (avail * 0.94) / need : 1);
+    const lines = this._questions && this._questions[mode];
+    if (!lines || !lines.length) return fitFor(el.scrollWidth);
+    /* MEASURED IN A PROBE, NOT IN THE LIVE ELEMENT.
+     *
+     * The first version wrote each sentence into #instruction-text and put the real words
+     * back afterwards. That is synchronous and never paints, but it does mean the board
+     * briefly HOLDS a sentence it is not showing — and anything that reads the DOM from
+     * outside this call (a test, an assistive tool, a MutationObserver) can be handed it.
+     * The plank is the one element in the game whose contents are an assertion about what
+     * the learner is being asked, so it is not the place to scribble.
+     *
+     * The probe is a clone with the same class inside the same pill, so it inherits every
+     * font rule including --k, and it is measured in the REAL face — Baloo 2 loads late
+     * and a detached element with fallback metrics would size the board to the wrong one.
+     * visibility:hidden keeps it out of the picture; absolute keeps it out of the layout. */
+    const probe = el.cloneNode(false);
+    probe.removeAttribute('id');
+    probe.removeAttribute('aria-live');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;' +
+                          'white-space:nowrap;pointer-events:none;';
+    probe.style.setProperty('--fit', '1');
+    pill.appendChild(probe);
+    let worst = 1;
+    try {
+      for (const s of lines) {
+        probe.textContent = s;
+        worst = Math.min(worst, fitFor(probe.scrollWidth));
+      }
+    } finally {
+      probe.remove();
+    }
+    return worst;
+  }
+
+  fitInstruction() {
+    const el = this.el.text, pill = this.el.pill, root = this.el.instruction;
     if (!el || !pill) return;
+    /* A banner is a different board — wider, and its own type size (see the .banner
+       rules) — so it keeps fitting the line it is showing. Only the question board,
+       the one the player sees on all nine crossings, is held constant. */
+    const banner = !!(root && root.classList.contains('banner'));
+    const mode = (root && root.classList.contains('centered')) ? 'centered' : 'band';
+    this._fit = this._fit || {};
+    if (!banner && this._fit[mode] != null) { el.style.setProperty('--fit', this._fit[mode]); return; }
     el.style.setProperty('--fit', '1');
     /* Deferred one frame: called straight after the words are appended, the pill has
        not been laid out at the new content yet and clientWidth is the previous
        question's. */
     const run = () => {
-      const cs = getComputedStyle(pill);
-      const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const need = el.scrollWidth;
-      if (!(avail > 0) || !(need > 0)) return;
+      const raw = banner ? (() => {
+        const cs = getComputedStyle(pill);
+        const avail = pill.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const need = el.scrollWidth;
+        return (avail > 0 && need > 0) ? (avail * 0.94) / need : null;
+      })() : this._measureFit(mode);
+      if (raw == null) return;
       /* A floor at 0.62. Below that the type is too small to be the thing you look at,
-         and a sentence that cannot fit even then should be shortened rather than
-         shrunk — none of the nine comes close (the longest needs 0.88). */
-      /* NINETY-FOUR PER CENT OF THE SPACE, NOT ALL OF IT. Filling  exactly means
-         a sentence that needs shrinking ends up flush against the caps with no clear
-         wood at all — measured at 0u for the four longest questions, against 15-35u for
-         the ones that fit. A board where the long lines touch the ends and the short
-         ones do not is the "does not fit dynamically" report. Leaving a margin in the
-         fit gives every line some wood either side, whatever its length. */
-      const fit = Math.max(0.62, Math.min(1, (avail * 0.94) / need));
-      el.style.setProperty('--fit', fit.toFixed(3));
+         and a sentence that cannot fit even then should be shortened rather than shrunk. */
+      const fit = Math.max(0.62, Math.min(1, raw)).toFixed(3);
+      if (!banner) this._fit[mode] = fit;
+      el.style.setProperty('--fit', fit);
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();
   }
@@ -14688,7 +14815,21 @@ const clampN = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 /* WHICH RECORDED LINE BELONGS TO WHICH STEP (docs/VO-SCRIPT.md, CFG.vo.lines). */
 const VO = {
   meet: 'tut-1-meet', goal: 'tut-2-goal', rock: 'tut-3-watch', jump: 'tut-4-jump',
-  gap: 'tut-5-broken', use: 'tut-6-use', fit: 'tut-7-fit'
+  gap: 'tut-5-broken',
+  /* THE 'use' STEP IS SILENT UNTIL IT IS RE-RECORDED, and that is deliberate.
+   *
+   * The take says "Use the right ice piece to fix the path." The step SHOWS "Cut this ice
+   * block to fix the path.", because the tutorial now runs over Part 2's crossing 1 —
+   * one slab, nothing to choose between — so "the RIGHT piece" asks a question the level
+   * does not. The words were changed for that reason and the recording could not be.
+   *
+   * Left pointing at tut-6-use, the bubble printed one sentence while the voice spoke a
+   * different one, and the word reveal ran eight printed words against the take's nine
+   * onsets — so the highlight drifted for the whole line. A line that says the wrong
+   * thing is worse than no line: say() returns 0 for an id with no window, the bubble
+   * reveals on its own pace, and nothing else changes. The replacement is listed in
+   * docs/VO-PART2.md; dropping its window into CFG.vo.lines is all that is needed. */
+  use: 'p2-tut-6-cut', fit: 'tut-7-fit'
   // 'cut' is the hand alone and says nothing: the plank's question is spoken by the engine
 };
 
@@ -15083,27 +15224,6 @@ class Tutorial {
     return { x: anchor, y: ropeY, rx: 120, ry: 34,
              aimX: anchor, belowY: bottom,
              handX: ropeX, handY: ropeY, world: true };
-  }
-
-  /** A box around every hanging block, in stage coordinates. */
-  rowBox(g) {
-    const hang = ((g.l1 && g.l1.shapes) || []).filter(s => s.state === 'hang');
-    if (!hang.length) return null;
-    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-    for (const s of hang) {
-      x0 = Math.min(x0, s.x - s.w / 2); x1 = Math.max(x1, s.x + s.w / 2);
-      y0 = Math.min(y0, s.y - s.h / 2); y1 = Math.max(y1, s.y + s.h / 2);
-    }
-    if (y1 < 40) return null;                       // still off the top of the screen
-    /* AN OVAL AROUND THE ROW, not a circle enclosing it. The row is much wider than it
-       is tall, so one radius big enough to cover its width is enormous vertically —
-       1228px across for a 970px row, which is most of the screen. Separate axes hug it. */
-    return {
-      x: (x0 + x1) / 2, y: (y0 + y1) / 2,
-      rx: (x1 - x0) / 2 + 60,
-      ry: (y1 - y0) / 2 + 50,
-      world: true
-    };
   }
 
   /* NO domSpot, AND NO LIFTED DOM TARGET. This measured an element's rect and returned
@@ -16075,6 +16195,15 @@ class Tutorial {
 
 const canvas = document.getElementById('game-canvas');
 const hud = new Hud(document);
+
+/* EVERY QUESTION THE PLANK CAN CARRY, handed over before the first one is shown.
+   The board sizes its type to the longest of them once and keeps that size for the whole
+   game, instead of re-fitting itself to each sentence — see Hud.setQuestions. Read from
+   CFG rather than listed here, so a crossing added later is measured with the rest. */
+hud.setQuestions({
+  band: CFG.levelOne.phases.map(p => p.instruction),        // the six rope crossings, left band
+  centered: CFG.levelTwo.levels.map(c => c.instruction)     // Part 2's three, middle of the stage
+});
 
 const params = new URLSearchParams(location.search);
 const num = (key, min, max, fallback) => {

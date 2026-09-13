@@ -515,15 +515,3 @@ export const optionShapes = {
     ]
   }
 };
-
-/** The ring for a shape, or null if the art does not cover it. */
-export function shapeRing(id) {
-  const s = optionShapes[id];
-  return s ? s.points : null;
-}
-
-/** How many sides a shape has, measured from its own artwork. */
-export function shapeSides(id) {
-  const s = optionShapes[id];
-  return s ? s.sides : 0;
-}
