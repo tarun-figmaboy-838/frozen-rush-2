@@ -112,29 +112,58 @@ export class Hud {
     this._steps = n;
     this._at = -1;
     rail.textContent = '';
-    /* PLATFORM, LINK, PLATFORM, LINK ... PLATFORM, LINK, CAVE. One link between every
-       pair, and one more between the last platform and the cave, so the chain runs
-       unbroken from the first step to the destination. The links carry the progress —
-       there is no separate bar — so link i is the stretch from platform i to i+1. */
+    /* THE FRAME DECORATES; IT DOES NOT LAY ANYTHING OUT.
+     *
+     * This was one flex row living in the card's CONTENT box — which meant the snow-cloud
+     * caps, drawn as the card's border-image, decided how much room the nine platforms
+     * had. The two pull in opposite directions: every attempt to make the panel taller
+     * scaled the caps up with it and squeezed the journey, and every attempt to widen the
+     * journey flattened the panel. "The corners have negative space", "the stones touch
+     * the bottom", "make it taller" and "do not stretch it" are all that one fault —
+     * layout and decoration were the same number.
+     *
+     * They are separate now: the card paints the frame on a pseudo-element and owns no
+     * border, and this row is a percentage SAFE AREA inside it. Inside the safe area,
+     *
+     *   .journey-lane      the path, behind everything, with its own fill for progress
+     *   .level-track       grid, repeat(n, 1fr) — even spacing by construction, not by
+     *                      hand-placed margins that drift the first time it resizes
+     *   .level-node        one cell: the platform, and Momo when it is the current one
+     *   .bear-destination  OUTSIDE the nine, with a gap, because the friend is the goal
+     *                      and not a tenth level
+     */
+    const lane = document.createElement('div');
+    lane.className = 'journey-lane';
+    const fill = document.createElement('i');
+    fill.className = 'journey-lane-fill';
+    lane.appendChild(fill);
+    rail.appendChild(lane);
+    this._lane = fill;
+
+    const track = document.createElement('div');
+    track.className = 'level-track';
+    track.style.setProperty('--steps', n);
     for (let i = 0; i < n; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'level-node';
       const img = document.createElement('img');
       img.className = 'trail-node next';
       img.alt = '';
       img.src = 'assets/progress/step-locked.webp';
-      rail.appendChild(img);
-      const link = document.createElement('i');
-      link.className = 'trail-link';
-      rail.appendChild(link);
+      cell.appendChild(img);
+      track.appendChild(cell);
     }
+    rail.appendChild(track);
+
+    const dest = document.createElement('div');
+    dest.className = 'bear-destination';
     const goal = document.createElement('img');
     goal.className = 'trail-goal';
     goal.alt = '';
     goal.src = 'assets/progress/step-goal.webp';
-    rail.appendChild(goal);
+    dest.appendChild(goal);
+    rail.appendChild(dest);
     this._goal = goal;
-    /* Momo is a child of the row and was cleared with it — see index.html for why he
-       has to be parented here and not to the card. */
-    if (this.el.trailMomo) rail.appendChild(this.el.trailMomo);
   }
 
   /** Every platform, in order. The cave is a sibling in the same row, so it has to be
@@ -152,12 +181,34 @@ export class Hud {
     if (!momo || !nodes.length) return;
     const node = nodes[Math.min(i, nodes.length - 1)];
     if (!node) return;
-    /* MEASURED OFF THE PLATFORM, not computed from --node and --gap. The two would
-       agree today and drift the first time either is touched, and a mammoth standing
-       between two platforms is worse than no mammoth. offsetLeft is relative to the
-       row, which is the offset parent of both him and the fill. */
-    const mid = node.offsetLeft + node.offsetWidth / 2;
-    momo.style.setProperty('--at', mid + 'px');
+    /* HE IS PUT IN THE CELL, NOT MEASURED ONTO IT.
+     *
+     * This used to read the platform's offsetLeft and write it to a custom property the
+     * CSS positioned him with — two coordinate systems for one fact, and they came apart
+     * repeatedly: the measurement is taken against the row while `left` resolves against
+     * the row's PADDING box, it is wrong on any frame the card is mid-animation, and on
+     * the end platforms he overhung the panel and had to be clamped back by hand.
+     *
+     * Owning the cell removes all of it: he is a child of the platform he is standing on,
+     * centred by the same grid that spaces it.
+     *
+     * AND HE STILL WALKS THERE. Re-parenting alone would move him between one frame and
+     * the next, so: note where he is, move him, offset him straight back to where he was,
+     * and release it. He ends up in the right cell having travelled the distance. */
+    const cell = node.parentElement;
+    if (cell && momo.parentElement !== cell) {
+      const from = momo.getBoundingClientRect().left;
+      cell.appendChild(momo);
+      const to = momo.getBoundingClientRect().left;
+      const d = from - to;
+      if (d && Math.abs(d) < 4000) {
+        momo.style.transition = 'none';
+        momo.style.setProperty('--slide', d + 'px');
+        void momo.offsetWidth;
+        momo.style.transition = '';
+        momo.style.setProperty('--slide', '0px');
+      }
+    }
     momo.classList.toggle('idle', !hop);
     if (hop) {
       // restarted by hand: re-adding a class an element already has replays nothing
@@ -173,14 +224,16 @@ export class Hud {
 
   /** One spark of ice over platform `i`, on the frame it is won. */
   _spark(i) {
-    const rail = this.el.trailRail;
     const node = this._nodes()[i];
-    if (!rail || !node) return;
+    const cell = node && node.parentElement;
+    if (!cell) return;
+    /* IN THE CELL, CENTRED BY CSS. It was measured onto the row with offsetLeft and
+       offsetTop, which stopped meaning anything once the platforms moved into grid cells
+       of their own — those offsets are relative to the cell now, so the spark landed in
+       the corner of the panel. A child of the cell needs no measurement at all. */
     const s = document.createElement('div');
     s.className = 'trail-spark';
-    s.style.left = (node.offsetLeft + node.offsetWidth / 2) + 'px';
-    s.style.top = (node.offsetTop + node.offsetHeight / 2) + 'px';
-    rail.appendChild(s);
+    cell.appendChild(s);
     s.addEventListener('animationend', () => s.remove(), { once: true });
   }
 
@@ -243,8 +296,15 @@ export class Hud {
     /* THE CHAIN. Link i is the stretch from platform i to platform i+1, so it is walked
        once the learner has passed platform i — and the last one, to the cave, only when
        the journey is over. This is the progress bar: there is no separate fill. */
-    const links = this.el.trailRail ? [...this.el.trailRail.querySelectorAll('.trail-link')] : [];
-    links.forEach((l, i) => l.classList.toggle('done', i < at));
+    /* ONE LANE WITH ONE FILL, rather than nine separate links between the stones. The
+       stones sit ON the lane, so a fill that runs to the middle of the platform in play
+       reads as ground already walked. Expressed as a fraction of the track, so it lands
+       on the same centres the grid puts the stones on at any width — the links were a
+       chain of elements whose lengths had to be kept in step with the spacing by hand. */
+    if (this._lane) {
+      const n = Math.max(1, this._steps);
+      this._lane.style.width = (Math.min(1, (at + 0.5) / n) * 100).toFixed(2) + '%';
+    }
 
     /* THE CAVE WARMS AS IT IS APPROACHED and lights when it is reached. A cave glowing
        from crossing one has stopped meaning anything by crossing nine. */

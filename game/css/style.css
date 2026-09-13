@@ -145,11 +145,13 @@ a:hover { color: var(--ice-pale); }
    the reference stage is 730 x 131 — 38% by 12.1% of a 1920x1080 stage.
 
    PARTS (see index.html and Hud.buildTrail):
-     .trail            the positioning wrapper
-     .trail-card       the ice card
-       .trail-link     the connector between two platforms; .done once walked
-       .trail-rail     the row: 9 x .trail-node, then .trail-goal
-       .trail-momo     the marker, over the current node
+     .trail                 the positioning wrapper
+     .trail-card            the ice frame — DECORATION ONLY; it lays nothing out
+       .trail-rail          the journey: a percentage safe area inside the frame
+         .journey-lane      the path, behind the stones, with its own progress fill
+         .level-track       grid, one cell per crossing
+           .level-node      one cell: a .trail-node, and .trail-momo on the current one
+         .bear-destination  the friend, outside the nine, with a gap
 */
 .trail {
   position: absolute;
@@ -221,216 +223,154 @@ a:hover { color: var(--ice-pale); }
    The padding is the frame's own inner margin: the crystal ends eat about a fifth of
    the width between them, and the snow sits proud of the top, so the row of platforms
    is inset far enough to sit in the dark field rather than on the ice. */
+/* THE CARD IS THE FRAME, AND THE FRAME DECORATES ONLY.
+ *
+ * The panel used to be a flex row living in this element's CONTENT box, with the snow
+ * caps drawn as its border-image. That made the clouds decide how much room the nine
+ * platforms had — and the two pull in opposite directions. Every attempt to make the
+ * panel taller scaled the caps up with it and squeezed the journey; every attempt to
+ * give the journey more room flattened the panel. "The corners have negative space",
+ * "the stones touch the bottom", "make it taller", "do not stretch it" are all one
+ * fault: layout and decoration were the same number.
+ *
+ * They are separate now. The frame is painted on ::after, which is positioned over the
+ * whole card and lays nothing out; the journey is a percentage SAFE AREA inside the
+ * card. The clouds can be any size at all and the nine stones keep their spacing. */
 .trail-card {
-  display: block;
+  position: relative;
+  /* Wide and short, in the stage's own units like everything else here — the interface
+     has to be the same share of the stage at 1920 and at 4K, which a vw would not be.
+     34 x 7 is 4.86:1: shorter than the 5.7 it was, so the frame's middle stretches less
+     and the panel reads as one object rather than a tube. */
+  width: calc(34 * var(--u));
+  height: calc(7 * var(--u));
+  /* the clouds are allowed to bleed past the panel; nothing inside is clipped by them */
+  overflow: visible;
+  /* A SOFTER, SHALLOWER SHADOW. A hard offset shadow is the single strongest cue that
+     something is a panel lying ON a picture rather than a thing in it. */
+  filter: drop-shadow(0 calc(0.35 * var(--u)) calc(1.4 * var(--u)) rgba(6, 26, 56, 0.3));
+}
+/* THE DELIVERED ICE FRAME. panel.webp ships at 1100x341: the snow-cloud clusters occupy
+   the first 264px and the last 265px, the glowing rim sits 55px down and 50px up, and
+   the pale cavity between them is x 50..1050, y 59..285.
 
-  /* NINE-SLICED, NOT STRETCHED — and this is what stops the frame looking pulled about.
-
-     Stretching the art to the box was the first attempt and it cannot work: the card has
-     to be as long as nine platforms and a cave, which is about 9:1, while the art is
-     5:1. Scaling one onto the other pulls the snow caps and the crystal ends sideways by
-     nearly a factor of two, and ornate corners are exactly where an eye reads
-     distortion. Reported as "too long, looks stretched".
-
-     border-image draws the four corners at their OWN proportions and stretches only the
-     flat runs between them — the top edge, the bottom edge and the dark field. Those are
-     smooth gradients with nothing in them to distort, so the card can be any length at
-     all and the ends never change shape. That is what makes this responsive rather than
-     merely resizable.
-
-     The slices are in the art's own pixels (2134x422 after trimming): 73 down from the
-     top is the flat top edge of the bar, 17 up from the bottom is its underside, and
-     330 / 300 in from the sides contain the crystal blocks and their snow caps. The
-     border WIDTHS are the size those corners are drawn at, in node units, so they scale
-     with everything else — and they double as the row's side clearance, which is why the
-     padding below needs none. */
+   Every border-width is its slice times ONE factor — s = height/341 — so each piece is
+   drawn at the proportions it was painted at and the clouds keep their shape. Only the
+   middle stretches, and it is a smooth gradient with nothing in it to distort. */
+.trail-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   border-style: solid;
   border-color: transparent;
-  /* MEASURED OFF THE DELIVERED PANEL, AND ALL AT ONE SCALE.
-   *
-   * panel.webp ships at 1100x341. Probing it: the snow-cloud clusters occupy the first
-   * 264px and the last 265px, the glowing rim sits 55px down from the top and 50px up
-   * from the bottom, and the pale cavity between them is x 50..1050, y 59..285.
-   *
-   * Every border-width below is that slice times ONE factor s, so each piece is drawn at
-   * the proportions it was painted at: s = node/129, which puts the cavity at 1.75 nodes
-   * — enough for the cave (1.25) and Momo's headroom above the platforms. Because the
-   * left and right EDGE slices then stretch by exactly nothing, the clouds keep their
-   * shape instead of being pulled, which is what a nine-slice is for. */
-  /* s = node/94.2, which puts the cavity at 2.4 nodes — asked for twice, each time
-     because the row looked lost in a shallow slot. Raising the cavity raises every slice
-     with it, so the caps grow in step and the panel stays the object it was painted as
-     rather than a tall frame with small clouds stuck on the ends. */
-  /* s = node/94.2, which puts the cavity at 2.4 nodes. Every slice still moves with it,
-     so the clouds keep the shape they were painted at — raising the panel must never be
-     paid for by stretching them. */
-  border-width: calc(var(--node) * 0.584) calc(var(--node) * 2.814)
-                calc(var(--node) * 0.531) calc(var(--node) * 2.803);
+  border-width: calc(1.129 * var(--u)) calc(5.440 * var(--u))
+                calc(1.026 * var(--u)) calc(5.419 * var(--u));
   border-image-source: url("../assets/progress/panel.webp?v=ccf5fac1");
   border-image-slice: 55 265 50 264 fill;
   border-image-repeat: stretch;
-  /* No padding: the border widths ARE the inset now, and they are the cavity's own
-     edges. Anything here would push the row off the centre line of the ice. */
-  padding: 0;
-  /* A SOFTER, SHALLOWER SHADOW. A hard offset shadow is the single strongest cue that
-     something is a panel lying ON a picture rather than a thing in it; halved and
-     spread, it still lifts the card off a pale sky without announcing a pasted layer. */
-  filter: drop-shadow(0 calc(var(--node) * 0.05) calc(var(--node) * 0.2) rgba(6, 26, 56, 0.3));
 }
-/* THE ROW. Platform, link, platform, link ... platform, link, cave — the connectors
-   are IN the row rather than one bar behind it, so each one runs from the middle of
-   one platform to the middle of the next and the chain cannot come adrift from what
-   it is joining. A single shelf under everything was tried first and was wrong: it
-   read as a ledge the platforms happened to be standing on, not as a path between
-   them, and it could only show progress as a fill that the platforms then covered. */
+
+/* THE JOURNEY — a safe area, and the only thing that decides where anything stands.
+   The caps come to 15.9% of the card at each side; 17% clears them with a margin, and
+   the vertical inset sits inside the cavity (17.3%..83.6% of the art). */
 .trail-rail {
-  position: relative;
-  display: flex;
-  /* CENTRED IN THE ICE, NOT STOOD ON THE BOTTOM OF IT.
-   *
-   * The row used to sit on the cavity floor, and three separate reports came out of that
-   * one decision: the stones looked like they were touching the bottom rim; the pale
-   * wedges at the two bottom corners read as dead space; and raising the panel to cure
-   * either only made the empty ice above them worse.
-   *
-   * All three are the same thing. The cavity is a STADIUM — its ends are half-circles —
-   * so it is only full width across its middle. A row standing on the floor sits exactly
-   * where the curve cuts in hardest, which is what put those wedges beside the end
-   * stones; and standing on the floor means being AT the floor, which is what made them
-   * look like they touch it. Centred, the row sits where the capsule is widest, it has
-   * clear ice above and below it by construction, and the panel can be made taller
-   * without opening a gap, because the extra height is shared between the two. */
-  align-items: center;
-  /* No gap: the links ARE the gaps now, and they carry their own overlap. */
-  /* THE ROW IS THE CAVITY, AND IT SAYS SO. Given no height the row was only as tall as
-     its tallest FLEX item — the cave, 1.25 nodes — while Momo is absolutely positioned
-     and reaches 1.47, so he was measured out of the box entirely and his head crossed
-     the top rim into the snow. Worse, the card then drew shorter than the art's own
-     proportions and squashed the cloud caps vertically.
-
-     Pinned to 1.75 nodes, the panel keeps the 1100x341 proportions it was painted at,
-     the platforms rest just clear of the bottom rim, and Momo tops out at 1.55 with a
-     fifth of a node of ice above him. */
-  box-sizing: border-box;
-  height: var(--row-h);
-  /* EQUAL ICE AT BOTH ENDS, and Momo never on the cloud.
-   *
-   * Two faults met here and read as "negative space". Momo is 1.15 nodes wide and centred
-   * on whichever platform he stands on, so on the FIRST one he reached half a node past
-   * the row and over the left snow cap — an overlap, not a gap. At the other end the row
-   * is laid out from flex-start, so whatever width the card had over and above its items
-   * collected on the right as one dead strip of pale ice. One end crowded, the other
-   * empty.
-   *
-   * Centring the row removes the strip. The side padding is then only 0.15 of a node —
-   * asked for: the first stone hard against the left end of the ice and the cave hard
-   * against the right, so the row FILLS the panel instead of floating in the middle of
-   * it. Momo's overhang is no longer handled by padding but by clamping him (see
-   * .trail-momo), which is the only one of the two that can hold at both ends at once. */
-  justify-content: center;
-  /* No vertical padding: `align-items: center` above is what holds the row off both
-     rims now, and it shares the ice evenly by construction. The 0.08 at the sides is
-     the last of the end clearance — Momo's overhang is handled by clamping him, not by
-     pushing every stone inward. */
-  padding: 0 calc(var(--node) * 0.08);
-  /* A FROSTED SHEEN THAT CROSSES THE ICE, slowly and only once in a while. The panel is
-     a pane of ice and a still pane reads as a sticker; one pass of light every few
-     seconds is what makes it look like a lit object in a game rather than a printed
-     read-out. Behind the platforms, so it lights the field and never the answer. */
-  isolation: isolate;
-}
-.trail-rail::after {
-  content: "";
   position: absolute;
-  inset: calc(var(--node) * -0.2) 0;
-  z-index: -2;
-  pointer-events: none;
-  border-radius: 999px;
-  background: linear-gradient(105deg,
-    rgba(255, 255, 255, 0) 38%,
-    rgba(255, 255, 255, 0.55) 48%,
-    rgba(214, 246, 255, 0.85) 52%,
-    rgba(255, 255, 255, 0) 62%);
-  background-size: 260% 100%;
-  animation: trailSheen 6.5s cubic-bezier(.5, 0, .5, 1) infinite;
-  mix-blend-mode: screen;
-}
-@keyframes trailSheen {
-  0%, 62% { background-position: 150% 0; opacity: 0; }
-  66%     { opacity: .9; }
-  96%     { background-position: -60% 0; opacity: 0; }
-  100%    { background-position: -60% 0; opacity: 0; }
+  left: 17%;
+  right: 17%;
+  top: 22%;
+  bottom: 20%;
+  z-index: 1;
+  /* the nine, then the friend — with a real gap, so the bear reads as the GOAL and not
+     as a tenth level */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(1.1 * var(--u));
 }
 
-/* A CONNECTOR. It is the width of the gap PLUS half a platform at each end, pulled
-   back by negative margins so those halves tuck behind its two neighbours — which is
-   what makes the line appear to leave the middle of one platform and arrive at the
-   middle of the next instead of merely bridging the space between them. Behind the
-   platforms (negative z-index in the card s own stacking context), and lifted to the
-   platforms mid-height so it emerges from the block rather than from under it. */
-.trail-link {
-  flex: 0 0 auto;
-  align-self: flex-end;
-  width: calc(var(--gap) + var(--node));
-  margin: 0 calc(var(--node) * -0.5) calc(var(--node) * 0.2);
-  /* THICKER, because the field it crosses is now PALE. On the old navy card a thin pale
-     line was the lightest thing on the panel and read instantly; on the ice frame the
-     background is lighter than the link was, so the chain has to be darker AND heavier
-     to read at all. 0.17 -> 0.22 of a node. */
-  height: calc(var(--node) * 0.22);
+/* THE PATH, behind the stones. One lane with one fill, rather than a chain of links
+   whose lengths had to be kept in step with the spacing by hand. */
+.journey-lane {
+  position: absolute;
+  left: 0;
+  right: calc(-1.1 * var(--u));
+  top: 58%;
+  transform: translateY(-50%);
+  height: calc(0.44 * var(--u));
   border-radius: 999px;
-  /* AN EMPTY GROOVE CUT INTO THE ICE. Deep steel blue with a shadow inside the top edge
-     and a hairline of light along the bottom: the same trick a real recessed track uses,
-     and it is what makes the travelled part below read as something filling it. */
+  z-index: 1;
+  /* a groove cut into the ice: shadow inside the top edge, a hairline of light below */
   background: linear-gradient(180deg, #5D7E9B 0%, #47698A 55%, #38587A 100%);
   box-shadow:
-    inset 0 calc(var(--node) * 0.035) calc(var(--node) * 0.05) rgba(6, 26, 56, 0.55),
-    0 calc(var(--node) * 0.02) 0 rgba(255, 255, 255, 0.65);
-  z-index: -1;
-  transition: background 320ms ease, box-shadow 320ms ease;
+    inset 0 calc(0.07 * var(--u)) calc(0.1 * var(--u)) rgba(6, 26, 56, 0.55),
+    0 calc(0.04 * var(--u)) 0 rgba(255, 255, 255, 0.65);
 }
-/* TRAVELLED — AND IT IS THE PROGRESS BAR. The chain itself fills, so there is no second
-   meter to keep in step with the platforms. Bright cyan against the recessed groove, lit
-   from inside, with a highlight riding along the top the way a charged bar does. */
-.trail-link.done {
+/* THE GROUND ALREADY WALKED. Runs to the middle of the platform in play. */
+.journey-lane-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  position: relative;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 42%),
     linear-gradient(180deg, #7FF0FF 0%, #22C8FF 48%, #0D8FD6 100%);
   box-shadow:
-    inset 0 calc(var(--node) * 0.03) 0 rgba(255, 255, 255, 0.9),
-    0 0 calc(var(--node) * 0.2) rgba(48, 212, 255, 0.85),
-    0 0 calc(var(--node) * 0.45) rgba(48, 212, 255, 0.4);
-  position: relative;
-  overflow: hidden;
+    inset 0 calc(0.05 * var(--u)) 0 rgba(255, 255, 255, 0.9),
+    0 0 calc(0.35 * var(--u)) rgba(48, 212, 255, 0.85);
+  transition: width 420ms cubic-bezier(.33, 0, .2, 1);
 }
-/* THE CHARGE RUNNING ALONG IT. A narrow band of light travelling the filled stretch,
-   which is the one animation every game progress bar has and the reason a filled bar
-   looks powered rather than painted. Only on the DONE links, so the energy is visibly
-   in the part that has been earned. */
-.trail-link.done::after {
+/* the charge running along it — the one animation every game progress bar has */
+.journey-lane-fill::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   background: linear-gradient(90deg,
-    rgba(255,255,255,0) 0%, rgba(255,255,255,0) 40%,
-    rgba(255,255,255,0.85) 50%,
-    rgba(255,255,255,0) 60%, rgba(255,255,255,0) 100%);
+    rgba(255,255,255,0) 40%, rgba(255,255,255,0.85) 50%, rgba(255,255,255,0) 60%);
   background-size: 220% 100%;
   animation: linkCharge 2.4s linear infinite;
 }
-@keyframes linkCharge {
-  from { background-position: 120% 0; }
-  to   { background-position: -120% 0; }
+
+/* NINE CELLS, EVENLY SPACED BY CONSTRUCTION. Not nine hand-placed margins that drift the
+   first time the panel resizes — one grid, and every stone lands on its own centre. */
+.level-track {
+  display: grid;
+  grid-template-columns: repeat(var(--steps, 9), minmax(0, 1fr));
+  /* ON ONE BASELINE, which means aligned to the GROUND and not to their middles. The
+     active stone's art is taller than a locked one (119px against 104), so centring them
+     put its top and bottom 1.4px out from the rest of the row — eight stones on one line
+     and one sitting slightly proud of it. Stones stand on something; `end` is that. */
+  align-items: end;
+  z-index: 2;
+}
+.level-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+/* THE FRIEND, OUTSIDE THE NINE. */
+.bear-destination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
 }
 
 /* A PLATFORM. One art, three states, all the same size — the state is carried by
    colour and light, never by scale, so the row's rhythm never breaks. */
 .trail-node {
   display: block;
-  width: var(--node);
+  /* A SHARE OF ITS CELL, not an absolute width. The grid decides where the nine centres
+     are; the stone fills most of its cell and the remainder IS the gap, so they always
+     read as separate stepping stones and the spacing cannot drift from the spacing. */
+  width: 82%;
+  max-width: calc(2.9 * var(--u));
   height: auto;
-  flex: 0 0 auto;
   transform-origin: 50% 100%;
   transition: filter 320ms ease, opacity 320ms ease;
 }
@@ -478,9 +418,12 @@ a:hover { color: var(--ice-pale); }
 /* and a single spark of ice off it, drawn rather than sprited */
 .trail-spark {
   position: absolute;
-  width: calc(var(--node) * 1.3);
-  height: calc(var(--node) * 1.3);
-  margin: calc(var(--node) * -0.65) 0 0 calc(var(--node) * -0.65);
+  /* Centred on its own cell BY the cell, rather than measured onto the row. */
+  left: 50%;
+  top: 50%;
+  width: calc(3.4 * var(--u));
+  height: calc(3.4 * var(--u));
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(226, 250, 255, 0.95) 0%, rgba(48, 212, 255, 0.5) 40%, rgba(48, 212, 255, 0) 70%);
   animation: spark 560ms ease-out both;
@@ -499,10 +442,10 @@ a:hover { color: var(--ice-pale); }
    platform and the cave do not read as another pair of steps. */
 .trail-goal {
   display: block;
-  width: calc(var(--node) * 1.34);
+  /* A little larger than one stone — it is the destination — but not so much that it
+     outranks Momo, who is the thing the child is actually following. */
+  width: calc(3.2 * var(--u));
   height: auto;
-  flex: 0 0 auto;
-  margin-left: calc(var(--gap) * 0.5);
   filter: saturate(0.7) brightness(0.92)
           drop-shadow(0 calc(var(--node) * 0.05) calc(var(--node) * 0.07) rgba(8, 43, 82, 0.5));
   transition: filter 420ms ease;
@@ -540,46 +483,38 @@ a:hover { color: var(--ice-pale); }
    that he cannot reach the platforms either side of the one he is standing on.
    Positioned by his platform's measured centre (--at), so he lands on it at any stage
    size and for any number of crossings. */
+/* HE BELONGS TO THE PLATFORM HE IS STANDING ON. He is a child of that cell, so the same
+   grid that spaces the stones centres him on one, and there is no second coordinate
+   system to come adrift from it — which is what `left: var(--at)` was: measured onto the
+   row, wrong on any frame the card was mid-animation, and clamped by hand at the ends
+   because he overhung the panel there.
+
+   `--slide` is how far he has still to travel, written by Hud._momoTo on the frame he
+   changes cell: he is re-parented, offset back to where he was, and released. */
 .trail-momo {
   position: absolute;
-  /* HELD INSIDE THE ICE AT BOTH ENDS.
-   *
-   * He is 1.15 nodes wide and centred on the platform he stands on, so on the first one
-   * he reached 0.575 of a node past the row and out over the left snow cap, and the only
-   * cure available to the ROW was side padding — which buys that clearance by pushing
-   * every stone inward and leaving the dead band of pale ice the panel was reported for.
-   *
-   * Clamping him instead fixes the one element that actually overhangs: the row now runs
-   * the full width of the ice, and on the end platforms he simply stops with his edge on
-   * the cavity's, which is what a marker at the end of a track does anyway. */
-  left: clamp(calc(var(--node) * 0.575), var(--at, 0px), calc(100% - var(--node) * 0.575));
-  /* Feet on the platform's top face. Measured from the ROW's bottom edge, which is the
-     platforms' base; the block art is 0.72 nodes tall, so this stands him about three
-     quarters of the way up it, where the drawn top surface of an isometric block is. */
-  /* ON THE PLATFORM'S TOP FACE, wherever the row's floor is. This was a bare 0.5 nodes
-     from the row's own bottom edge, which stopped pointing at the blocks once the row
-     was centred in the cavity instead of stood on its floor — he sank through them.
-     */
-  /* ON THE PLATFORM'S TOP FACE, wherever the centred row puts it. The stones are 0.72
-     of a node tall and the row is 2.4, so their base sits (2.4 - 0.72) / 2 = 0.84 of a
-     node up from the bottom; his feet are half a node above that, which is the drawn
-     top surface of an isometric block. Written out rather than hard-coded to 1.34 so
-     the two stay tied if the row's height changes again. */
-  bottom: calc((var(--row-h) - var(--node) * 0.72) / 2 + var(--node) * 0.5);
-  width: calc(var(--node) * 1.15);
+  left: 50%;
+  /* Feet on the stone's drawn top face. A share of the stone itself, so it holds at any
+     panel size rather than being re-derived every time the row's height changes. */
+  bottom: 46%;
+  width: 92%;
   height: auto;
-  transform: translateX(-50%);
-  /* 340ms, not 520. A marker this size crossing one platform-width reads as trudging
-     at half a second; the travel and the arc are the same length so they cannot drift. */
-  transition: left 340ms cubic-bezier(.33, 0, .2, 1);
-  filter: drop-shadow(0 calc(var(--node) * 0.05) calc(var(--node) * 0.07) rgba(8, 43, 82, 0.55));
-  will-change: left, transform;
+  z-index: 3;
+  transform: translateX(calc(-50% + var(--slide, 0px)));
+  /* THE TRANSITION IS ON --slide, NOT ON transform, and that is what lets the walk and
+     the hop run at once: an animation on `transform` overrides a transition on it, so
+     with both on the same property the hop simply cancelled the travel. Registered as a
+     real <length> below, the custom property animates on its own and the hop's keyframes
+     READ it, so the two compose. */
+  transition: --slide 340ms cubic-bezier(.33, 0, .2, 1);
+  filter: drop-shadow(0 calc(0.12 * var(--u)) calc(0.18 * var(--u)) rgba(8, 43, 82, 0.55));
+  will-change: transform;
 }
 /* HE STANDS STILL. There was a small idle bob here and on a marker this size it read as
    floating rather than as breathing — asked for exactly that: ON the platform, not
    hovering above it. The only movement left on the card is the hop between platforms,
    which is something that HAPPENED rather than something that is happening. */
-.trail-momo.idle { animation: none; transform: translateX(-50%); }
+.trail-momo.idle { animation: none; }
 /* MOVING ON: gather, arc, land. `left` carries him across on its own transition and
    this lifts him over the gap — the two together are a jump rather than a slide. */
 .trail-momo.hop { animation: momoHop 340ms cubic-bezier(.33, 0, .2, 1) both; }
@@ -587,12 +522,23 @@ a:hover { color: var(--ice-pale); }
    ease evenly up and back down, which is what made this read as slow even once the
    duration came down. Off the ground by 14%, over the apex between 40 and 60%, landed
    and absorbed by 88%. The squash at each end is the weight. */
+/* --slide is the distance still to walk, written by Hud._momoTo when he changes cell and
+   eased to zero by the transition above. Registering it as a <length> is what makes that
+   animate at all: an unregistered custom property is a string and would jump. */
+@property --slide {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+/* EVERY KEYFRAME CARRIES THE TRAVEL. The hop is vertical, the walk is horizontal, both
+   are the same 340ms — reading --slide here is what lets them run together instead of
+   the hop cancelling the walk. */
 @keyframes momoHop {
-  0%   { transform: translateX(-50%) translateY(0) scaleY(0.86) scaleX(1.1); }
-  14%  { transform: translateX(-50%) translateY(calc(var(--node) * -0.46)) scaleY(1.12) scaleX(0.92); }
-  50%  { transform: translateX(-50%) translateY(calc(var(--node) * -0.6)) scaleY(1.02) scaleX(0.99); }
-  88%  { transform: translateX(-50%) translateY(0) scaleY(0.9) scaleX(1.07); }
-  100% { transform: translateX(-50%) translateY(0) scaleY(1) scaleX(1); }
+  0%   { transform: translateX(calc(-50% + var(--slide, 0px))) translateY(0) scaleY(0.86) scaleX(1.1); }
+  14%  { transform: translateX(calc(-50% + var(--slide, 0px))) translateY(calc(-0.9 * var(--u))) scaleY(1.12) scaleX(0.92); }
+  50%  { transform: translateX(calc(-50% + var(--slide, 0px))) translateY(calc(-1.2 * var(--u))) scaleY(1.02) scaleX(0.99); }
+  88%  { transform: translateX(calc(-50% + var(--slide, 0px))) translateY(0) scaleY(0.9) scaleX(1.07); }
+  100% { transform: translateX(calc(-50% + var(--slide, 0px))) translateY(0) scaleY(1) scaleX(1); }
 }
 
 /* THE CARD ARRIVES once, when the journey opens. */
@@ -1095,7 +1041,7 @@ a:hover { color: var(--ice-pale); }
     opacity: 1;
     transform: none;
   }
-  .trail-momo.hop, .trail-momo.idle { transform: translateX(-50%); }
+  .trail-momo.hop, .trail-momo.idle { transform: translateX(-50%); --slide: 0px; }
   .trail-goal.lit { transform: scale(1.06); }
   .trail-spark { display: none; }
   /* THE WHOOSH AND THE SHEEN GO. The card still arrives and leaves — .away does that
@@ -1104,7 +1050,7 @@ a:hover { color: var(--ice-pale); }
   .trail-card, .trail-card::before,
   .trail:not(.away) .trail-card, .trail:not(.away) .trail-card::before,
   .trail.away .trail-card, .trail.away .trail-card::before,
-  .trail-rail::after, .trail-link.done::after {
+  .trail-rail::after, .journey-lane-fill::after, .trail-momo {
     animation: none;
     transform: none;
   }

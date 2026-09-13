@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Progress panel — live tuning</title>
+
+<!-- THE REAL STYLESHEET AND THE REAL ART.
+     Nothing here re-draws the panel: it loads game/css/style.css and renders the same
+     markup Hud.buildTrail produces, so what you tune IS what ships. The sliders write
+     the same custom properties the stylesheet reads, and the box at the bottom prints
+     the values to paste back into style.css. -->
+<link rel="stylesheet" href="../game/css/style.css">
+
+<style>
+  body {
+    margin: 0;
+    background: #0e2a52;
+    color: #EAF9FF;
+    font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  .lab { display: grid; grid-template-columns: 1fr 300px; min-height: 100vh; }
+  .view { position: relative; display: grid; place-items: center; padding: 20px; }
+
+  /* The panel is sized from --u, which the game derives from the stage. Here the
+     "stage" is a box you can resize with the width slider, so the panel responds
+     exactly as it does in game. */
+  .stage-sim {
+    position: relative;
+    background: linear-gradient(180deg, #2E8BD6 0%, #1E63A8 60%, #17518C 100%);
+    border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.45);
+    overflow: hidden;
+  }
+  .stage-sim .trail { position: absolute; }
+
+  .panel { background: #0b2141; border-left: 1px solid #1d3f6e; padding: 16px; overflow-y: auto; }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  .sub { color: #8fb6de; font-size: 12px; margin: 0 0 16px; }
+  .grp { border-top: 1px solid #1d3f6e; padding: 10px 0 4px; }
+  .grp h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6f9ccb; margin: 0 0 8px; }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; margin-bottom: 7px; font-size: 12px; }
+  label span.v { color: #7FF0FF; font-variant-numeric: tabular-nums; font-size: 11px; }
+  input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: #22C8FF; }
+  button {
+    font: inherit; font-size: 12px; color: #EAF9FF; background: #17518C;
+    border: 1px solid #2E8BD6; border-radius: 4px; padding: 6px 10px; cursor: pointer;
+  }
+  button:hover { background: #1E63A8; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  pre {
+    background: #071730; border: 1px solid #1d3f6e; border-radius: 4px;
+    padding: 10px; font-size: 11px; line-height: 1.45; white-space: pre-wrap;
+    color: #9fe9ff; max-height: 260px; overflow: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="lab">
+  <div class="view">
+    <div class="stage-sim" id="stageSim">
+      <!-- the same markup Hud.buildTrail writes -->
+      <div class="trail" id="trail">
+        <div class="trail-card">
+          <div class="trail-rail" id="rail"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h1>Progress panel</h1>
+    <p class="sub">Live, against the real stylesheet and the real art. Values print below.</p>
+
+    <div class="grp">
+      <h2>Stage</h2>
+      <label>Stage width <span class="v" id="vStage">1600</span>
+        <input type="range" id="stageW" min="700" max="3200" step="20" value="1600"></label>
+      <label>Progress <span class="v" id="vStep">1 / 9</span>
+        <input type="range" id="step" min="0" max="9" step="1" value="0"></label>
+    </div>
+
+    <div class="grp">
+      <h2>Card</h2>
+      <label>width (stage units) <span class="v" id="vCardW">34</span>
+        <input type="range" id="cardW" min="20" max="48" step="0.5" value="34"></label>
+      <label>height (stage units) <span class="v" id="vCardH">7</span>
+        <input type="range" id="cardH" min="4" max="14" step="0.25" value="7"></label>
+    </div>
+
+    <div class="grp">
+      <h2>Safe area (the journey)</h2>
+      <label>inset left / right <span class="v" id="vSideI">17</span>%
+        <input type="range" id="sideI" min="4" max="26" step="0.5" value="17"></label>
+      <label>inset top <span class="v" id="vTopI">22</span>%
+        <input type="range" id="topI" min="10" max="40" step="1" value="22"></label>
+      <label>inset bottom <span class="v" id="vBotI">20</span>%
+        <input type="range" id="botI" min="10" max="40" step="1" value="20"></label>
+      <label>gap before the friend <span class="v" id="vGap">1.1</span>
+        <input type="range" id="gap" min="0" max="4" step="0.1" value="1.1"></label>
+    </div>
+
+    <div class="grp">
+      <h2>Contents</h2>
+      <label>stone width (% of cell) <span class="v" id="vStone">82</span>%
+        <input type="range" id="stone" min="40" max="100" step="1" value="82"></label>
+      <label>friend width (stage units) <span class="v" id="vGoal">3.2</span>
+        <input type="range" id="goal" min="1.5" max="6" step="0.1" value="3.2"></label>
+      <label>Momo width (% of stone) <span class="v" id="vMomoW">92</span>%
+        <input type="range" id="momoW" min="50" max="140" step="1" value="92"></label>
+      <label>Momo feet (% up the stone) <span class="v" id="vMomoB">46</span>%
+        <input type="range" id="momoB" min="10" max="90" step="1" value="46"></label>
+      <label>lane height (stage units) <span class="v" id="vLaneH">0.44</span>
+        <input type="range" id="laneH" min="0.1" max="1.4" step="0.02" value="0.44"></label>
+      <label>lane position <span class="v" id="vLaneY">58</span>%
+        <input type="range" id="laneY" min="20" max="90" step="1" value="58"></label>
+    </div>
+
+    <div class="row">
+      <button id="reset">Reset to shipped</button>
+      <button id="copy">Copy CSS</button>
+    </div>
+    <pre id="out"></pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STEPS = 9;
+  var rail = document.getElementById('rail');
+  var trail = document.getElementById('trail');
+  var sim = document.getElementById('stageSim');
+
+  /* THE SAME ROW Hud.buildTrail WRITES — lane, then a grid of cells, then the friend
+     outside it. Kept identical on purpose: if this drifts from hud.js the lab stops
+     telling the truth. */
+  function build() {
+    rail.textContent = '';
+    var lane = document.createElement('div');
+    lane.className = 'journey-lane';
+    var fill = document.createElement('i');
+    fill.className = 'journey-lane-fill';
+    lane.appendChild(fill);
+    rail.appendChild(lane);
+
+    var track = document.createElement('div');
+    track.className = 'level-track';
+    track.style.setProperty('--steps', STEPS);
+    for (var i = 0; i < STEPS; i++) {
+      var cell = document.createElement('div');
+      cell.className = 'level-node';
+      var img = document.createElement('img');
+      img.className = 'trail-node next';
+      img.alt = '';
+      img.src = '../game/assets/progress/step-locked.webp';
+      cell.appendChild(img);
+      track.appendChild(cell);
+    }
+    rail.appendChild(track);
+
+    var dest = document.createElement('div');
+    dest.className = 'bear-destination';
+    var goal = document.createElement('img');
+    goal.className = 'trail-goal';
+    goal.alt = '';
+    goal.src = '../game/assets/progress/step-goal.webp';
+    dest.appendChild(goal);
+    rail.appendChild(dest);
+
+    var momo = document.createElement('img');
+    momo.className = 'trail-momo idle';
+    momo.id = 'trail-momo';
+    momo.alt = '';
+    momo.src = '../game/assets/progress/step-momo.webp';
+    track.children[0].appendChild(momo);
+  }
+
+  function setProgress(at) {
+    var nodes = rail.querySelectorAll('.trail-node');
+    for (var i = 0; i < nodes.length; i++) {
+      var want = i < at ? 'done' : i === at ? 'now' : 'next';
+      nodes[i].className = 'trail-node ' + want;
+      nodes[i].src = '../game/assets/progress/step-' + (want === 'next' ? 'locked' : want) + '.webp';
+    }
+    var fill = rail.querySelector('.journey-lane-fill');
+    if (fill) fill.style.width = (Math.min(1, (at + 0.5) / STEPS) * 100).toFixed(2) + '%';
+    var momo = document.getElementById('trail-momo');
+    var cell = nodes[Math.min(at, nodes.length - 1)];
+    if (momo && cell && momo.parentElement !== cell.parentElement) cell.parentElement.appendChild(momo);
+    var goal = rail.querySelector('.trail-goal');
+    if (goal) {
+      goal.classList.toggle('near', at >= STEPS - 1 && at < STEPS);
+      goal.classList.toggle('lit', at >= STEPS);
+    }
+  }
+
+  var DEFAULTS = {
+    cardW: 34, cardH: 7, sideI: 17, topI: 22, botI: 20, gap: 1.1,
+    stone: 82, goal: 3.2, momoW: 92, momoB: 46, laneH: 0.44, laneY: 58
+  };
+  var ids = Object.keys(DEFAULTS);
+
+  function val(id) { return parseFloat(document.getElementById(id).value); }
+
+  /* The stylesheet reads these; overriding them here is exactly what editing style.css
+     would do, which is why the printed block below can be pasted straight back. */
+  function apply() {
+    var stageW = val('stageW');
+    var stageH = Math.round(stageW * 9 / 16);
+    sim.style.width = stageW + 'px';
+    sim.style.height = stageH + 'px';
+    // --u is one per cent of the stage, exactly as the game defines it
+    sim.style.setProperty('--u', (stageW / 100) + 'px');
+
+    var s = document.documentElement.style;
+    s.setProperty('--lab-card-w', val('cardW'));
+    s.setProperty('--lab-card-h', val('cardH'));
+
+    var card = trail.querySelector('.trail-card');
+    var h = val('cardH');
+    card.style.width = 'calc(' + val('cardW') + ' * var(--u))';
+    card.style.height = 'calc(' + h + ' * var(--u))';
+    /* the frame's slices scale with the card's height so the clouds keep their shape:
+       s = height / 341, and each border-width is its slice times s */
+    var k = h / 341;
+    card.style.setProperty('--lab-bt', (55 * k).toFixed(3));
+    var after = [
+      (55 * k).toFixed(3), (265 * k).toFixed(3), (50 * k).toFixed(3), (264 * k).toFixed(3)
+    ];
+    card.style.setProperty('--bw-t', after[0] + '');
+    // the ::after cannot be styled inline, so drive it through custom properties
+    s.setProperty('--panel-bw-t', 'calc(' + after[0] + ' * var(--u))');
+    s.setProperty('--panel-bw-r', 'calc(' + after[1] + ' * var(--u))');
+    s.setProperty('--panel-bw-b', 'calc(' + after[2] + ' * var(--u))');
+    s.setProperty('--panel-bw-l', 'calc(' + after[3] + ' * var(--u))');
+
+    var r = rail.style;
+    r.left = val('sideI') + '%';
+    r.right = val('sideI') + '%';
+    r.top = val('topI') + '%';
+    r.bottom = val('botI') + '%';
+    r.gap = 'calc(' + val('gap') + ' * var(--u))';
+
+    s.setProperty('--lab-stone', val('stone') + '%');
+    s.setProperty('--lab-goal', 'calc(' + val('goal') + ' * var(--u))');
+    s.setProperty('--lab-momo-w', val('momoW') + '%');
+    s.setProperty('--lab-momo-b', val('momoB') + '%');
+    s.setProperty('--lab-lane-h', 'calc(' + val('laneH') + ' * var(--u))');
+    s.setProperty('--lab-lane-y', val('laneY') + '%');
+
+    ids.forEach(function (id) {
+      var out = document.getElementById('v' + id.charAt(0).toUpperCase() + id.slice(1));
+      if (out) out.textContent = val(id);
+    });
+    document.getElementById('vStage').textContent = stageW;
+    var at = val('step');
+    document.getElementById('vStep').textContent = (at + 1) + ' / ' + STEPS;
+    setProgress(at);
+    print();
+  }
+
+  function print() {
+    var h = val('cardH'), k = h / 341;
+    document.getElementById('out').textContent =
+      '/* game/css/style.css */\n\n' +
+      '.trail-card {\n' +
+      '  width: calc(' + val('cardW') + ' * var(--u));\n' +
+      '  height: calc(' + h + ' * var(--u));\n}\n\n' +
+      '.trail-card::after {\n  border-width:\n' +
+      '    calc(' + (55 * k).toFixed(3) + ' * var(--u)) calc(' + (265 * k).toFixed(3) + ' * var(--u))\n' +
+      '    calc(' + (50 * k).toFixed(3) + ' * var(--u)) calc(' + (264 * k).toFixed(3) + ' * var(--u));\n}\n\n' +
+      '.trail-rail {\n' +
+      '  left: ' + val('sideI') + '%;  right: ' + val('sideI') + '%;\n' +
+      '  top: ' + val('topI') + '%;  bottom: ' + val('botI') + '%;\n' +
+      '  gap: calc(' + val('gap') + ' * var(--u));\n}\n\n' +
+      '.trail-node { width: ' + val('stone') + '%; }\n' +
+      '.trail-goal { width: calc(' + val('goal') + ' * var(--u)); }\n\n' +
+      '.trail-momo {\n' +
+      '  width: ' + val('momoW') + '%;\n' +
+      '  bottom: ' + val('momoB') + '%;\n}\n\n' +
+      '.journey-lane {\n' +
+      '  height: calc(' + val('laneH') + ' * var(--u));\n' +
+      '  top: ' + val('laneY') + '%;\n}\n';
+  }
+
+  build();
+  ids.concat(['stageW', 'step']).forEach(function (id) {
+    document.getElementById(id).addEventListener('input', apply);
+  });
+  document.getElementById('reset').addEventListener('click', function () {
+    ids.forEach(function (id) { document.getElementById(id).value = DEFAULTS[id]; });
+    apply();
+  });
+  document.getElementById('copy').addEventListener('click', function () {
+    var t = document.getElementById('out').textContent;
+    navigator.clipboard.writeText(t).then(function () {
+      var b = document.getElementById('copy');
+      b.textContent = 'Copied';
+      setTimeout(function () { b.textContent = 'Copy CSS'; }, 1200);
+    });
+  });
+  apply();
+})();
+</script>
+
+<!-- The lab's overrides. They sit AFTER the game stylesheet so they win, and each one
+     reads a custom property the sliders write — so the panel here is the shipped panel
+     with a few numbers turned, never a second implementation of it. -->
+<style>
+  .trail-card::after {
+    border-width: var(--panel-bw-t) var(--panel-bw-r) var(--panel-bw-b) var(--panel-bw-l) !important;
+  }
+  .trail-node  { width: var(--lab-stone) !important; max-width: none !important; }
+  .trail-goal  { width: var(--lab-goal) !important; }
+  .trail-momo  { width: var(--lab-momo-w) !important; bottom: var(--lab-momo-b) !important; }
+  .journey-lane { height: var(--lab-lane-h) !important; top: var(--lab-lane-y) !important; }
+</style>
+
+</body>
+</html>
