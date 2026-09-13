@@ -294,14 +294,50 @@
     ids.forEach(function (id) { document.getElementById(id).value = DEFAULTS[id]; });
     apply();
   });
+  /* COPY HAS TO WORK OFF THE DISK, and navigator.clipboard does not.
+     Opened as file://, Chromium reports isSecureContext true and exposes the API, then
+     rejects writeText with NotAllowedError — so the button looked like it worked and
+     copied nothing. execCommand through a temporary textarea is the one path that is
+     allowed here, and selecting the text is the fallback if even that is refused, so
+     the worst case is still Ctrl+C. */
+  function copyText(t) {
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+  function selectOut() {
+    var pre = document.getElementById('out');
+    var r = document.createRange();
+    r.selectNodeContents(pre);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
   document.getElementById('copy').addEventListener('click', function () {
+    var btn = this;
     var t = document.getElementById('out').textContent;
-    navigator.clipboard.writeText(t).then(function () {
-      var b = document.getElementById('copy');
-      b.textContent = 'Copied';
-      setTimeout(function () { b.textContent = 'Copy CSS'; }, 1200);
-    });
+    var done = function (msg) {
+      btn.textContent = msg;
+      setTimeout(function () { btn.textContent = 'Copy CSS'; }, 1600);
+    };
+    if (copyText(t)) return done('Copied');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(function () { done('Copied'); },
+        function () { selectOut(); done('Selected — press Ctrl+C'); });
+      return;
+    }
+    selectOut();
+    done('Selected — press Ctrl+C');
   });
+  // clicking the block selects all of it, so Ctrl+C always works
+  document.getElementById('out').addEventListener('click', selectOut);
   apply();
 })();
 </script>
