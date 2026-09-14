@@ -151,17 +151,22 @@
     </div>
 
     <div class="row">
-      <button id="edit">Edit on the panel: OFF</button>
+      <button id="edit" class="on">Edit on the panel: ON</button>
     </div>
     <div class="hint" id="hint">
-      Turn it on, then <b>click a part</b> of the panel — the card, a stone, Momo, the
-      friend or the lane. <b>Drag</b> it to size or move it, or use the <b>arrow keys</b>
-      to nudge. The sliders and the CSS below follow whatever you do.
+      Editing is <b>already on</b>. <b>Click a part</b> of the panel — the card's frame,
+      a stone, Momo, the friend or the lane — then <b>drag</b> it, or nudge it with the
+      <b>arrow keys</b>. The sliders follow. When it looks right, hit <b>Copy JSON</b> and
+      send it over; <b>Paste JSON</b> takes a set back.
     </div>
 
     <div class="row">
       <button id="reset">Reset to shipped</button>
       <button id="copy">Copy CSS</button>
+      <button id="copyJson">Copy JSON</button>
+    </div>
+    <div class="row">
+      <button id="paste">Paste JSON</button>
     </div>
     <pre id="out"></pre>
   </div>
@@ -393,6 +398,50 @@
   // clicking the block selects all of it, so Ctrl+C always works
   document.getElementById('out').addEventListener('click', selectOut);
 
+  /* ---------------- THE NUMBERS, AS JSON ----------------
+   *
+   * The CSS block is for pasting into the stylesheet; this is for handing the layout to
+   * someone else and getting one back. Same values either way — it is generated from the
+   * sliders, which are the only source of truth here — so a set of numbers can go round
+   * the loop without anybody transcribing anything. */
+  function currentJson() {
+    var o = { panel: 'frozen-rush-2 progress panel', stageW: val('stageW') };
+    ids.forEach(function (id) { o[id] = val(id); });
+    return JSON.stringify(o, null, 2);
+  }
+  document.getElementById('copyJson').addEventListener('click', function () {
+    var btn = this, t = currentJson();
+    var done = function (m) { btn.textContent = m; setTimeout(function () { btn.textContent = 'Copy JSON'; }, 1600); };
+    if (copyText(t)) return done('Copied');
+    document.getElementById('out').textContent = t;
+    selectOut();
+    done('Shown below — Ctrl+C');
+  });
+
+  /* AND BACK IN AGAIN. Paste a set and the panel takes it: unknown keys are ignored and
+     every value is clamped to its slider's own range, so a hand-edited or truncated blob
+     cannot put the panel into a state the sliders could not have produced. */
+  document.getElementById('paste').addEventListener('click', function () {
+    var raw = window.prompt('Paste the panel JSON:');
+    if (!raw) return;
+    var data;
+    try { data = JSON.parse(raw); }
+    catch (e) { window.alert('That is not valid JSON:\n\n' + e.message); return; }
+    var applied = 0, skipped = [];
+    Object.keys(data).forEach(function (k) {
+      var input = document.getElementById(k);
+      if (!input || input.type !== 'range') { if (k !== 'panel') skipped.push(k); return; }
+      var v = parseFloat(data[k]);
+      if (!isFinite(v)) { skipped.push(k); return; }
+      input.value = Math.min(parseFloat(input.max), Math.max(parseFloat(input.min), v));
+      applied++;
+    });
+    apply();
+    var btn = document.getElementById('paste');
+    btn.textContent = 'Applied ' + applied + (skipped.length ? ' (ignored ' + skipped.join(', ') + ')' : '');
+    setTimeout(function () { btn.textContent = 'Paste JSON'; }, 2600);
+  });
+
   /* ---------------- EDITING ON THE PANEL ITSELF ----------------
    *
    * The sliders already drive everything, but hunting for the right one means knowing
@@ -423,7 +472,9 @@
       x: { ctl: 'goal', per: 16, unit: 'u' }, y: null }
   ];
 
-  var editing = false, sel = null, drag = null, hits = [];
+  /* ON BY DEFAULT. Dragging the picture is what this tool is FOR; having to find a
+     toggle first is the thing that made it look like there was no drag access at all. */
+  var editing = true, sel = null, drag = null, hits = [];
   var tip = document.createElement('div');
   tip.className = 'lab-tip';
   tip.hidden = true;
@@ -541,6 +592,20 @@
 
   window.addEventListener('resize', layoutHits);
   labRelayout = layoutHits;
+
+  /* THE OVERLAY HAS TO BE PUT UP AFTER THE ART IS IN.
+     Editing is on from the start, so layoutHits runs on the first apply() — when the
+     stone, Momo and the friend are still images with no intrinsic size. A box is skipped
+     when it measures smaller than 2px, so three of the six never appeared and the parts
+     that matter most could not be grabbed. Re-laying out as the pictures arrive fixes it
+     without polling: load fires per image, and the timers cover a warm cache where load
+     has already gone by. */
+  sim.classList.toggle('editing', editing);
+  window.addEventListener('load', layoutHits);
+  rail.querySelectorAll('img').forEach(function (im) {
+    if (!im.complete) im.addEventListener('load', layoutHits, { once: true });
+  });
+  [120, 400, 1200].forEach(function (ms) { setTimeout(layoutHits, ms); });
   apply();
 })();
 </script>
