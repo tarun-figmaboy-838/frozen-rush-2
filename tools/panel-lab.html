@@ -19,8 +19,19 @@
     color: #EAF9FF;
     font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
   }
-  .lab { display: grid; grid-template-columns: 1fr 300px; min-height: 100vh; }
-  .view { position: relative; display: grid; place-items: center; padding: 20px; }
+  /* HEIGHT, NOT MIN-HEIGHT — and min-width 0 on both columns.
+     apply() sizes the stage from the view's own clientHeight, so a view that is allowed
+     to grow with its contents feeds back into itself: it settled 1617px tall in a 950px
+     window, and centring that pushed the panel 667px above the top with nothing
+     clickable on screen. A fixed row height breaks the loop. */
+  .lab { display: grid; grid-template-columns: minmax(0, 1fr) 300px; height: 100vh; }
+  .view { position: relative; display: grid; place-items: center; padding: 20px; overflow: hidden; min-height: 0; min-width: 0; }
+  /* The stage box is sized for real in apply(), rather than drawn small and scaled up
+     with a transform: a transform reports screen pixels through getBoundingClientRect
+     while a child's left/top are read unscaled, so the edit overlays landed at 0.725 of
+     the right offset and ended up off the top of the window. This wrapper is just a
+     block; nothing scales. */
+  .view-fit { display: block; }
 
   /* The panel is sized from --u, which the game derives from the stage. Here the
      "stage" is a box you can resize with the width slider, so the panel responds
@@ -34,7 +45,7 @@
   }
   .stage-sim .trail { position: absolute; }
 
-  .panel { background: #0b2141; border-left: 1px solid #1d3f6e; padding: 16px; overflow-y: auto; }
+  .panel { background: #0b2141; border-left: 1px solid #1d3f6e; padding: 16px; overflow-y: auto; min-height: 0; }
   h1 { font-size: 15px; margin: 0 0 4px; }
   .sub { color: #8fb6de; font-size: 12px; margin: 0 0 16px; }
   .grp { border-top: 1px solid #1d3f6e; padding: 10px 0 4px; }
@@ -48,6 +59,26 @@
   }
   button:hover { background: #1E63A8; }
   .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+
+  /* ---- direct editing ---- */
+  .stage-sim.editing { cursor: crosshair; }
+  .lab-hit {
+    position: absolute; z-index: 50; border-radius: 4px;
+    outline: 1px dashed rgba(127,240,255,.45); outline-offset: 1px;
+  }
+  .lab-hit:hover { outline-color: #7FF0FF; background: rgba(127,240,255,.10); }
+  .lab-hit.sel   { outline: 2px solid #FFC44A; background: rgba(255,196,74,.14); }
+  .lab-tip {
+    position: fixed; z-index: 60; pointer-events: none;
+    background: #071730; border: 1px solid #2E8BD6; border-radius: 4px;
+    padding: 4px 8px; font-size: 11px; color: #9fe9ff; white-space: nowrap;
+  }
+  .hint {
+    font-size: 11px; color: #8fb6de; background: #071730;
+    border: 1px solid #1d3f6e; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px;
+  }
+  .hint b { color: #7FF0FF; font-weight: 600; }
+  .on { background: #C8811A !important; border-color: #FFC44A !important; }
   pre {
     background: #071730; border: 1px solid #1d3f6e; border-radius: 4px;
     padding: 10px; font-size: 11px; line-height: 1.45; white-space: pre-wrap;
@@ -58,7 +89,8 @@
 <body>
 
 <div class="lab">
-  <div class="view">
+  <div class="view" id="view">
+   <div class="view-fit" id="viewFit">
     <div class="stage-sim" id="stageSim">
       <!-- the same markup Hud.buildTrail writes -->
       <div class="trail" id="trail">
@@ -67,6 +99,7 @@
         </div>
       </div>
     </div>
+   </div>
   </div>
 
   <div class="panel">
@@ -118,6 +151,15 @@
     </div>
 
     <div class="row">
+      <button id="edit">Edit on the panel: OFF</button>
+    </div>
+    <div class="hint" id="hint">
+      Turn it on, then <b>click a part</b> of the panel — the card, a stone, Momo, the
+      friend or the lane. <b>Drag</b> it to size or move it, or use the <b>arrow keys</b>
+      to nudge. The sliders and the CSS below follow whatever you do.
+    </div>
+
+    <div class="row">
       <button id="reset">Reset to shipped</button>
       <button id="copy">Copy CSS</button>
     </div>
@@ -130,6 +172,8 @@
   'use strict';
 
   var STEPS = 9;
+  var labRelayout = null;      // set once the edit layer exists; keeps its hit boxes on the art
+  var labScale = 1;            // the preview is scaled to fit the window; drags are in screen px
   var rail = document.getElementById('rail');
   var trail = document.getElementById('trail');
   var sim = document.getElementById('stageSim');
@@ -208,11 +252,19 @@
   /* The stylesheet reads these; overriding them here is exactly what editing style.css
      would do, which is why the printed block below can be pasted straight back. */
   function apply() {
-    var stageW = val('stageW');
+    /* THE STAGE IS AS BIG AS THE WINDOW WILL SHOW, and --u follows THAT.
+       Scaling the preview with a transform was tried first and is the wrong tool: the
+       rects come back in screen pixels while a child's left/top are read in unscaled
+       ones, so the edit overlays landed at 0.725 of the right offset and ended up above
+       the window. Sizing the box for real removes the second coordinate system — the
+       panel genuinely lays out at this width, which is what a stage this wide does. */
+    var view = document.getElementById('view');
+    var want = val('stageW');
+    var room = Math.max(320, Math.min(view.clientWidth - 40, (view.clientHeight - 40) * 16 / 9));
+    var stageW = Math.min(want, Math.round(room));
     var stageH = Math.round(stageW * 9 / 16);
     sim.style.width = stageW + 'px';
     sim.style.height = stageH + 'px';
-    // --u is one per cent of the stage, exactly as the game defines it
     sim.style.setProperty('--u', (stageW / 100) + 'px');
 
     var s = document.documentElement.style;
@@ -255,11 +307,13 @@
       var out = document.getElementById('v' + id.charAt(0).toUpperCase() + id.slice(1));
       if (out) out.textContent = val(id);
     });
-    document.getElementById('vStage').textContent = stageW;
+    document.getElementById('vStage').textContent = stageW + (stageW < want ? ' (capped to the window)' : '');
     var at = val('step');
     document.getElementById('vStep').textContent = (at + 1) + ' / ' + STEPS;
     setProgress(at);
     print();
+    // the outlines are drawn over the panel, so they have to follow it
+    if (labRelayout) labRelayout();
   }
 
   function print() {
@@ -338,6 +392,155 @@
   });
   // clicking the block selects all of it, so Ctrl+C always works
   document.getElementById('out').addEventListener('click', selectOut);
+
+  /* ---------------- EDITING ON THE PANEL ITSELF ----------------
+   *
+   * The sliders already drive everything, but hunting for the right one means knowing
+   * which number a part of the picture belongs to. This maps it the other way round:
+   * click the thing you can see, drag it, and the slider that owns it moves.
+   *
+   * Nothing here styles the panel directly — every gesture writes a slider value and
+   * fires `input`, so there is exactly one path from a number to the screen and the
+   * printed CSS can never disagree with what is drawn. */
+  var PARTS = [
+    /* THE CARD IS GRABBED BY ITS FRAME, not by its middle. Its box contains every other
+       part, and the later boxes paint over it, so the only pixels that were still the
+       card's were ones nothing else wanted — dragging the centre moved the lane instead.
+        clips its handle to the snow-and-rim strip above the journey, which
+       is the part of the picture that IS the frame. */
+    { id: 'card',  label: 'Card',      sel: '.trail-card', band: 'top',
+      x: { ctl: 'cardW', per: 18, unit: 'u' }, y: { ctl: 'cardH', per: 18, unit: 'u' } },
+    { id: 'rail',  label: 'Safe area', sel: '.trail-rail',
+      x: { ctl: 'sideI', per: -8, unit: '%' }, y: { ctl: 'topI', per: -8, unit: '%' } },
+    { id: 'lane',  label: 'Lane',      sel: '.journey-lane',
+      x: null, y: { ctl: 'laneY', per: -3, unit: '%' }, shiftY: { ctl: 'laneH', per: -60, unit: 'u' } },
+    { id: 'stone', label: 'Stone',     sel: '.level-track .level-node:nth-child(3) .trail-node',
+      x: { ctl: 'stone', per: 3, unit: '%' }, y: null },
+    { id: 'momo',  label: 'Momo',      sel: '#trail-momo',
+      x: { ctl: 'step', per: 0.03, unit: '' }, y: { ctl: 'momoB', per: -3, unit: '%' },
+      shiftY: { ctl: 'momoW', per: -3, unit: '%' } },
+    { id: 'bear',  label: 'Friend',    sel: '.bear-destination',
+      x: { ctl: 'goal', per: 16, unit: 'u' }, y: null }
+  ];
+
+  var editing = false, sel = null, drag = null, hits = [];
+  var tip = document.createElement('div');
+  tip.className = 'lab-tip';
+  tip.hidden = true;
+  document.body.appendChild(tip);
+
+  function layoutHits() {
+    hits.forEach(function (h) { h.remove(); });
+    hits = [];
+    if (!editing) return;
+    var base = sim.getBoundingClientRect();
+    PARTS.forEach(function (part) {
+      var el = sim.querySelector(part.sel);
+      if (!el) return;
+      var r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return;
+      var top = r.top, hgt = r.height;
+      if (part.band === 'top') {
+        var inner = sim.querySelector('.trail-rail');
+        if (inner) hgt = Math.max(10, inner.getBoundingClientRect().top - r.top);
+      }
+      var d = document.createElement('div');
+      d.className = 'lab-hit' + (sel === part.id ? ' sel' : '');
+      d.dataset.part = part.id;
+      d.title = part.label;
+      /* DIVIDED BY THE PREVIEW'S SCALE. getBoundingClientRect reports SCREEN pixels, and
+         the preview is inside a scaled wrapper — but `left`/`top` on a child of the sim
+         are read in its own unscaled pixels, and the browser then scales them again. Set
+         from the raw difference the boxes landed at 0.725 of the right offset, which put
+         the card's box 170px above the window with nothing clickable in it. */
+      d.style.left = (r.left - base.left) + 'px';
+      d.style.top = (top - base.top) + 'px';
+      d.style.width = r.width + 'px';
+      d.style.height = hgt + 'px';
+      sim.appendChild(d);
+      hits.push(d);
+    });
+  }
+
+  function partById(id) { return PARTS.filter(function (p) { return p.id === id; })[0]; }
+
+  function nudge(axis, px, shift) {
+    var part = partById(sel);
+    if (!part) return;
+    var map = (shift && part.shiftY && axis === 'y') ? part.shiftY : part[axis];
+    if (!map) return;
+    var input = document.getElementById(map.ctl);
+    var stepAttr = parseFloat(input.step) || 1;
+    var delta = px / map.per;
+    var next = parseFloat(input.value) + delta;
+    next = Math.round(next / stepAttr) * stepAttr;
+    next = Math.min(parseFloat(input.max), Math.max(parseFloat(input.min), next));
+    if (next === parseFloat(input.value)) return;
+    input.value = next;
+    input.dispatchEvent(new Event('input'));
+    showTip(part.label + ' · ' + map.ctl + ' ' + next + (map.unit === 'u' ? ' units' : map.unit));
+  }
+
+  var tipT = 0;
+  function showTip(text, x, y) {
+    tip.textContent = text;
+    tip.hidden = false;
+    var b = sim.getBoundingClientRect();
+    tip.style.left = (x != null ? x : b.left + 12) + 'px';
+    tip.style.top = (y != null ? y : b.top - 26) + 'px';
+    clearTimeout(tipT);
+    tipT = setTimeout(function () { tip.hidden = true; }, 1400);
+  }
+
+  sim.addEventListener('pointerdown', function (e) {
+    if (!editing) return;
+    var hit = e.target.closest('.lab-hit');
+    if (!hit) { sel = null; layoutHits(); return; }
+    sel = hit.dataset.part;
+    layoutHits();
+    drag = { x: e.clientX, y: e.clientY, shift: e.shiftKey };
+    sim.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  sim.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    if (Math.abs(dx) >= Math.abs(dy)) nudge('x', dx, drag.shift);
+    else nudge('y', dy, drag.shift);
+    drag.x = e.clientX; drag.y = e.clientY;
+    showTip(tip.textContent, e.clientX + 14, e.clientY - 28);
+  });
+  function endDrag(e) {
+    if (!drag) return;
+    drag = null;
+    try { sim.releasePointerCapture(e.pointerId); } catch (err) {}
+    layoutHits();
+  }
+  sim.addEventListener('pointerup', endDrag);
+  sim.addEventListener('pointercancel', endDrag);
+
+  window.addEventListener('keydown', function (e) {
+    if (!editing || !sel) return;
+    var big = e.shiftKey ? 6 : 1;
+    if (e.key === 'ArrowLeft')  { nudge('x', -big, false); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { nudge('x',  big, false); e.preventDefault(); }
+    if (e.key === 'ArrowUp')    { nudge('y', -big, e.altKey); e.preventDefault(); }
+    if (e.key === 'ArrowDown')  { nudge('y',  big, e.altKey); e.preventDefault(); }
+    if (e.key === 'Escape') { sel = null; layoutHits(); }
+  });
+
+  document.getElementById('edit').addEventListener('click', function () {
+    editing = !editing;
+    this.textContent = 'Edit on the panel: ' + (editing ? 'ON' : 'OFF');
+    this.classList.toggle('on', editing);
+    sim.classList.toggle('editing', editing);
+    if (!editing) { sel = null; tip.hidden = true; }
+    layoutHits();
+  });
+
+  window.addEventListener('resize', layoutHits);
+  labRelayout = layoutHits;
   apply();
 })();
 </script>
