@@ -113,10 +113,23 @@ for (const vp of VIEWPORTS) {
           for (let i = 0; i < n; i++) {
             for (let j = i + 2; j < n; j++) if (!(i === 0 && j === n - 1)) diags.push([i, j]);
           }
+          /* LONGEST FIRST, AND NEVER ONE ALREADY DRAWN.
+             Trying them in index order meant offering short diagonals to crossing 1,
+             which only takes a main one — 122 refusals in a run, each of which drops the
+             slab, plays the wrong-answer beat and grows a new one, so the bot spent the
+             clock being told no. Ordering by span puts corner-to-opposite-corner first,
+             which is what every crossing here will take; skipping what is on the slab
+             already is what crossing 2 needs to finish. */
           const o = L.origin;
-          const order = (o === undefined || o === null)
-            ? diags
-            : diags.filter(d => d[0] === o || d[1] === o).concat(diags);
+          const drawn = new Set(L.drawn || []);
+          const span = d => Math.min(d[1] - d[0], n - (d[1] - d[0]));
+          const order = diags
+            .filter(d => !drawn.has(d[0] + '-' + d[1]))
+            .sort((a, b) => span(b) - span(a));
+          // where the level has fixed an origin, its diagonals go first: same-vertex wants that
+          if (o !== undefined && o !== null) {
+            order.sort((a, b) => ((b[0] === o || b[1] === o) ? 1 : 0) - ((a[0] === o || a[1] === o) ? 1 : 0));
+          }
           for (const [i, j] of order) {
             const took = g._l2Cut(i, j);
             if (took) { l2cuts++; break; }
