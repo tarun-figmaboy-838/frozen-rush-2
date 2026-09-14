@@ -4,11 +4,13 @@
  * a shipped build nothing: the file is never fetched unless the flag is set.
  *
  * WHY IT IS HERE AND NOT IN tools/. The dev server serves game/ as its root and refuses
- * anything above it, so a module in tools/ cannot be imported by the page at all. The
- * alternative was a separate mock-up page — which is what tools/panel-lab.html is, and
- * the reason it was not enough: a mock-up is not the game. Momo is not walking, the
- * crossings are not arriving, the card is not sliding away for a question. Alignment
- * that looks right in a still frame can still be wrong in play.
+ * anything above it, so a module in tools/ cannot be imported by the page at all. There
+ * used to be a stand-alone mock-up page instead (tools/panel-lab.html, now deleted) and
+ * the reason it was not enough is worth keeping: a mock-up is not the game. Momo is not
+ * walking, the crossings are not arriving, the card is not sliding away for a question.
+ * Alignment that looks right in a still frame can still be wrong in play. Worse, it kept
+ * its own copy of the markup, so when the row stopped being a grid the page went on
+ * showing the old even spacing and quietly tuned a layout that no longer existed.
  *
  * WHAT IT DOES. Every number the panel is laid out from is a CSS variable with the
  * shipped value as its fallback (see style.css), so this sets variables on the .trail
@@ -17,45 +19,54 @@
  * ships.
  */
 
-/* part -> the variable it writes, and what a percentage of it is a percentage OF.
+/* EVERY ENTRY HERE IS A VARIABLE THE STYLESHEET ACTUALLY READS, and that had stopped
+ * being true. The panel was rebuilt around absolute percentages of the card, and this
+ * table was left describing the grid-and-safe-area layout that came before it: --ph,
+ * --safe-x, --safe-t, --safe-b and --safe-gap had no reader left in style.css, --goal-w
+ * and --lane-h had changed from stage units to percentages, and --stone-w had gone from
+ * 82 (per cent of a grid cell) to 6.2 (per cent of the card). Reset wrote all of it
+ * back, so the one button that promised to restore the shipped panel was the one that
+ * destroyed it. Anything added here must exist in style.css with the SAME default.
+ *
+ * --lane-x0 and --lane-x1 are deliberately absent: hud.js writes them from MARKER_X so
+ * the path always starts at the first platform and ends at the friend. Dragging them
+ * apart from the markers they are derived from is not an alignment anyone wants.
  *
  * ONE PIXEL OF CURSOR IS ONE PIXEL OF MOVEMENT, and it was not. Sensitivity used to be a
  * fixed number per value, which cannot be right for both: a stage unit is ~16px while 1%
- * of a grid cell is ~0.34px, so the same constant that suited the card made a stone move
+ * of a stone is ~0.24px, so the same constant that suited the card made a stone move
  * 0.12px per pixel dragged and Momo 0.09px. That is the whole of "I still cannot move it"
  * — the handle followed the cursor at a twelfth speed and read as dead.
  *
  * So `ref` names the length the value is measured against and the scale is worked out at
  * drag time from the element actually on screen. `sign` is -1 where the value grows as
- * the cursor moves the other way (an inset, or a distance from the bottom). */
+ * the cursor moves the other way (a distance from the bottom). */
 const PARTS = [
   { id: 'card', label: 'Card', sel: '.trail-card', band: 'top',
-    x: { key: 'pw', unit: 'u', min: 20, max: 48, step: 0.5 },
-    y: { key: 'ph', unit: 'u', min: 4, max: 14, step: 0.25 } },
-  { id: 'rail', label: 'Safe area', sel: '.trail-rail',
-    x: { key: 'safe-x', unit: '%', ref: 'cardW', sign: -1, min: 4, max: 26, step: 0.5 },
-    y: { key: 'safe-t', unit: '%', ref: 'cardH', min: 10, max: 40, step: 1 } },
-  { id: 'lane', label: 'Lane', sel: '.journey-lane',
-    y: { key: 'lane-y', unit: '%', ref: 'railH', min: 20, max: 90, step: 1 },
-    shiftY: { key: 'lane-h', unit: 'u', sign: -1, min: 0.1, max: 1.4, step: 0.02 } },
-  { id: 'stone', label: 'Stone', sel: '.level-track .level-node:nth-child(3) .trail-node',
-    x: { key: 'stone-w', unit: '%', ref: 'cellW', min: 40, max: 100, step: 1 } },
+    x: { key: 'pw', unit: 'u', min: 14, max: 44, step: 0.5 } },
+  { id: 'stone', label: 'Stones', sel: '.trail-rail .level-node:nth-child(6)',
+    x: { key: 'stone-w', unit: '%', ref: 'cardW', min: 3, max: 12, step: 0.1 },
+    y: { key: 'axis-y', unit: '%', ref: 'cardH', min: 20, max: 85, step: 0.5 } },
+  { id: 'lane', label: 'Path', sel: '.journey-lane',
+    y: { key: 'lane-y', unit: '%', ref: 'cardH', min: 20, max: 85, step: 0.5 },
+    shiftY: { key: 'lane-h', unit: '%', ref: 'cardH', sign: -1, min: 0.5, max: 8, step: 0.1 } },
   { id: 'momo', label: 'Momo', sel: '#trail-momo',
     y: { key: 'momo-b', unit: '%', ref: 'stoneH', sign: -1, min: 10, max: 90, step: 1 },
     shiftY: { key: 'momo-w', unit: '%', ref: 'stoneW', sign: -1, min: 50, max: 140, step: 1 } },
   { id: 'bear', label: 'Friend', sel: '.bear-destination',
-    x: { key: 'goal-w', unit: 'u', min: 1.5, max: 6, step: 0.1 } }
+    x: { key: 'bear-x', unit: '%', ref: 'cardW', min: 70, max: 97, step: 0.1 },
+    y: { key: 'bear-y', unit: '%', ref: 'cardH', min: 20, max: 85, step: 0.5 },
+    shiftY: { key: 'goal-w', unit: '%', ref: 'cardW', sign: -1, min: 3, max: 14, step: 0.1 } }
 ];
 
 /* The shipped values, which are also the fallbacks in style.css. Reset restores these,
-   and Copy JSON prints whatever is current against them. */
+   and Copy JSON prints whatever is current against them. Keep the two in step. */
 const SHIPPED = {
-  pw: 34, ph: 7, 'safe-x': 17, 'safe-t': 22, 'safe-b': 20, 'safe-gap': 1.1,
-  'stone-w': 82, 'goal-w': 3.2, 'momo-w': 92, 'momo-b': 46, 'lane-h': 0.44, 'lane-y': 58
+  pw: 24, 'stone-w': 6.2, 'axis-y': 52, 'lane-y': 51.5, 'lane-h': 2.2,
+  'momo-w': 92, 'momo-b': 46, 'bear-x': 87.4, 'bear-y': 50.8, 'goal-w': 7.4
 };
-const UNIT = { pw: 'u', ph: 'u', 'safe-x': '%', 'safe-t': '%', 'safe-b': '%',
-  'safe-gap': 'u', 'stone-w': '%', 'goal-w': 'u', 'momo-w': '%', 'momo-b': '%',
-  'lane-h': 'u', 'lane-y': '%' };
+const UNIT = { pw: 'u', 'stone-w': '%', 'axis-y': '%', 'lane-y': '%', 'lane-h': '%',
+  'momo-w': '%', 'momo-b': '%', 'bear-x': '%', 'bear-y': '%', 'goal-w': '%' };
 
 export function startPanelEditor(trail) {
   if (!trail || trail.dataset.editor) return;
@@ -66,23 +77,19 @@ export function startPanelEditor(trail) {
 
   const css = v => UNIT[v] === 'u' ? `calc(${vals[v]} * var(--u))` : `${vals[v]}%`;
 
-  /* THE CARD'S FRAME SCALES WITH ITS HEIGHT. panel.webp is 1100x341 with 264/265px cloud
-     caps and a 55/50px rim, so every border-width is its slice times height/341 — which
-     is what keeps the clouds the shape they were painted. Recomputed here so dragging
-     the card taller cannot silently stretch them. */
+  /* THE FRAME IS NOT RECOMPUTED HERE ANY MORE, and it must not be. It used to derive
+     --bw-t/r/b/l from a --ph the stylesheet no longer has, so vals.ph was undefined, k
+     was NaN, and every border-image-width became calc(NaN * var(--u)) — invalid at
+     computed-value time, which throws the whole shorthand back to its 100% initial and
+     destroys the panel art the instant the editor opens.
+
+     Nothing needs to replace it. The card carries `aspect-ratio: 1362 / 464`, so its
+     height follows its width, and the slice percentages (264/1100 and 265/1100 across,
+     55/341 and 50/341 down) are the same fractions of the border box at every size. The
+     clouds keep their shape on their own; dragging the card cannot stretch them. */
   function write() {
     const s = trail.style;
-    s.setProperty('--pw', css('pw'));
-    s.setProperty('--ph', css('ph'));
-    const k = vals.ph / 341;
-    s.setProperty('--bw-t', `calc(${(55 * k).toFixed(3)} * var(--u))`);
-    s.setProperty('--bw-r', `calc(${(265 * k).toFixed(3)} * var(--u))`);
-    s.setProperty('--bw-b', `calc(${(50 * k).toFixed(3)} * var(--u))`);
-    s.setProperty('--bw-l', `calc(${(264 * k).toFixed(3)} * var(--u))`);
-    for (const key of ['safe-x', 'safe-t', 'safe-b', 'stone-w', 'goal-w', 'momo-w', 'momo-b', 'lane-h', 'lane-y']) {
-      s.setProperty('--' + key, css(key));
-    }
-    s.setProperty('--safe-gap', `calc(${vals['safe-gap']} * var(--u))`);
+    for (const key of Object.keys(SHIPPED)) s.setProperty('--' + key, css(key));
     layout();
     readout();
   }
@@ -167,18 +174,21 @@ export function startPanelEditor(trail) {
 
   // ---- gestures ----
   /* The lengths a percentage can be measured against, read off the page as it is now —
-     the panel resizes with the stage, so these cannot be constants. */
+     the panel resizes with the stage, so these cannot be constants.
+
+     stoneW/stoneH come from .level-node rather than from the .trail-node image inside it
+     because they exist for Momo, and Momo is positioned against .level-node: it is the
+     nearest positioned ancestor, so that is the box his bottom% and width% resolve
+     against. --stone-w and --bear-x are percentages of the CARD, which is what the
+     reference coordinates measure, so those take cardW. */
   function refs() {
     const box = s => { const e = trail.querySelector(s); return e ? e.getBoundingClientRect() : null; };
-    const card = box('.trail-card'), rail = box('.trail-rail');
-    const cell = box('.level-node'), stone = box('.trail-node');
+    const card = box('.trail-card'), cell = box('.level-node');
     const u = parseFloat(getComputedStyle(trail).getPropertyValue('--u')) || 16;
     return {
       u,
       cardW: card ? card.width : 0, cardH: card ? card.height : 0,
-      railW: rail ? rail.width : 0, railH: rail ? rail.height : 0,
-      cellW: cell ? cell.width : 0,
-      stoneW: stone ? stone.width : 0, stoneH: stone ? stone.height : 0
+      stoneW: cell ? cell.width : 0, stoneH: cell ? cell.height : 0
     };
   }
 
