@@ -14145,9 +14145,10 @@ class Hud {
      * border, and this row is a percentage SAFE AREA inside it. Inside the safe area,
      *
      *   .journey-lane      the path, behind everything, with its own fill for progress
-     *   .level-track       grid, repeat(n, 1fr) — even spacing by construction, not by
-     *                      hand-placed margins that drift the first time it resizes
-     *   .level-node        one cell: the platform, and Momo when it is the current one
+     *   .level-node        one platform at its own --x from MARKER_X, and Momo when it
+     *                      is the current one. Absolutely placed rather than laid out by
+     *                      a grid: the reference checkpoints are not evenly spaced, and
+     *                      a grid can only ever give even cells.
      *   .bear-destination  OUTSIDE the nine, with a gap, because the friend is the goal
      *                      and not a tenth level
      */

@@ -149,8 +149,7 @@ a:hover { color: var(--ice-pale); }
      .trail-card            the ice frame — DECORATION ONLY; it lays nothing out
        .trail-rail          the journey: a percentage safe area inside the frame
          .journey-lane      the path, behind the stones, with its own progress fill
-         .level-track       grid, one cell per crossing
-           .level-node      one cell: a .trail-node, and .trail-momo on the current one
+         .level-node        one stone at its own --x, and .trail-momo on the current one
          .bear-destination  the friend, outside the nine, with a gap
 */
 .trail {
@@ -162,33 +161,22 @@ a:hover { color: var(--ice-pale); }
   top: calc(1.45 * var(--u));
   left: 1.6%;
   pointer-events: none;
-  /* THE ONE NUMBER. Clamped at both ends: under about 16px a platform is a smudge, and
-     over 92 the card would be taller than the top band it has to live in. Asked to be
-     smaller than the 2.71 it was drawn at first, while still plainly readable. */
-  /* SMALL. Reported three times as too big, too wide and "like a cutout", and the
-     arithmetic says why: at 2.3u the card was 1007x97, which is 52.5% of the stage by
-     9% of it — 4.7% of the whole screen for a read-out, sitting over the sky. A HUD
-     element that large is not read as part of the world no matter how it is painted.
-     1.46u makes it 479x62 — 25% by 5.7%, a bit over 1.4% of the screen. Seventy per
-     cent less area, and the platforms are still 28px with the mammoth at 32. */
-  /* 1.62, from 1.46. The panel was raised twice on request, and a taller cavity with the
-     same stones in it is just a bigger empty box — the ice above the row read as dead
-     space of its own. Everything on the card scales from this one number, so raising it
-     grows the stones, the cave and Momo together and the row fills the frame again. */
-  --node: clamp(12px, calc(1.62 * var(--u)), 50px);
-  /* THE SPACE BETWEEN TWO PLATFORMS, and it is the CONNECTOR’s visible length: the
-     link runs centre to centre and is covered by a platform at each end, so what shows
-     of it is exactly this. At 0.33 the platforms were almost touching and the line
-     between them was a 15px stub. A full node apart reads as a path with steps on it. */
-  /* 0.4 of a platform. This is also the connector’s visible length, and at a full node
-     the chain was longer than the things it joined — which is most of where the extra
-     width went. Two fifths still plainly links one platform to the next. */
-  --gap: calc(var(--node) * 0.4);
-  /* THE CLEAR ICE UNDER THE ROW. Read by the row (its padding-bottom) and by Momo (his
-     feet are this plus three quarters of a platform), so the two can never come apart. */
-  /* The row's own height, read by the row and by Momo (his feet are placed from it), so
-     the two cannot come apart when it changes. */
-  --row-h: calc(var(--node) * 2.4);
+  /* THE CARD'S WIDTH, and the one number the whole panel is sized from. Declared here
+     rather than inline at each use so its two readers cannot drift apart, and on .trail
+     specifically because that is the element panel-edit.js writes --pw to: an inline
+     value beats this one, so the editor re-lays the card out live.
+
+     24, DOWN FROM 34. At 34 the card came out 544x185 on a 1600 stage, a third of it
+     wide and a fifth of it tall, which is a poster rather than a read-out. The reference
+     proportions are untouched; only the size comes down, so it reads as game UI again. */
+  --pw: calc(24 * var(--u));
+  /* THE STONE'S OWN WIDTH, 6.2% of the card, the same fraction the reference art puts a
+     checkpoint at. Every glow, shadow, hop height and puff on the card is a multiple of
+     it. Derived from the card rather than from the stage so that resizing the card
+     carries its ornament along, instead of leaving a small card wearing a large card's
+     shadows. --gap and --row-h used to live here too; the row became absolutely
+     positioned from MARKER_X and they have had no readers since. */
+  --node: calc(var(--pw) * 0.062);
   /* IT SLIDES OUT OF THE WAY, LEFT, WHEN A QUESTION ARRIVES — and back when the
      question goes. Both directions are this one transition, so the card cannot get
      stuck half-way and there is no second animation to keep in step with it.
@@ -248,10 +236,10 @@ a:hover { color: var(--ice-pale); }
  * stops the checkpoints bunching toward the middle with dead ice at the ends. */
 .trail-card {
   position: relative;
-  /* 1362 x 464 is the reference panel, and this keeps its proportions at any size. The
-     width stays in the stage's own units like everything else in the HUD, so the panel
-     is the same share of the stage at 1920 and at 4K — a vw would not be. */
-  width: var(--pw, calc(34 * var(--u)));
+  /* 1362 x 464 is the reference panel, and this keeps its proportions at any size: set
+     a width and the aspect-ratio settles the height, so nothing can stretch the art.
+     The width itself is --pw, declared on .trail above. */
+  width: var(--pw);
   aspect-ratio: 1362 / 464;
   /* the clouds are allowed to bleed past the panel; nothing inside is clipped by them */
   overflow: visible;
@@ -583,7 +571,11 @@ a:hover { color: var(--ice-pale); }
 .trail-card::before {
   content: "";
   position: absolute;
-  inset: calc(var(--node) * -0.5) calc(var(--node) * -0.75);
+  /* THE CLOUD SPILLS WELL PAST THE CARD. A puff that stops at the edge reads as a
+     glow on the panel; one that breaks the outline reads as snow the panel is riding
+     on. Widened from -0.5/-0.75 when the card came down to 24u — the bleed is a share
+     of the card, so it stayed in proportion and therefore got smaller with it. */
+  inset: calc(var(--node) * -0.85) calc(var(--node) * -1.6);
   pointer-events: none;
   z-index: -1;
   opacity: 0;
@@ -591,21 +583,24 @@ a:hover { color: var(--ice-pale); }
     radial-gradient(36% 56% at 9%  50%, rgba(255,255,255,.95) 0%, rgba(226,246,255,.62) 45%, rgba(255,255,255,0) 74%),
     radial-gradient(36% 56% at 91% 50%, rgba(255,255,255,.95) 0%, rgba(226,246,255,.62) 45%, rgba(255,255,255,0) 74%),
     radial-gradient(58% 42% at 50% 56%, rgba(255,255,255,.5)  0%, rgba(255,255,255,0) 72%);
-  filter: blur(calc(var(--node) * 0.09));
+  filter: blur(calc(var(--node) * 0.34));
 }
 .trail:not(.away) .trail-card         { animation: cardWhooshIn 620ms cubic-bezier(.2, 1.25, .35, 1) both; }
 .trail:not(.away) .trail-card::before { animation: snowPuff 780ms ease-out both; }
 .trail.away .trail-card               { animation: cardWhooshOut 420ms cubic-bezier(.55, 0, .9, .4) both; }
 .trail.away .trail-card::before       { animation: snowPuff 430ms ease-in both; }
 
+/* THE ARRIVAL AND THE DEPARTURE. A slide with a squash in it — the squash is what sells
+   the speed — measured in STAGE units rather than in stones. Against --node (a sixteenth
+   of the card) the travel was about a stone's width and read as no movement at all. */
 @keyframes cardWhooshIn {
-  0%   { transform: translateX(calc(var(--node) * -1.1)) scale(.9, 1.08); }
-  55%  { transform: translateX(calc(var(--node) * 0.1)) scale(1.03, .97); }
+  0%   { transform: translateX(calc(-3.2 * var(--u))) scale(.9, 1.08); }
+  55%  { transform: translateX(calc(0.35 * var(--u))) scale(1.03, .97); }
   100% { transform: none; }
 }
 @keyframes cardWhooshOut {
   0%   { transform: none; }
-  100% { transform: translateX(calc(var(--node) * -0.8)) scale(1.09, .86); }
+  100% { transform: translateX(calc(-2.6 * var(--u))) scale(1.09, .86); }
 }
 @keyframes snowPuff {
   0%   { opacity: 0;   transform: scale(.7); }
@@ -1434,7 +1429,6 @@ a:hover { color: var(--ice-pale); }
   animation: none;
 }
 .trail.debug .trail-rail { outline: 1px solid #45E0FF; }
-.trail.debug .level-track { outline: 1px dotted rgba(69, 224, 255, .55); }
 .trail.debug .level-node { outline: 1px dotted rgba(255, 255, 255, .35); }
 /* each stone's centre, and the line they all stand on */
 .trail.debug .trail-node {
