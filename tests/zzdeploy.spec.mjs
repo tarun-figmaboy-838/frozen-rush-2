@@ -48,3 +48,49 @@ test('the game loads and plays from a simulated Vercel deploy', async ({ page })
   expect([...new Set(bad)], 'requests that 404 on a deploy').toEqual([]);
   expect(errs.filter(e => e.startsWith('PAGEERROR')), 'the game threw').toEqual([]);
 });
+
+/* WHAT THE BROWSER IS TOLD TO KEEP, and for how long. Nothing asserted this before, so
+   the whole caching design — the one thing a visitor's SECOND load depends on — was
+   riding on a file nobody tested.
+ 
+   The two halves are deliberately opposite and both matter:
+ 
+     assets   immutable for a year. Safe ONLY because every asset URL carries a content
+              hash (?v=<md5-8>, see tools/build-bundle.mjs), so changing the art changes
+              the URL. Take the hash away and this header strands players on old art.
+ 
+     css/js   must-revalidate. Neither is hashed — index.html asks for css/style.css and
+              js/main.js by plain name — so the browser has to ask every time whether it
+              still has the current one. style.css matched NO rule at all until this test
+              was written, leaving the file that carries the entire HUD to Vercel's
+              default, which is not ours to rely on.
+ 
+   Run against the simulator, which applies the real vercel.json the way Vercel does, so
+   this fails on the config rather than on a deployed mistake. */
+test('the cache headers say what they should', async ({ request }) => {
+  const at = async path => {
+    const r = await request.get('http://127.0.0.1:8201' + path);
+    expect(r.status(), path).toBeLessThan(400);
+    return (r.headers()['cache-control'] || '(none)').toLowerCase();
+  };
+
+  // hashed, so it may be held forever
+  const art = await at('/game/assets/progress/panel.webp');
+  console.log('  assets:     ' + art);
+  expect(art, 'hashed art should be immutable').toContain('immutable');
+  expect(art).toContain('max-age=31536000');
+
+  // NOT hashed, so both must be re-checked on every load
+  for (const path of ['/game/css/style.css', '/game/js/main.js']) {
+    const h = await at(path);
+    console.log('  ' + path.padEnd(22) + h);
+    expect(h, path + ' is unhashed and must revalidate').toContain('must-revalidate');
+    expect(h, path + ' must not be cached for any length of time').toContain('max-age=0');
+    expect(h, path + ' must never be immutable').not.toContain('immutable');
+  }
+
+  // the entry point, likewise
+  const html = await at('/game/index.html');
+  console.log('  index.html:           ' + html);
+  expect(html).toContain('must-revalidate');
+});

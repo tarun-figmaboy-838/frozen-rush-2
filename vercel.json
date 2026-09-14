@@ -12,6 +12,12 @@
       ]
     },
     {
+      "source": "/game/css/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
       "source": "/game/js/(.*)",
       "headers": [
         { "key": "Content-Type", "value": "text/javascript; charset=utf-8" },
