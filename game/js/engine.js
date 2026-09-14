@@ -1310,10 +1310,14 @@ export const CFG = {
       // two good diagonals, but not from one corner: the constraint, not the concept
       sameVertex: 'Start this one at the same corner.'
     },
-    /* The recorded line for the question. Nothing is recorded under this id yet, so
-       say() logs it and returns 0 and the level is simply silent — see the note in
-       docs/VO-SCRIPT.md. Wiring it now means the take drops straight in. */
-    voId: 'p2-1-diagonal'
+    /* NO voId HERE, AND THAT IS DELIBERATE. It carried 'p2-1-diagonal' — crossing 1's
+       own line — as a level-wide default, and p2Cfg() merges this object under the
+       crossing being played. All three crossings name their own line, so the default
+       could never apply; but a crossing added without one would have inherited it and
+       spoken CROSSING 1's sentence over its own question, silently and plausibly.
+       Without a default, a missing id is simply silent — say() returns 0 for an id it
+       has no window for — and tests/buffers.spec asserts every crossing names one, so
+       the omission is caught rather than papered over. */
   },
   /* THE MUSIC BED. One looping track under everything.
 
