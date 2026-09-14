@@ -106,10 +106,13 @@ test('the whoosh fires on arrival and on departure', async ({ page }) => {
 test('the panel editor opens without moving anything', async ({ page }) => {
   await boot(page);
   await page.waitForTimeout(1200);
+  // the entrance is transform-based and would skew the rects; stop it first
+  await page.evaluate(() => { document.querySelector('.trail-card').style.animation = 'none'; });
   const before = await page.evaluate(probe);
 
   await boot(page, { query: 'panel=1' });
   await page.waitForTimeout(1500);
+  await page.evaluate(() => { document.querySelector('.trail-card').style.animation = 'none'; });
 
   const open = await page.evaluate(() => !!document.querySelector('.trail').dataset.editor);
   console.log('editor attached:', open);
