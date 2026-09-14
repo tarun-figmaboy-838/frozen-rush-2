@@ -1129,6 +1129,11 @@ const CFG = {
    * reads as travel without putting him a body-length from his own hit box. */
   // a quarter of the ground a leap now covers (676), so the arc still reads as travel
   jumpLead: 165, jumpLeadBackS: 0.9,
+  /* The most of the run speed the frame may slide backwards at while it catches up after
+     a landing. At 0.3 he appears to run at about seventy per cent for a moment; above
+     roughly 1.0 the drawing would move back faster than the world moves forward and he
+     would travel backwards, which is what 0.9s of easeInOut was doing. */
+  leadBackMax: 0.3,
   totalDistance: 11200,
   // surfaceRatio anchors the path image to surfaceY. The art's faint top fringe starts
   // at src y~216 but its SOLID snow edge is at ~227, so the old 0.406 left the feet
@@ -4860,14 +4865,38 @@ class PlayerController {
         this.audio.land(); this.particles.poof(this.drawX, CFG.surfaceY, 6, 1.15);
       }
     } else {
-      /* THE FRAME CATCHES UP. Eased at both ends rather than decayed towards zero: an
-         exponential approach is fastest on its first frame and then creeps, which is
-         the fault already written up on the camera move — it would read as a lurch
-         backwards on the landing frame followed by a long drift. */
+      /* THE FRAME CATCHES UP — AND IT MUST NEVER CATCH UP FASTER THAN HE IS RUNNING.
+       *
+       * Eased at both ends rather than decayed towards zero: an exponential approach is
+       * fastest on its first frame and then creeps, which is the fault already written up
+       * on the camera move — a lurch backwards on the landing frame, then a long drift.
+       *
+       * But eased at both ends was not enough, because the SPEED of the return was never
+       * compared with the speed of the run. easeInOut peaks at three times its average,
+       * so 165px returned over 0.9s peaked near 550px/s against a run of 520 — measured
+       * at 879px/s on a real landing. The world moves forward at 520 and the drawing was
+       * moving back faster than that, so Momo visibly WALKED BACKWARDS for about half a
+       * second after every jump. That is what "the jump is not seamless" was: not the
+       * flight, the landing.
+       *
+       * Two changes, both about that peak. Smootherstep peaks at 1.875x its average
+       * instead of 3x, and the return is given the time its own distance needs rather
+       * than a fixed 0.9s — so the fastest the frame ever slides back is a set fraction
+       * of the run, whatever the lead was. He settles; he never reverses. */
       if (this.dx !== 0) {
         this.dxT += dt;
-        const p = clamp(this.dxT / Math.max(0.01, CFG.jumpLeadBackS || 0.75), 0, 1);
-        this.dx = p >= 1 ? 0 : this.dxFrom * (1 - easeInOut(p));
+        const back = Math.abs(this.dxFrom);
+        /* 1.875 is smootherstep's peak-to-average ratio, and leadBackMax the share of the
+           run speed that peak is allowed to be. Solving for the duration keeps the cap
+           true at any lead and any run speed. */
+        const capped = back > 0
+          ? (1.875 * back) / Math.max(1, CFG.runSpeed * (CFG.leadBackMax || 0.3))
+          : 0;
+        const dur = Math.max(CFG.jumpLeadBackS || 0.75, capped);
+        const p = clamp(this.dxT / Math.max(0.01, dur), 0, 1);
+        // smootherstep: zero slope at both ends, and a gentler middle than easeInOut
+        const s = p * p * p * (p * (p * 6 - 15) + 10);
+        this.dx = p >= 1 ? 0 : this.dxFrom * (1 - s);
       }
       if (this.bufferedJump > 0 && now - this.bufferedJump < CFG.bufferMs &&
         (this.state === 'RUN' || this.state === 'LAND')) { this.bufferedJump = -1; this.doJump(); }
@@ -11546,7 +11575,25 @@ function createGame(canvas, hooks = {}) {
        air stays in front while the one already in the hole is covered. Whole, it is a
        single object and its own centre decides, which is what this test has always done. */
     const l2Debris = !!(G.l2 && G.l2.fall && G.l2.debris && G.l2.debris.length);
-    const l2Sinking = !!(G.l2 && G.l2.fall && G.l2.pos.y > CFG.surfaceY);
+    /* A WHOLE SLAB GOES BEHIND THE ICE WHEN ITS TOP DOES, NOT WHEN ITS CENTRE DOES.
+     *
+     * This tested pos.y, and a slab is not a point: at hexR 167 it stands about 330px
+     * across and its top edge is ~170px above its centre. So the frame its CENTRE passed
+     * the ice line, the whole block was moved behind the platform — with the top half
+     * still plainly in the air above the ground. That is the "it goes behind the path
+     * instead of dropping into the ditch mouth" report, and the per-piece fix below never
+     * touched it: a wrong cut on crossing 1 is refused as a WRONG ANSWER rather than
+     * splitting the slab, so there is no debris and this is the path that runs.
+     *
+     * Using the top edge, it stays in front for the whole of the visible fall — which is
+     * the block descending INTO the mouth — and is covered only once it is genuinely
+     * inside the ground. */
+    const l2Top = (() => {
+      const L = G.l2;
+      if (!L || !L.fall || !L.pts) return Infinity;
+      return L.pos.y + polyBounds(L.pts).y0 * (L.scale || 1);
+    })();
+    const l2Sinking = !!(G.l2 && G.l2.fall && l2Top > CFG.surfaceY);
     if ((l2Sinking || l2Debris) && !p2FocusOn()) drawL2(ctx, l2Debris ? true : null);
     // the pool surface closes over anything that fell into it
     ground.drawWaterFront(ctx, G.worldX, G.t);
@@ -13979,6 +14026,21 @@ function fitBubble(svg, box, tail) {
  * key-word treatment is for questions. */
 const KEY_WORD = /^(.*?\bthe\s+(?:[a-z]+\s+)*)([a-z]+?)(s?)([.!]?)$/i;
 
+/* WHERE EVERY MARKER STANDS, AS A PERCENTAGE OF THE PANEL.
+ *
+ * Measured off the reference panel (1362 x 464) and written down ONCE: the CSS places
+ * each checkpoint at its own `--x` and never has to know how many there are, and Momo
+ * animates between these exact centres rather than between positions recomputed from a
+ * grid. Spacing comes out at a uniform 8.4% from the first platform to the eighth, with
+ * 8.6% to the friend — slightly wider, so she reads as the destination and not a tenth
+ * level.
+ *
+ * The nine are the current platform plus eight ahead of it. A grid of equal fractions
+ * was the previous approach and it could not reproduce this: its cells spanned an inset
+ * safe area, which bunched the row toward the middle and left dead ice at both ends. */
+const MARKER_X = [11.8, 20.2, 28.5, 36.9, 45.3, 53.7, 62.1, 70.4, 78.8];
+const BEAR_X = 87.4;
+
 class Hud {
   /** A stage point where the zoomed canvas actually draws it. */
   static toView(view, p) {
@@ -14097,20 +14159,23 @@ class Hud {
     rail.appendChild(lane);
     this._lane = fill;
 
-    const track = document.createElement('div');
-    track.className = 'level-track';
-    track.style.setProperty('--steps', n);
+    /* EACH MARKER AT ITS OWN PERCENTAGE, from the one shared array. A crossing count
+       other than nine still works: the positions are spread evenly across the same span
+       the reference uses, so the panel cannot be left with a short row and a gap. */
     for (let i = 0; i < n; i++) {
       const cell = document.createElement('div');
       cell.className = 'level-node';
+      cell.style.setProperty('--x', this._markerX(i, n) + '%');
       const img = document.createElement('img');
       img.className = 'trail-node next';
       img.alt = '';
       img.src = 'assets/progress/step-locked.webp';
       cell.appendChild(img);
-      track.appendChild(cell);
+      rail.appendChild(cell);
     }
-    rail.appendChild(track);
+
+    // the lane runs from the first marker to the friend, on the shared axis
+    lane.style.setProperty('--lane-x0', this._markerX(0, n) + '%');
 
     const dest = document.createElement('div');
     dest.className = 'bear-destination';
@@ -14121,6 +14186,15 @@ class Hud {
     dest.appendChild(goal);
     rail.appendChild(dest);
     this._goal = goal;
+  }
+
+  /** Where marker `i` of `n` stands, as a percentage of the panel. Nine crossings get the
+      reference's own measured positions; any other count is spread evenly across the same
+      span, so the journey always runs from end to end rather than stopping short. */
+  _markerX(i, n) {
+    if (n === MARKER_X.length) return MARKER_X[i];
+    const a = MARKER_X[0], b = MARKER_X[MARKER_X.length - 1];
+    return n < 2 ? a : +(a + (b - a) * (i / (n - 1))).toFixed(2);
   }
 
   /** Every platform, in order. The cave is a sibling in the same row, so it has to be
@@ -14258,9 +14332,16 @@ class Hud {
        reads as ground already walked. Expressed as a fraction of the track, so it lands
        on the same centres the grid puts the stones on at any width — the links were a
        chain of elements whose lengths had to be kept in step with the spacing by hand. */
+    /* THE FILL STOPS AT THE MARKER IN PLAY, measured in the same percentages the markers
+       are placed at — so it lands on a platform's centre rather than on a fraction of the
+       row that only happened to agree with one. */
     if (this._lane) {
       const n = Math.max(1, this._steps);
-      this._lane.style.width = (Math.min(1, (at + 0.5) / n) * 100).toFixed(2) + '%';
+      const x0 = this._markerX(0, n);
+      const span = BEAR_X - x0;
+      const here = this._markerX(Math.min(at, n - 1), n);
+      const p = span > 0 ? (here - x0) / span : 0;
+      this._lane.style.width = (Math.max(0, Math.min(1, p)) * 100).toFixed(2) + '%';
     }
 
     /* THE CAVE WARMS AS IT IS APPROACHED and lights when it is reached. A cave glowing

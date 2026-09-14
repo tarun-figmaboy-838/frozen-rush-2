@@ -22,6 +22,21 @@ import { fitBubble } from './bubble.js';
  * key-word treatment is for questions. */
 export const KEY_WORD = /^(.*?\bthe\s+(?:[a-z]+\s+)*)([a-z]+?)(s?)([.!]?)$/i;
 
+/* WHERE EVERY MARKER STANDS, AS A PERCENTAGE OF THE PANEL.
+ *
+ * Measured off the reference panel (1362 x 464) and written down ONCE: the CSS places
+ * each checkpoint at its own `--x` and never has to know how many there are, and Momo
+ * animates between these exact centres rather than between positions recomputed from a
+ * grid. Spacing comes out at a uniform 8.4% from the first platform to the eighth, with
+ * 8.6% to the friend — slightly wider, so she reads as the destination and not a tenth
+ * level.
+ *
+ * The nine are the current platform plus eight ahead of it. A grid of equal fractions
+ * was the previous approach and it could not reproduce this: its cells spanned an inset
+ * safe area, which bunched the row toward the middle and left dead ice at both ends. */
+export const MARKER_X = [11.8, 20.2, 28.5, 36.9, 45.3, 53.7, 62.1, 70.4, 78.8];
+export const BEAR_X = 87.4;
+
 export class Hud {
   /** A stage point where the zoomed canvas actually draws it. */
   static toView(view, p) {
@@ -140,20 +155,23 @@ export class Hud {
     rail.appendChild(lane);
     this._lane = fill;
 
-    const track = document.createElement('div');
-    track.className = 'level-track';
-    track.style.setProperty('--steps', n);
+    /* EACH MARKER AT ITS OWN PERCENTAGE, from the one shared array. A crossing count
+       other than nine still works: the positions are spread evenly across the same span
+       the reference uses, so the panel cannot be left with a short row and a gap. */
     for (let i = 0; i < n; i++) {
       const cell = document.createElement('div');
       cell.className = 'level-node';
+      cell.style.setProperty('--x', this._markerX(i, n) + '%');
       const img = document.createElement('img');
       img.className = 'trail-node next';
       img.alt = '';
       img.src = 'assets/progress/step-locked.webp';
       cell.appendChild(img);
-      track.appendChild(cell);
+      rail.appendChild(cell);
     }
-    rail.appendChild(track);
+
+    // the lane runs from the first marker to the friend, on the shared axis
+    lane.style.setProperty('--lane-x0', this._markerX(0, n) + '%');
 
     const dest = document.createElement('div');
     dest.className = 'bear-destination';
@@ -164,6 +182,15 @@ export class Hud {
     dest.appendChild(goal);
     rail.appendChild(dest);
     this._goal = goal;
+  }
+
+  /** Where marker `i` of `n` stands, as a percentage of the panel. Nine crossings get the
+      reference's own measured positions; any other count is spread evenly across the same
+      span, so the journey always runs from end to end rather than stopping short. */
+  _markerX(i, n) {
+    if (n === MARKER_X.length) return MARKER_X[i];
+    const a = MARKER_X[0], b = MARKER_X[MARKER_X.length - 1];
+    return n < 2 ? a : +(a + (b - a) * (i / (n - 1))).toFixed(2);
   }
 
   /** Every platform, in order. The cave is a sibling in the same row, so it has to be
@@ -301,9 +328,16 @@ export class Hud {
        reads as ground already walked. Expressed as a fraction of the track, so it lands
        on the same centres the grid puts the stones on at any width — the links were a
        chain of elements whose lengths had to be kept in step with the spacing by hand. */
+    /* THE FILL STOPS AT THE MARKER IN PLAY, measured in the same percentages the markers
+       are placed at — so it lands on a platform's centre rather than on a fraction of the
+       row that only happened to agree with one. */
     if (this._lane) {
       const n = Math.max(1, this._steps);
-      this._lane.style.width = (Math.min(1, (at + 0.5) / n) * 100).toFixed(2) + '%';
+      const x0 = this._markerX(0, n);
+      const span = BEAR_X - x0;
+      const here = this._markerX(Math.min(at, n - 1), n);
+      const p = span > 0 ? (here - x0) / span : 0;
+      this._lane.style.width = (Math.max(0, Math.min(1, p)) * 100).toFixed(2) + '%';
     }
 
     /* THE CAVE WARMS AS IT IS APPROACHED and lights when it is reached. A cave glowing

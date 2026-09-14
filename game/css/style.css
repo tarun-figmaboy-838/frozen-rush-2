@@ -236,82 +236,87 @@ a:hover { color: var(--ice-pale); }
  * They are separate now. The frame is painted on ::after, which is positioned over the
  * whole card and lays nothing out; the journey is a percentage SAFE AREA inside the
  * card. The clouds can be any size at all and the nine stones keep their spacing. */
+/* THE CARD IS THE FRAME, AND THE FRAME DECORATES ONLY.
+ *
+ * Layout and decoration were the same number once: the panel was a row living in this
+ * element's CONTENT box, with the snow caps drawn as its border-image, so the clouds
+ * decided how much room the nine platforms had. Making the panel taller scaled the caps
+ * up and squeezed the journey; widening the journey flattened the panel.
+ *
+ * They are separate now, and the journey is placed by PERCENTAGES OF THE PANEL rather
+ * than by a grid inside a safe area — which is what the reference asks for and what
+ * stops the checkpoints bunching toward the middle with dead ice at the ends. */
 .trail-card {
   position: relative;
-  /* Wide and short, in the stage's own units like everything else here — the interface
-     has to be the same share of the stage at 1920 and at 4K, which a vw would not be.
-     34 x 7 is 4.86:1: shorter than the 5.7 it was, so the frame's middle stretches less
-     and the panel reads as one object rather than a tube. */
-  /* Every number the panel is laid out from is a variable with the shipped value as its
-     FALLBACK, so the layout is unchanged by default and ?panel=1 can set any of them live
-     (see game/js/panel-edit.js). A fallback is not a second source of truth: with nothing
-     overriding it, this IS the value. */
+  /* 1362 x 464 is the reference panel, and this keeps its proportions at any size. The
+     width stays in the stage's own units like everything else in the HUD, so the panel
+     is the same share of the stage at 1920 and at 4K — a vw would not be. */
   width: var(--pw, calc(34 * var(--u)));
-  height: var(--ph, calc(7 * var(--u)));
+  aspect-ratio: 1362 / 464;
   /* the clouds are allowed to bleed past the panel; nothing inside is clipped by them */
   overflow: visible;
-  /* A SOFTER, SHALLOWER SHADOW. A hard offset shadow is the single strongest cue that
-     something is a panel lying ON a picture rather than a thing in it. */
   filter: drop-shadow(0 calc(0.35 * var(--u)) calc(1.4 * var(--u)) rgba(6, 26, 56, 0.3));
 }
-/* THE DELIVERED ICE FRAME. panel.webp ships at 1100x341: the snow-cloud clusters occupy
-   the first 264px and the last 265px, the glowing rim sits 55px down and 50px up, and
-   the pale cavity between them is x 50..1050, y 59..285.
-
-   Every border-width is its slice times ONE factor — s = height/341 — so each piece is
-   drawn at the proportions it was painted at and the clouds keep their shape. Only the
-   middle stretches, and it is a smooth gradient with nothing in it to distort. */
+/* THE DELIVERED ICE FRAME, at the proportions it was painted. panel.webp is 1100x341:
+   the cloud clusters occupy the first 264px and the last 265px, the rim sits 55px down
+   and 50px up. Each border-width is its slice as a PERCENTAGE of the art, so the frame
+   scales with the card and the clouds keep their shape whatever size it is drawn at. */
 .trail-card::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;                      /* the panel background: everything else sits over it */
   pointer-events: none;
   border-style: solid;
   border-color: transparent;
-  border-width: var(--bw-t, calc(1.129 * var(--u))) var(--bw-r, calc(5.440 * var(--u)))
-                var(--bw-b, calc(1.026 * var(--u))) var(--bw-l, calc(5.419 * var(--u)));
+  /* THE FRAME'S SIZE GOES ON border-image-width, NOT ON border-width.
+   *
+   * border-width takes lengths only — a percentage there is invalid and the browser
+   * quietly falls back to `medium`. Measured: 3px on every side where the cloud cap
+   * needed 131px, so the caps were crushed to a hairline and the `fill` middle stretched
+   * across the whole panel. That is the panel design being destroyed.
+   *
+   * border-image-width DOES take percentages, and resolves them exactly the way this
+   * needs: left/right against the border box's WIDTH, top/bottom against its HEIGHT. So
+   * each slice stays the fraction of the art it is — 264/1100 and 265/1100 across, 55/341
+   * and 50/341 down — whatever size the panel is drawn at, and the clouds keep the shape
+   * they were painted with. border-width is 0 because nothing is laid out in the content
+   * box any more: the journey is positioned over the whole card. */
+  border-width: 0;
   border-image-source: url("../assets/progress/panel.webp?v=ccf5fac1");
   border-image-slice: 55 265 50 264 fill;
+  border-image-width: var(--bw-t, 16.1%) var(--bw-r, 24.1%)
+                      var(--bw-b, 14.7%) var(--bw-l, 24.0%);
   border-image-repeat: stretch;
 }
 
-/* THE JOURNEY — a safe area, and the only thing that decides where anything stands.
-   The caps come to 15.9% of the card at each side; 17% clears them with a margin, and
-   the vertical inset sits inside the cavity (17.3%..83.6% of the art). */
+/* THE JOURNEY LAYER. It covers the whole panel, because every marker is placed by its
+   own percentage of the PANEL — not by a box inset from it. That is the difference the
+   reference asks for: the checkpoints run from 11.8% to 87.4%, which no inset box was
+   ever going to reproduce. */
 .trail-rail {
   position: absolute;
-  left: var(--safe-x, 17%);
-  right: var(--safe-x, 17%);
-  top: var(--safe-t, 22%);
-  bottom: var(--safe-b, 20%);
-  z-index: 1;
-  /* the nine, then the friend — with a real gap, so the bear reads as the GOAL and not
-     as a tenth level */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--safe-gap, calc(1.1 * var(--u)));
+  inset: 0;
+  z-index: 2;
 }
 
-/* THE PATH, behind the stones. One lane with one fill, rather than a chain of links
-   whose lengths had to be kept in step with the spacing by hand. */
+/* THE PATH, behind every checkpoint. Runs from the first platform's centre to the
+   friend, on the same axis they all share. */
 .journey-lane {
   position: absolute;
-  left: 0;
-  right: calc(-1.1 * var(--u));
-  top: var(--lane-y, 58%);
+  left: var(--lane-x0, 11.8%);
+  right: calc(100% - var(--lane-x1, 87.4%));
+  top: var(--lane-y, 51.5%);
   transform: translateY(-50%);
-  height: var(--lane-h, calc(0.44 * var(--u)));
+  height: var(--lane-h, 2.2%);
   border-radius: 999px;
-  z-index: 1;
-  /* a groove cut into the ice: shadow inside the top edge, a hairline of light below */
+  z-index: 2;                      /* behind the platforms, over the panel */
   background: linear-gradient(180deg, #5D7E9B 0%, #47698A 55%, #38587A 100%);
   box-shadow:
-    inset 0 calc(0.07 * var(--u)) calc(0.1 * var(--u)) rgba(6, 26, 56, 0.55),
-    0 calc(0.04 * var(--u)) 0 rgba(255, 255, 255, 0.65);
+    inset 0 1px 2px rgba(6, 26, 56, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.5);
 }
-/* THE GROUND ALREADY WALKED. Runs to the middle of the platform in play. */
+/* the ground already walked */
 .journey-lane-fill {
   display: block;
   width: 0;
@@ -322,12 +327,9 @@ a:hover { color: var(--ice-pale); }
   background:
     linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 42%),
     linear-gradient(180deg, #7FF0FF 0%, #22C8FF 48%, #0D8FD6 100%);
-  box-shadow:
-    inset 0 calc(0.05 * var(--u)) 0 rgba(255, 255, 255, 0.9),
-    0 0 calc(0.35 * var(--u)) rgba(48, 212, 255, 0.85);
-  transition: width 420ms cubic-bezier(.33, 0, .2, 1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 6px rgba(48, 212, 255, 0.85);
+  transition: width 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* the charge running along it — the one animation every game progress bar has */
 .journey-lane-fill::after {
   content: "";
   position: absolute;
@@ -338,31 +340,40 @@ a:hover { color: var(--ice-pale); }
   animation: linkCharge 2.4s linear infinite;
 }
 
-/* NINE CELLS, EVENLY SPACED BY CONSTRUCTION. Not nine hand-placed margins that drift the
-   first time the panel resizes — one grid, and every stone lands on its own centre. */
-.level-track {
-  display: grid;
-  grid-template-columns: repeat(var(--steps, 9), minmax(0, 1fr));
-  /* ON ONE BASELINE, which means aligned to the GROUND and not to their middles. The
-     active stone's art is taller than a locked one (119px against 104), so centring them
-     put its top and bottom 1.4px out from the rest of the row — eight stones on one line
-     and one sitting slightly proud of it. Stones stand on something; `end` is that. */
-  align-items: end;
-  z-index: 2;
-}
+/* ONE CHECKPOINT. Placed by its own percentage — `left` comes from the shared array in
+   hud.js, so the nine positions are written down once and the CSS never has to know how
+   many there are. translate(-50%, -50%) makes that percentage the marker's CENTRE, which
+   is what the reference coordinates measure. */
 .level-node {
-  position: relative;
+  position: absolute;
+  left: var(--x);
+  top: var(--axis-y, 52%);
+  transform: translate(-50%, -50%);
+  width: var(--stone-w, 6.2%);
+  /* THE PERCENTAGE GOVERNS, and the pixel floor is the thing that had to go.
+     The reference's 42px minimum is measured against a 1362px panel, where 6.2% is 84px
+     and the floor never binds. This panel is a HUD inside a letterboxed stage and comes
+     out around 544px, where 6.2% is 34px — so the floor bound immediately and widened
+     every platform to 7.7%, which is the composition drifting from the reference rather
+     than being protected. The panel already scales with the stage, so the markers scale
+     with it; the max is kept because a platform has no reason to grow past its art. */
+  max-width: 86px;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 0;
 }
-/* THE FRIEND, OUTSIDE THE NINE. */
+/* THE FRIEND, at the end of the journey and a little above the axis, as drawn. */
 .bear-destination {
+  position: absolute;
+  left: var(--bear-x, 87.4%);
+  top: var(--bear-y, 50.8%);
+  transform: translate(-50%, -50%);
+  width: var(--goal-w, 7.4%);
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
 }
 
 /* A PLATFORM. One art, three states, all the same size — the state is carried by
@@ -372,8 +383,10 @@ a:hover { color: var(--ice-pale); }
   /* A SHARE OF ITS CELL, not an absolute width. The grid decides where the nine centres
      are; the stone fills most of its cell and the remainder IS the gap, so they always
      read as separate stepping stones and the spacing cannot drift from the spacing. */
-  width: var(--stone-w, 82%);
-  max-width: calc(2.9 * var(--u));
+  /* THE MARKER OWNS THE WIDTH; the picture fills it. Every platform is therefore the
+     same size by construction — the reference asks for exactly that — and the asset is
+     never stretched, because only its width is set and the height follows. */
+  width: 100%;
   height: auto;
   transform-origin: 50% 100%;
   transition: filter 320ms ease, opacity 320ms ease;
@@ -448,7 +461,7 @@ a:hover { color: var(--ice-pale); }
   display: block;
   /* A little larger than one stone — it is the destination — but not so much that it
      outranks Momo, who is the thing the child is actually following. */
-  width: var(--goal-w, calc(3.2 * var(--u)));
+  width: 100%;
   height: auto;
   filter: saturate(0.7) brightness(0.92)
           drop-shadow(0 calc(var(--node) * 0.05) calc(var(--node) * 0.07) rgba(8, 43, 82, 0.5));
@@ -510,7 +523,7 @@ a:hover { color: var(--ice-pale); }
      with both on the same property the hop simply cancelled the travel. Registered as a
      real <length> below, the custom property animates on its own and the hop's keyframes
      READ it, so the two compose. */
-  transition: --slide 340ms cubic-bezier(.33, 0, .2, 1);
+  transition: --slide 450ms cubic-bezier(0.22, 1, 0.36, 1);
   filter: drop-shadow(0 calc(0.12 * var(--u)) calc(0.18 * var(--u)) rgba(8, 43, 82, 0.55));
   will-change: transform;
 }
