@@ -242,8 +242,12 @@ a:hover { color: var(--ice-pale); }
      has to be the same share of the stage at 1920 and at 4K, which a vw would not be.
      34 x 7 is 4.86:1: shorter than the 5.7 it was, so the frame's middle stretches less
      and the panel reads as one object rather than a tube. */
-  width: calc(34 * var(--u));
-  height: calc(7 * var(--u));
+  /* Every number the panel is laid out from is a variable with the shipped value as its
+     FALLBACK, so the layout is unchanged by default and ?panel=1 can set any of them live
+     (see game/js/panel-edit.js). A fallback is not a second source of truth: with nothing
+     overriding it, this IS the value. */
+  width: var(--pw, calc(34 * var(--u)));
+  height: var(--ph, calc(7 * var(--u)));
   /* the clouds are allowed to bleed past the panel; nothing inside is clipped by them */
   overflow: visible;
   /* A SOFTER, SHALLOWER SHADOW. A hard offset shadow is the single strongest cue that
@@ -265,8 +269,8 @@ a:hover { color: var(--ice-pale); }
   pointer-events: none;
   border-style: solid;
   border-color: transparent;
-  border-width: calc(1.129 * var(--u)) calc(5.440 * var(--u))
-                calc(1.026 * var(--u)) calc(5.419 * var(--u));
+  border-width: var(--bw-t, calc(1.129 * var(--u))) var(--bw-r, calc(5.440 * var(--u)))
+                var(--bw-b, calc(1.026 * var(--u))) var(--bw-l, calc(5.419 * var(--u)));
   border-image-source: url("../assets/progress/panel.webp?v=ccf5fac1");
   border-image-slice: 55 265 50 264 fill;
   border-image-repeat: stretch;
@@ -277,17 +281,17 @@ a:hover { color: var(--ice-pale); }
    the vertical inset sits inside the cavity (17.3%..83.6% of the art). */
 .trail-rail {
   position: absolute;
-  left: 17%;
-  right: 17%;
-  top: 22%;
-  bottom: 20%;
+  left: var(--safe-x, 17%);
+  right: var(--safe-x, 17%);
+  top: var(--safe-t, 22%);
+  bottom: var(--safe-b, 20%);
   z-index: 1;
   /* the nine, then the friend — with a real gap, so the bear reads as the GOAL and not
      as a tenth level */
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: calc(1.1 * var(--u));
+  gap: var(--safe-gap, calc(1.1 * var(--u)));
 }
 
 /* THE PATH, behind the stones. One lane with one fill, rather than a chain of links
@@ -296,9 +300,9 @@ a:hover { color: var(--ice-pale); }
   position: absolute;
   left: 0;
   right: calc(-1.1 * var(--u));
-  top: 58%;
+  top: var(--lane-y, 58%);
   transform: translateY(-50%);
-  height: calc(0.44 * var(--u));
+  height: var(--lane-h, calc(0.44 * var(--u)));
   border-radius: 999px;
   z-index: 1;
   /* a groove cut into the ice: shadow inside the top edge, a hairline of light below */
@@ -368,7 +372,7 @@ a:hover { color: var(--ice-pale); }
   /* A SHARE OF ITS CELL, not an absolute width. The grid decides where the nine centres
      are; the stone fills most of its cell and the remainder IS the gap, so they always
      read as separate stepping stones and the spacing cannot drift from the spacing. */
-  width: 82%;
+  width: var(--stone-w, 82%);
   max-width: calc(2.9 * var(--u));
   height: auto;
   transform-origin: 50% 100%;
@@ -444,7 +448,7 @@ a:hover { color: var(--ice-pale); }
   display: block;
   /* A little larger than one stone — it is the destination — but not so much that it
      outranks Momo, who is the thing the child is actually following. */
-  width: calc(3.2 * var(--u));
+  width: var(--goal-w, calc(3.2 * var(--u)));
   height: auto;
   filter: saturate(0.7) brightness(0.92)
           drop-shadow(0 calc(var(--node) * 0.05) calc(var(--node) * 0.07) rgba(8, 43, 82, 0.5));
@@ -496,8 +500,8 @@ a:hover { color: var(--ice-pale); }
   left: 50%;
   /* Feet on the stone's drawn top face. A share of the stone itself, so it holds at any
      panel size rather than being re-derived every time the row's height changes. */
-  bottom: 46%;
-  width: 92%;
+  bottom: var(--momo-b, 46%);
+  width: var(--momo-w, 92%);
   height: auto;
   z-index: 3;
   transform: translateX(calc(-50% + var(--slide, 0px)));
