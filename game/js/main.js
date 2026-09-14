@@ -56,6 +56,24 @@ const options = {
   dev: flag('dev', false)
 };
 
+/* ?panel=1 — THE PROGRESS PANEL'S ALIGNMENT, VISIBLE, IN THE REAL GAME.
+ *
+ * The card's frame is a nine-sliced picture and the journey inside it is a percentage
+ * safe area, so "is it aligned?" is a question about two things that are drawn by
+ * different mechanisms and cannot be compared by eye. The overlay draws the boundaries
+ * the numbers actually describe — the card, the safe area, where the art's own cavity
+ * is, the stones' shared baseline and each stone's centre — so a misalignment is
+ * something you can see and measure rather than something you suspect.
+ *
+ * A query flag rather than a build switch: it costs nothing when it is off, and it is
+ * the same way every other review control here is reached. Shift+P toggles it too, so
+ * it can be turned on in the middle of a crossing without reloading and losing the run. */
+if (flag('panel', false) && hud.el && hud.el.trail) hud.el.trail.classList.add('debug');
+window.addEventListener('keydown', e => {
+  if (e.key === 'P' && e.shiftKey && hud.el && hud.el.trail) hud.el.trail.classList.toggle('debug');
+});
+
+
 let front = null;
 
 let tut = null;

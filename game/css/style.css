@@ -1383,3 +1383,56 @@ a:hover { color: var(--ice-pale); }
    anything. The sentences still live in CFG.levelOne.phases and are still tested
    (curriculum.spec: "every phase has a sub-line"); they are simply not published to
    the HUD. */
+
+/* ================== THE PANEL'S ALIGNMENT, MADE VISIBLE ==================
+   ?panel=1 on the URL, or Shift+P at any time. See the note in main.js.
+
+   Every guide below is drawn from the SAME number the layout uses, so it cannot
+   agree with the layout by accident:
+
+     magenta   the card's own box
+     cyan      the journey's safe area (.trail-rail's percentage insets)
+     amber     where the ART's cavity is — 4.55%/4.45% in, 17.30%/16.13% down and up,
+               measured off panel.webp. The safe area must sit INSIDE this; if a cyan
+               edge crosses an amber one, the row is over the frame's rim.
+     white     the stones' shared baseline, and a tick on each stone's centre.
+
+   What to look for: the amber box should hug the pale ice; the cyan box should sit
+   inside it with clear ice all round; every white tick should be evenly spaced; and
+   the baseline should pass through the bottom of all nine stones at once. */
+.trail.debug .trail-card { outline: 1px solid #FF4FD8; outline-offset: 0; }
+/* the art's own cavity, from the measurements in the .trail-card::after note */
+.trail.debug .trail-card::before {
+  content: "";
+  position: absolute;
+  left: 4.55%; right: 4.45%; top: 17.30%; bottom: 16.13%;
+  border: 1px dashed #FFC44A;
+  border-radius: 999px;
+  z-index: 9;
+  pointer-events: none;
+  /* the arrival puff shares this pseudo-element; the guide replaces it while debugging */
+  background: none;
+  filter: none;
+  opacity: 1;
+  animation: none;
+}
+.trail.debug .trail-rail { outline: 1px solid #45E0FF; }
+.trail.debug .level-track { outline: 1px dotted rgba(69, 224, 255, .55); }
+.trail.debug .level-node { outline: 1px dotted rgba(255, 255, 255, .35); }
+/* each stone's centre, and the line they all stand on */
+.trail.debug .trail-node {
+  outline: 1px solid rgba(255,255,255,.85);
+  outline-offset: 0;
+}
+.trail.debug .level-node::after {
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 0;
+  width: 1px; height: 140%;
+  background: rgba(255,255,255,.75);
+  z-index: 9;
+  pointer-events: none;
+}
+.trail.debug .journey-lane { outline: 1px solid rgba(255,255,255,.5); }
+.trail.debug .bear-destination { outline: 1px solid #8CFF6B; }
+.trail.debug #trail-momo { outline: 1px solid #FF4FD8; }
