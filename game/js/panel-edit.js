@@ -17,25 +17,34 @@
  * ships.
  */
 
-/* part -> the variable it writes, how a drag maps to it, and how to print it.
-   `per` is pixels of drag per unit of value; negative means dragging up increases it. */
+/* part -> the variable it writes, and what a percentage of it is a percentage OF.
+ *
+ * ONE PIXEL OF CURSOR IS ONE PIXEL OF MOVEMENT, and it was not. Sensitivity used to be a
+ * fixed number per value, which cannot be right for both: a stage unit is ~16px while 1%
+ * of a grid cell is ~0.34px, so the same constant that suited the card made a stone move
+ * 0.12px per pixel dragged and Momo 0.09px. That is the whole of "I still cannot move it"
+ * — the handle followed the cursor at a twelfth speed and read as dead.
+ *
+ * So `ref` names the length the value is measured against and the scale is worked out at
+ * drag time from the element actually on screen. `sign` is -1 where the value grows as
+ * the cursor moves the other way (an inset, or a distance from the bottom). */
 const PARTS = [
   { id: 'card', label: 'Card', sel: '.trail-card', band: 'top',
-    x: { key: 'pw', unit: 'u', per: 18, min: 20, max: 48, step: 0.5 },
-    y: { key: 'ph', unit: 'u', per: 18, min: 4, max: 14, step: 0.25 } },
+    x: { key: 'pw', unit: 'u', min: 20, max: 48, step: 0.5 },
+    y: { key: 'ph', unit: 'u', min: 4, max: 14, step: 0.25 } },
   { id: 'rail', label: 'Safe area', sel: '.trail-rail',
-    x: { key: 'safe-x', unit: '%', per: -8, min: 4, max: 26, step: 0.5 },
-    y: { key: 'safe-t', unit: '%', per: -8, min: 10, max: 40, step: 1 } },
+    x: { key: 'safe-x', unit: '%', ref: 'cardW', sign: -1, min: 4, max: 26, step: 0.5 },
+    y: { key: 'safe-t', unit: '%', ref: 'cardH', min: 10, max: 40, step: 1 } },
   { id: 'lane', label: 'Lane', sel: '.journey-lane',
-    y: { key: 'lane-y', unit: '%', per: -3, min: 20, max: 90, step: 1 },
-    shiftY: { key: 'lane-h', unit: 'u', per: -60, min: 0.1, max: 1.4, step: 0.02 } },
+    y: { key: 'lane-y', unit: '%', ref: 'railH', min: 20, max: 90, step: 1 },
+    shiftY: { key: 'lane-h', unit: 'u', sign: -1, min: 0.1, max: 1.4, step: 0.02 } },
   { id: 'stone', label: 'Stone', sel: '.level-track .level-node:nth-child(3) .trail-node',
-    x: { key: 'stone-w', unit: '%', per: 3, min: 40, max: 100, step: 1 } },
+    x: { key: 'stone-w', unit: '%', ref: 'cellW', min: 40, max: 100, step: 1 } },
   { id: 'momo', label: 'Momo', sel: '#trail-momo',
-    y: { key: 'momo-b', unit: '%', per: -3, min: 10, max: 90, step: 1 },
-    shiftY: { key: 'momo-w', unit: '%', per: -3, min: 50, max: 140, step: 1 } },
+    y: { key: 'momo-b', unit: '%', ref: 'stoneH', sign: -1, min: 10, max: 90, step: 1 },
+    shiftY: { key: 'momo-w', unit: '%', ref: 'stoneW', sign: -1, min: 50, max: 140, step: 1 } },
   { id: 'bear', label: 'Friend', sel: '.bear-destination',
-    x: { key: 'goal-w', unit: 'u', per: 16, min: 1.5, max: 6, step: 0.1 } }
+    x: { key: 'goal-w', unit: 'u', min: 1.5, max: 6, step: 0.1 } }
 ];
 
 /* The shipped values, which are also the fallbacks in style.css. Reset restores these,
@@ -157,13 +166,39 @@ export function startPanelEditor(trail) {
   }
 
   // ---- gestures ----
+  /* The lengths a percentage can be measured against, read off the page as it is now —
+     the panel resizes with the stage, so these cannot be constants. */
+  function refs() {
+    const box = s => { const e = trail.querySelector(s); return e ? e.getBoundingClientRect() : null; };
+    const card = box('.trail-card'), rail = box('.trail-rail');
+    const cell = box('.level-node'), stone = box('.trail-node');
+    const u = parseFloat(getComputedStyle(trail).getPropertyValue('--u')) || 16;
+    return {
+      u,
+      cardW: card ? card.width : 0, cardH: card ? card.height : 0,
+      railW: rail ? rail.width : 0, railH: rail ? rail.height : 0,
+      cellW: cell ? cell.width : 0,
+      stoneW: stone ? stone.width : 0, stoneH: stone ? stone.height : 0
+    };
+  }
+
+  /** Pixels on screen per one unit of this value — so a drag can be 1:1. */
+  function pxPerUnit(map, R) {
+    if (map.unit === 'u') return R.u || 16;
+    const len = R[map.ref] || 0;
+    return len ? len / 100 : 1;          // 1% of whatever it is a percentage of
+  }
+
   function nudge(axis, px, shift) {
     const part = PARTS.find(p => p.id === sel);
     if (!part) return;
     const map = (shift && part.shiftY && axis === 'y') ? part.shiftY : part[axis];
     if (!map) return;
+    const per = pxPerUnit(map, refs());
+    if (!(per > 0)) return;
+    const delta = (px / per) * (map.sign || 1);
     const next = Math.min(map.max, Math.max(map.min,
-      Math.round((vals[map.key] + px / map.per) / map.step) * map.step));
+      Math.round((vals[map.key] + delta) / map.step) * map.step));
     if (next === vals[map.key]) return;
     vals[map.key] = +next.toFixed(3);
     write();
