@@ -54,6 +54,8 @@ for (const vp of VIEWPORTS) {
     const frames = [];
     let last = '', lastAt = performance.now(), lastFrame = performance.now();
     let deadTaps = 0, cuts = 0, wrongs = 0, jumps = 0, retries = 0;
+    // Part 2 is drawn, not cut: its own counter, and a throttle so the drags can play out
+    let l2cuts = 0, lastL2 = -999;
     const growth = [];
     const t0 = Date.now();
 
@@ -85,6 +87,44 @@ for (const vp of VIEWPORTS) {
         else if (G.l1.unfilled.length) { g._cut(G.l1.unfilled[0]); cuts++; }
       }
 
+      /* AND PART 2, WHICH THIS COULD NOT PLAY AT ALL.
+       *
+       * The loop above is the whole of what it knew: g._cut(kind), the rope crossings'
+       * mechanic. Part 2 is drawn diagonals, so the moment the game reached LEVEL_2 the
+       * bot had nothing to do and sat there until the clock ran out — a run reported as
+       * "0 / 7 crossings, 0 cuts, 87.7% of the time in LEVEL_2_ACTIVE", which reads like
+       * the game is stuck when it is the tool that is.
+       *
+       * A diagonal is any pair of corners that are not neighbours. Trying them in order
+       * satisfies all three crossings without knowing which is which: crossing 1 wants
+       * one, crossing 2 wants every one, and crossing 3 wants two that share a corner —
+       * so where the level has already fixed an origin, its diagonals are tried first.
+       * Refusals are the level's own rules talking and are counted as wrong answers.
+       *
+       * Throttled, because these are drags with animations behind them: firing every
+       * frame would queue hundreds of them and measure nothing real. */
+      if (/^LEVEL_2/.test(G.state) && typeof g._l2Cut === 'function' && typeof g._l2 === 'function') {
+        const L = g._l2();
+        if (L && L.corners && L.corners.length >= 4 && !L.fall && !L.seated && !L.locked
+            && frames.length - lastL2 > 24) {
+          lastL2 = frames.length;
+          const n = L.corners.length;
+          const diags = [];
+          for (let i = 0; i < n; i++) {
+            for (let j = i + 2; j < n; j++) if (!(i === 0 && j === n - 1)) diags.push([i, j]);
+          }
+          const o = L.origin;
+          const order = (o === undefined || o === null)
+            ? diags
+            : diags.filter(d => d[0] === o || d[1] === o).concat(diags);
+          for (const [i, j] of order) {
+            const took = g._l2Cut(i, j);
+            if (took) { l2cuts++; break; }
+            if (took === false) { wrongs++; break; }   // the level refused it: that is an answer
+          }
+        }
+      }
+
       // arrays that only ever grow are the leak signature
       if (frames.length % 120 === 0) {
         growth.push({
@@ -107,7 +147,7 @@ for (const vp of VIEWPORTS) {
       finished: G.state === 'COMPLETE',
       state: G.state, phasesDone: G.phasesDone,
       wallMs: Date.now() - t0,
-      trail, cuts, wrongs, jumps, retries, deadTaps,
+      trail, cuts, wrongs, jumps, retries, deadTaps, l2cuts,
       frame: { p50: at(0.5), p90: at(0.9), p99: at(0.99), worst: +frames[frames.length - 1].toFixed(1) },
       longFrames: frames.filter(f => f > 100).length,
       growth: growth.slice(-1)[0], growthFirst: growth[0]
@@ -117,7 +157,7 @@ for (const vp of VIEWPORTS) {
   console.log(`\nPLAYTHROUGH  (fast=3, so wall clock is a third of game time)`);
   console.log(`  reached              ${run.state}${run.finished ? '  — finished' : '  — DID NOT FINISH'}`);
   console.log(`  crossings repaired   ${run.phasesDone} / 7`);
-  console.log(`  cuts ${run.cuts}   wrong answers ${run.wrongs}   jumps ${run.jumps}   retries ${run.retries}`);
+  console.log(`  cuts ${run.cuts}   diagonals drawn ${run.l2cuts}   wrong answers ${run.wrongs}   jumps ${run.jumps}   retries ${run.retries}`);
   console.log(`  wall clock           ${(run.wallMs / 1000).toFixed(1)} s  (~${(run.wallMs * 3 / 1000).toFixed(0)} s of game time)`);
 
   console.log(`\nFRAME TIME`);
