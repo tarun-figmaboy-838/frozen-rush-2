@@ -69,40 +69,8 @@
              still be set from the URL (?sound=0, ?reduced=1) and the pause panel below
              is still wired, but nothing opens it any more. -->
 
-        <!-- HOW FAR THROUGH THE NINE CROSSINGS — the trail Momo is walking.
-
-             This replaces the row of diamonds that used to sit here and was removed as
-             too plain to be worth the space. A child cannot read "3 / 9", but they can
-             see that the mammoth is three stones along a path of ice with a bear's cave
-             at the end of it, and that one more stone lights up every time they answer
-             something. The stones ARE the nine levels.
-
-             Built in script rather than written out nine times, because the count comes
-             from the engine (three drawing crossings plus six rope ones) and a hard
-             coded nine here would be a second place to change. See Hud.buildTrail.
-
-             It is top-left, in the sky, above everything the game draws — the ice line
-             is at stage y 840 and the trail's bottom is at about 150, so it can never
-             cover a crevasse, a block or the character. Pointer events off: it is a
-             read-out, and a tap anywhere on the stage is the jump control. -->
-        <div class="trail" id="trail" aria-hidden="true" hidden>
-          <div class="trail-card">
-            <!-- The row. Nine platforms then the cave, built in script (Hud.buildTrail)
-                 because the count is the engine's, not the markup's. The shelf they
-                 stand on is a child of the row so it spans exactly what the row spans,
-                 however many platforms there turn out to be. -->
-            <div class="trail-rail" id="trail-rail">
-              <!-- .trail-node / .trail-link x N, then .trail-goal, inserted here -->
-              <!-- MOMO IS IN THE ROW, not in the card, and that is load-bearing. He is
-                   placed by `left: var(--at)` where --at is a platform's offsetLeft —
-                   which is measured against the ROW. Parented to the card instead, the
-                   card's own padding and border sat between the two coordinate systems
-                   and he stood exactly that far to the left of the platform he was
-                   supposed to be on: 21px of a 52px platform, at every viewport. -->
-              <img class="trail-momo" id="trail-momo" alt="" src="assets/progress/step-momo.webp" />
-            </div>
-          </div>
-        </div>
+        <!-- NO PROGRESS PANEL. The trail card of nine stones (Momo walking to the cave) that sat
+             top-left was removed on request. Hud.setTrail/buildTrail find no #trail and do nothing. -->
 
         <div class="instruction" id="instruction" hidden>
           <div class="instruction-pill" id="instruction-pill">
